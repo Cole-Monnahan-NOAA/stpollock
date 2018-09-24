@@ -64,27 +64,27 @@ PARAMETER_SECTION
   number a
   init_number d2
   init_number b_BD
-  init_bounded_number b_ST(-10,10,-1)
-  init_bounded_number b_BT(-10,10,-1)
-  init_bounded_number b_CC(-10,10,-1)
-  init_bounded_number b_PC(-10,10,-1)
-  init_bounded_number b_PP(-10,10,-1)
-  init_bounded_number b_BL(-10,10,-1)
-  init_bounded_number b_FL(-10,10,-1)
-  init_bounded_number log_c(-1,25,1)
+  // init_bounded_number b_ST(-10,10,-1)
+  // init_bounded_number b_BT(-10,10,-1)
+  // init_bounded_number b_CC(-10,10,-1)
+  // init_bounded_number b_PC(-10,10,-1)
+  // init_bounded_number b_PP(-10,10,-1)
+  // init_bounded_number b_BL(-10,10,-1)
+  // init_bounded_number b_FL(-10,10,-1)
+ init_bounded_number log_c(-1,25,1)
   number c
   init_number logSigma
   sdreport_number sigmasq
-  init_bounded_number b_TC(-10,10,-1)
+//  init_bounded_number b_TC(-10,10,-1)
   init_number cb_BD
-  init_bounded_number cb_ST(-10,10,-1)
-  init_bounded_number cb_BT(-10,10,-1)
-  init_bounded_number cb_CC(-10,10,-1)
-  init_bounded_number cb_PC(-10,10,-1)
-  init_bounded_number cb_PP(-10,10,-1)
-  init_bounded_number cb_BL(-10,10,-1)
-  init_bounded_number cb_FL(-10,10,-1)
-  init_bounded_number cb_TC(-10,10,-1)
+  // init_bounded_number cb_ST(-10,10,-1)
+  // init_bounded_number cb_BT(-10,10,-1)
+  // init_bounded_number cb_CC(-10,10,-1)
+  // init_bounded_number cb_PC(-10,10,-1)
+  // init_bounded_number cb_PP(-10,10,-1)
+  // init_bounded_number cb_BL(-10,10,-1)
+  // init_bounded_number cb_FL(-10,10,-1)
+  // init_bounded_number cb_TC(-10,10,-1)
 
   sdreport_number q2
   sdreport_number a2
@@ -105,10 +105,8 @@ PROCEDURE_SECTION
    dvar_vector eta(1,ntows);
    dvar_vector eta_c(1,ntows);
   // dvar_vector eta_q(1,ntows);
-   eta = d2+b_BD*BD + b_ST*ST + b_BT*BT + b_CC*CC + b_PC*PC + 
-         b_PP*PP + b_BL*BL + b_FL*FL + b_TC*TC;
-   eta_c = cb_BD*BD + cb_ST*ST + cb_BT*BT + cb_CC*CC + cb_PC*PC + 
-         cb_PP*PP + cb_BL*BL + cb_FL*FL + cb_TC*TC;
+   eta = d2+b_BD*BD;// + b_ST*ST + b_BT*BT + b_CC*CC + b_PC*PC + b_PP*PP + b_BL*BL + b_FL*FL + b_TC*TC;
+   eta_c = cb_BD*BD;// + cb_ST*ST + cb_BT*BT + cb_CC*CC + cb_PC*PC + cb_PP*PP + cb_BL*BL + cb_FL*FL + cb_TC*TC;
    //eta_q = d1 + qb_BD*BD + qb_ST*ST + qb_BT*BT + qb_CC*CC + qb_PC*PC + 
    //      qb_PP*PP + qb_BL*BL + qb_FL*FL;
    // BSA_hat =
