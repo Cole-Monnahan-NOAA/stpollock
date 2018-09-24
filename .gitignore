@@ -1,0 +1,15 @@
+data
+models/simplified/simplified.dat
+models/simplified/simplified.cpp
+*.bar
+*.cor
+*.eva
+*.exe
+*.htp
+*.log
+*.obj
+*.rep
+*.std
+admodel.cov
+admodel.dep
+admodel.hes
