@@ -1,6 +1,9 @@
 data
 models/simplified/simplified.dat
 models/simplified/simplified.cpp
+*.dll
+*.o
+init.pin
 *.bar
 *.cor
 *.eva
@@ -13,3 +16,5 @@ models/simplified/simplified.cpp
 admodel.cov
 admodel.dep
 admodel.hes
+VAST_output
+
