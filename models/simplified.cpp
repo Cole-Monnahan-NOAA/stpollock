@@ -10,7 +10,6 @@ Type objective_function<Type>::operator() ()
   // DATA_INTEGER(ntows);
   // DATA_INTEGER(nlayers);
   DATA_VECTOR(BSA);
-  DATA_VECTOR(SA);
   DATA_VECTOR(BD);
   DATA_VECTOR(sum_SA1);
   DATA_VECTOR(sum_SA2);
@@ -39,7 +38,12 @@ Type objective_function<Type>::operator() ()
    (q*sum_SA1 +exp(eta)*sum_SA2 + exp(eta_c)*c)+1/a);
   Type sigmasq=exp(2*logSigma);
   nll=0.5*(ntows*log(2*PI*sigmasq)+
-	   pow(log(BSA)-log(BSA_hat),Type(2)).sum()/sigmasq);   
+	   pow(log(BSA)-log(BSA_hat),Type(2)).sum()/sigmasq);
+  ADREPORT(a);
+  ADREPORT(q);
+  ADREPORT(c);
+  vector<Type> d1=exp(eta)*sum_SA2 + exp(eta_c)*c;
+  REPORT(d1);
   return(nll);
 }
 
