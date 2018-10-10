@@ -2,89 +2,55 @@
 ## pollock data where categories are the three depth strata. Based on Jim's
 ## code from his class.
 
-
 # Load libraries
 library(TMB)
-# Compile if necessary
+## Compile if necessary
+dyn.unload( dynlib(Version) )
 Version = "models/factor_analysis"
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
 
-# Initialization
-Obj <- MakeADFun(data=Data, parameters=Params, random=Random, hessian=FALSE, inner.control=list(maxit=1000) )
-table(names(Obj$env$last.par))
-Obj$env$beSilent()
-# Run model
-Opt = TMBhelper::Optimize( obj=Obj, getsd=TRUE, newtonsteps=1, control=list(trace=1) )
-
-# Summarize
-Report = Obj$report()
-
-# Compare with simulated values
-# Psi (loadings matrix)
-Data_List$Loadings_pf
-Report$Loadings_pf
-
-# Compare covariances
-plot( x=Report$Loadings_pf%*%t(Report$Loadings_pf),
-     y=Data_List$Loadings_pf%*%t(Data_List$Loadings_pf),
-     xlab="Estimated covariance", ylab="True covariance" )
-abline( a=0, b=1, lty="dotted", lwd=2 )
-
-# Omega (prediction for each species)
-par( mfrow=c(1,min(n_factors_true,n_factors_estimation)) )
-for(fI in 1:min(n_factors_true,n_factors_estimation)){
-  plot(y=Report$Omega_xf[1:n_stations,fI],
-       x=Data_List$Omega_sf[,fI],
-       xlab="True", ylab="Estimated", main=paste("Factor",fI))
+layers <- as.matrix(read.csv('data/layers.csv', header=FALSE, sep=','))
+hauls <- read.csv('data/hauls.csv')
+SA <- layers; dimnames(SA) <- NULL
+h1 <- 5; h2 <- 7
+ntows <- 355
+## Get
+at1 <- at2<- rep(NA, ntows)
+for (i in 1:ntows){
+  at1[i] <- sum(SA[i, 3:16])
+  at2[i] <- sum(SA[i, 16:ncol(SA)])
 }
-
-# Compare for non-matching number of factors
-Eigen = eigen( Data_List$Loadings_pf %*% t(Data_List$Loadings_pf) )
-Eigen_hat = eigen( Report$Loadings_pf %*% t(Report$Loadings_pf) )
-
-##########################
-# Real dataset
-##########################
-
-# Load and format data
-load( "EBS_Nspecies=20.RData" )
-DF = DF[which( DF$year == 1990 ),]
-SpeciesSet = unique( DF$spp )
-
-# Identify unique locations
-Match = match(unique(DF$TowID), DF$TowID)
-Loc_xy = DF[Match,c('long','lat')]
-
-# Make mesh
-mesh = inla.mesh.create( Loc_xy )
-spde = inla.spde2.matern( mesh )
-
-# Format data frame
-Y_sp = matrix( NA, nrow=length(Match), ncol=length(SpeciesSet), dimnames=list(NULL,SpeciesSet))
-for(pI in 1:ncol(Y_sp)){
-  DF_subset = DF[which(DF$spp==SpeciesSet[pI]),]
-  Match = match( unique(DF$TowID), DF_subset[,'TowID'] )
-  Y_sp[,pI] = round( DF_subset[Match,'catch'] )
-}
-
-# Data
-Data = list("Y_sp"=Y_sp, "n_f"=3, "n_x"=mesh$n, "x_s"=mesh$idx$loc-1, "X_sj"=matrix(1,nrow=nrow(Y_sp),ncol=1), "M0"=spde$param.inla$M0, "M1"=spde$param.inla$M1, "M2"=spde$param.inla$M2)
-# Parameters
-Params = list( "beta_jp"=matrix(0,nrow=ncol(Data$X_sj),ncol=ncol(Data$Y_sp)), "Loadings_vec"=rep(1,Data$n_f*ncol(Data$Y_sp)-Data$n_f*(Data$n_f-1)/2), "log_kappa"=log(1), "Omega_xf"=matrix(0,nrow=mesh$n,ncol=Data$n_f) )
+Y <- cbind(log(hauls$pred_sa), log(at1), log(at2))
+pairs(Y)
+## Prepare the TMB inputs
+dat <- list(Y_sp=Y, n_f=2, X_sj=matrix(1, nrow=ntows))
+Params = list(beta_jp=matrix(0,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
+              Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
+              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
+              logsigma=1)
 # Declare random
-Random = c("Omega_xf")
+Random = c("Omega_sf")
+
 
 # Initialization
-Obj <- MakeADFun(data=Data, parameters=Params, random=Random, hessian=FALSE, inner.control=list(maxit=1000) )
-Obj$env$beSilent()
+Obj <- MakeADFun(data=dat, parameters=Params, random=Random, hessian=FALSE, inner.control=list(maxit=1000) )
 table(names(Obj$env$last.par))
-
+Obj$env$beSilent()
 # Run model
-#Opt = TMBhelper::Optimize( obj=Obj, getsd=TRUE, newtonsteps=1 )
 Opt = TMBhelper::Optimize( obj=Obj, getsd=TRUE, newtonsteps=1, control=list(trace=1) )
 
 # Summarize
 Report = Obj$report()
-Report$Loadings_pf
-Cov_pp = Report$Loadings_pf %*% t(Report$Loadings_pf)
+rep <- sdreport(Obj)
+with(rep, cbind(par.fixed, sqrt(diag(cov.fixed))))
+
+yy <- Report$ln_yexp_sp
+par(mfrow=c(1,3))
+plot(yy[,1]+yy[,2], dat$Y_sp[,1]); abline(0,1)
+plot(yy[,2], dat$Y_sp[,2]); abline(0,1)
+plot(yy[,3], dat$Y_sp[,3]); abline(0,1)
+
+cov.est <- Report$Loadings_pf%*%t(Report$Loadings_pf)
+cov2cor(cov.est)
+

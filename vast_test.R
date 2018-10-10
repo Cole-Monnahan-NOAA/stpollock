@@ -1,15 +1,16 @@
 ## Central file to fit the pollock data using the modified VAST model
 
-library(devtools)
+## library(devtools)
 ## remove.packages('VAST')
 ## install_github('James-Thorson/VAST')
-library(VAST)
+devtools::install('../VAST')
 library(TMB)
-library(maps)
-library(mapdata)
+library(VAST)
+## library(maps)
+## library(mapdata)
 
 ## I stripped these out of the VAST single species example
-Version = get_latest_version( package="VAST" )
+Version = 'VAST_v5_2_0_CCM'
 ## Spatial settings
 Method = c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km = 25
@@ -21,9 +22,7 @@ OverdispersionConfig = c("Eta1"=0, "Eta2"=0)
 ObsModel = c(2,0)
 DateFile = paste0(getwd(),'/VAST_output/')
 dir.create(DateFile)
-
 Kmeans_Config <- list('randomseed'=1, 'nstart'=1, 'iter.max'=200)
-
 strata.limits <- data.frame('STRATA'="All_areas")
 Region <- "Eastern_Bering_Sea"
 data( EBS_pollock_data, package="FishStatsUtils" )
@@ -76,7 +75,6 @@ Enc_prob = plot_encounter_diagnostic( Report=Report, Data_Geostat=Data_Geostat, 
 Q = plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
                              FileName_Phist="Posterior_Predictive-Histogram",
                              FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile )
-
 MapDetails_List = make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
                                         # Decide which years to plot
 Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
@@ -94,7 +92,6 @@ plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
                Legend=MapDetails_List[["Legend"]],
                zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
                oma=c(3.5,3.5,0,0), cex=1.8)
-
 plot_anisotropy( FileName=paste0(DateFile,"Aniso.png"), Report=Report,
                 TmbData=TmbData )
 Dens_xt = plot_maps(plot_set=c(3),
@@ -114,7 +111,6 @@ Dens_DF = cbind( "Density"=as.vector(Dens_xt),
                 "Year"=Year_Set[col(Dens_xt)],
                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
-
 Index = plot_biomass_index( DirName=DateFile, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
 pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
 plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=DateFile, Year_Set=Year_Set)

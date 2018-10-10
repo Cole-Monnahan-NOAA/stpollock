@@ -1,4 +1,4 @@
-// A factor analysis model modified from Thorson's spatial_factor_analysis
+/// A factor analysis model modified from Thorson's spatial_factor_analysis
 // TMB model. Here I'm using it to try and closely match Stan's old method. 
 
 #include <TMB.hpp>
@@ -9,8 +9,8 @@ Type objective_function<Type>::operator() ()
   // Data
   DATA_MATRIX(Y_sp);       	// Responses
   DATA_INTEGER(n_f);        // Number of factors
-  DATA_INTEGER(n_x); // Number of vertices in mesh
-  DATA_IVECTOR(x_s);	// Convert site s to vertex x
+  // DATA_INTEGER(n_x); // Number of vertices in mesh
+  //  DATA_IVECTOR(x_s);	// Convert site s to vertex x
   DATA_MATRIX(X_sj);		// Covariate design matrix
 
   // Parameters
@@ -18,13 +18,14 @@ Type objective_function<Type>::operator() ()
   PARAMETER_VECTOR(Loadings_vec);
 
   // Random effect
-  PARAMETER_ARRAY(Omega_xf);
-
-  //
+  PARAMETER_ARRAY(Omega_sf);
+  PARAMETER(logsigma); // obs variance
+  Type Sigma=exp(logsigma);
+  
   using namespace density;
   int n_p = Y_sp.row(0).size();    // n_p is number of species
-  int n_s = Y_sp.col(0).size();
-  int n_j = X_sj.row(0).size();
+  int n_s = Y_sp.col(0).size();	   // num of observations
+  int n_j = X_sj.row(0).size();	   // num of covariates
   Type jnll = 0;
 
   // Unpack loadings matrix
@@ -48,9 +49,9 @@ Type objective_function<Type>::operator() ()
   // for(int f=0; f<n_f; f++){
   //   jnll += SCALE( GMRF(Q), 1/exp(log_tau))( Omega_xf.col(f) );
   // }
-  for(int ii=0; ii<n_x; ii++){
+  for(int ii=0; ii<n_s; ii++){
     for(int jj=0; jj<n_f; jj++){
-      jnll-=dnorm(Omega_xf(ii,jj), Type(0),  Type(1), true);
+      jnll-=dnorm(Omega_sf(ii,jj), Type(0),  Type(1), true);
     }
   }
   // Likelihood contribution from observations
@@ -62,20 +63,31 @@ Type objective_function<Type>::operator() ()
     // Predictor
     ln_yexp_sp(s,p) = eta_sp(s,p);
     for(int f=0; f<n_f; f++){
-      ln_yexp_sp(s,p) += Omega_xf(x_s(s),f) * Loadings_pf(p,f);
+      // This is the log-density in each of the three strata (p)
+      ln_yexp_sp(s,p) += Omega_sf(s,f) * Loadings_pf(p,f);
     }
-    // Likelihood
-    jnll -= dpois( Y_sp(s,p), exp(ln_yexp_sp(s,p)), true );
+    // jnll -= dpois( Y_sp(s,p), exp(ln_yexp_sp(s,p)), true );
   }}
+
+  // The likelihood 
+  for(int s=0; s<n_s; s++){
+    // Likelihood for the BT data (first column) I need to sum across the
+    // first two strata. I guess this is where the correlation is induced.
+    jnll-=dnorm(Y_sp(s,0), ln_yexp_sp(s,0)+ln_yexp_sp(s,1), Sigma, true);
+    // The AT1 is just the middle strata
+    jnll-=dnorm(Y_sp(s,1), ln_yexp_sp(s,1), Sigma, true);
+    // and AT2 is the last strata
+    jnll-=dnorm(Y_sp(s,2), ln_yexp_sp(s,2), Sigma, true);
+  }
   
   // Reporting
   // REPORT( log_kappa );
   //  REPORT( log_tau );
   // REPORT( Range );
-  REPORT( Omega_xf );
+  REPORT( Omega_sf );
   REPORT( Loadings_pf );
   REPORT( jnll );
   REPORT( ln_yexp_sp );
-
+  ADREPORT(Sigma);
   return jnll;
 }
