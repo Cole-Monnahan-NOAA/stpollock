@@ -55,39 +55,43 @@ Type objective_function<Type>::operator() ()
     }
   }
   // Likelihood contribution from observations
-  matrix<Type> ln_yexp_sp( n_s, n_p );
+  matrix<Type> logdensity_sp( n_s, n_p );
   matrix<Type> eta_sp( n_s, n_p );
   eta_sp = X_sj * beta_jp;
   for(int s=0; s<n_s; s++){
   for(int p=0; p<n_p; p++){
     // Predictor
-    ln_yexp_sp(s,p) = eta_sp(s,p);
+    logdensity_sp(s,p) = eta_sp(s,p);
     for(int f=0; f<n_f; f++){
       // This is the log-density in each of the three strata (p)
-      ln_yexp_sp(s,p) += Omega_sf(s,f) * Loadings_pf(p,f);
+      logdensity_sp(s,p) += Omega_sf(s,f) * Loadings_pf(p,f);
     }
-    // jnll -= dpois( Y_sp(s,p), exp(ln_yexp_sp(s,p)), true );
+    // jnll -= dpois( Y_sp(s,p), exp(logdensity_sp(s,p)), true );
   }}
 
+  vector<Type> BT_hat(n_s);
   // The likelihood 
   for(int s=0; s<n_s; s++){
     // Likelihood for the BT data (first column) I need to sum across the
     // first two strata. I guess this is where the correlation is induced.
-    jnll-=dnorm(Y_sp(s,0), ln_yexp_sp(s,0)+ln_yexp_sp(s,1), Sigma, true);
+    BT_hat(s)=log(exp(logdensity_sp(s,0))+exp(logdensity_sp(s,1)));
+    // BT_hat(s)=logdensity_sp(s,0)+logdensity_sp(s,1);
+    jnll-=dnorm(Y_sp(s,0), BT_hat(s), Sigma, true);
     // The AT1 is just the middle strata
-    jnll-=dnorm(Y_sp(s,1), ln_yexp_sp(s,1), Sigma, true);
+    jnll-=dnorm(Y_sp(s,1), logdensity_sp(s,1), Sigma, true);
     // and AT2 is the last strata
-    jnll-=dnorm(Y_sp(s,2), ln_yexp_sp(s,2), Sigma, true);
+    jnll-=dnorm(Y_sp(s,2), logdensity_sp(s,2), Sigma, true);
   }
   
   // Reporting
   // REPORT( log_kappa );
   //  REPORT( log_tau );
   // REPORT( Range );
+  REPORT(BT_hat);
   REPORT( Omega_sf );
   REPORT( Loadings_pf );
   REPORT( jnll );
-  REPORT( ln_yexp_sp );
+  REPORT( logdensity_sp );
   ADREPORT(Sigma);
   return jnll;
 }

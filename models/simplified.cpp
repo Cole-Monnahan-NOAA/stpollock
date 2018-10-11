@@ -44,6 +44,7 @@ Type objective_function<Type>::operator() ()
   ADREPORT(c);
   vector<Type> d1=exp(eta)*sum_SA2 + exp(eta_c)*c;
   REPORT(d1);
+  REPORT(BSA_hat);
   return(nll);
 }
 
