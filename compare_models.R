@@ -42,7 +42,8 @@ opt1 <- Optimize(obj=obj1, getsd=TRUE, newtonsteps=1, control=list(trace=1))
 ## with(rep, cbind(value, sd))
 Report1 <- obj1$report()
 
-### Now fit it with a non-spatial factor analysis using the lognormal distribution
+### Now fit it with a non-spatial factor analysis using the lognormal
+### distribution
 dyn.unload( dynlib(Version) )
 Version <- "models/factor_analysis"
 compile( paste0(Version,".cpp") )
@@ -69,6 +70,27 @@ Report2 <- obj2$report()
 ## plot(yy[,3], dat$Y_sp[,3]); abline(0,1)
 ## cov.est <- Report2$Loadings_pf%*%t(Report2$Loadings_pf)
 ## cov2cor(cov.est)
+
+### Now fit it with a non-spatial factor analysis using the Poisson-link
+### likelihood
+dyn.unload( dynlib(Version) )
+Version <- "models/factor_analysis_pois"
+compile( paste0(Version,".cpp") )
+dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
+dat <- list(Y_sp=Y, n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+pars <- list(beta_jp=matrix(0,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
+              Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
+              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
+              logsigma=1)
+obj2 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
+                 inner.control=list(maxit=1000), DLL=Version)
+## table(names(Obj$env$last.par))
+obj2$env$beSilent()
+# Run model
+opt2 <- TMBhelper::Optimize( obj=obj2, getsd=TRUE, newtonsteps=1,
+                            control=list(trace=1) )
+Report2 <- obj2$report()
+
 
 
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
