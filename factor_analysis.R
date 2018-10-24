@@ -25,7 +25,7 @@ for (i in 1:ntows){
 bt <- hauls$pred_sa
 Y <- cbind(log(bt), log(at1), log(at2))
 pairs(Y)
-plot(log(at1), log(hauls$pred_sa))
+plot(log(at1), log(bt))
 
 ## First fit the model with Stan's way (Model D)
 dat <- list(BSA=hauls$pred_sa, BD=hauls$depth,
@@ -43,8 +43,6 @@ opt1 <- Optimize(obj=obj1, getsd=TRUE, newtonsteps=1, control=list(trace=1))
 Report1 <- obj1$report()
 
 ### Now fit it with a non-spatial factor analysis using the lognormal distribution
-## Prepare the TMB inputs
-## Compile if necessary
 dyn.unload( dynlib(Version) )
 Version <- "models/factor_analysis"
 compile( paste0(Version,".cpp") )
@@ -74,20 +72,38 @@ Report2 <- obj2$report()
 
 
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
-resids1 <- (Y[,1]-Report2$BT_hat)
-resids2 <- (Y[,1]-log(ReportXX$BSA_hat))
+yy <- Report2$logdensity_sp
+resids1 <- (Y[,1]-log(Report1$BSA_hat))
+resids2 <- (Y[,1]-Report2$BT_hat)
 
-par(mfrow=c(3,2))
-plot(log(ReportXX$BSA_hat), Y[,1], xlab='Predicted BT',
+png('plots/method_comparison.png', width=5, height=6, res=500, units='in')
+par(mfrow=c(3,2), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
+xlim <- range(log(Report1$BSA_hat), Report2$BT_hat)
+plot(log(Report1$BSA_hat), Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Stan model D');abline(0,1)
-plot(Report2$BT_hat, Y[,1], xlab='Predicted BT',
+plot(Report2$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-spatial factor analysis');abline(0,1)
-plot(log(at1), log(obj$report()$d1), xlab='AT 3-15m',
-     ylab='Predicted log ADZ density', )
-plot(log(at1), yy[,1], xlab='AT 3-15m',
-     ylab='Predicted log ADZ density')
+ylim <- range(c(log(Report1$d1), yy[,1]))
+plot(log(at1), log(Report1$d1), xlab='Observed log AT 3-15m',
+     ylab='Predicted log ADZ density', ylim=ylim)
+abline(0,1)
+plot(log(at1), yy[,1], xlab='Observed log AT 3-15m',
+     ylab='Predicted log ADZ density', ylim=ylim)
+abline(0,1)
 jitter <- rnorm(ntows, 0,.1)
-plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids2),
-     col=ifelse(resids2>0, 'black', 'red'), xlab='long', ylab='lat')
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1),
      col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
+plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids2),
+     col=ifelse(resids2>0, 'black', 'red'), xlab='long', ylab='lat')
+dev.off()
+
+png('plots/method_comparison_spatial_resids.png', width=5, height=6, res=500, units='in')
+par(mfrow=c(2,1), mgp=c(1,.2,0), mar=c(.5,.5,.5,.5), tck=-.02)
+plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids2), axes=FALSE,
+     col=ifelse(resids2>0, 'black', 'red'), xlab='long', ylab='lat')
+mtext('Stan model D', line=-1); box()
+plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1), axes=FALSE,
+     col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
+mtext('Factor analysis', line=-1); box()
+dev.off()
+
