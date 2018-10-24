@@ -4,11 +4,7 @@
 
 # Load libraries
 library(TMB)
-## Compile if necessary
-dyn.unload( dynlib(Version) )
-Version = "models/factor_analysis"
-compile( paste0(Version,".cpp") )
-dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
+library(TMBhelper)
 
 layers <- as.matrix(read.csv('data/layers.csv', header=FALSE, sep=','))
 hauls <- read.csv('data/hauls.csv')
@@ -31,65 +27,60 @@ Y <- cbind(log(bt), log(at1), log(at2))
 pairs(Y)
 plot(log(at1), log(hauls$pred_sa))
 
-## Prepare the TMB inputs
-dat <- list(Y_sp=Y, n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
-Params = list(beta_jp=matrix(0,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
-              Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
-              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
-              logsigma=1)
-# Declare random
-Random = c("Omega_sf")
-
-# Initialization
-Obj <- MakeADFun(data=dat, parameters=Params, random=Random, hessian=FALSE,
-                 inner.control=list(maxit=1000), DLL='factor_analysis')
-table(names(Obj$env$last.par))
-Obj$env$beSilent()
-# Run model
-Opt = TMBhelper::Optimize( obj=Obj, getsd=TRUE, newtonsteps=1, control=list(trace=1) )
-
-# Summarize
-Report1 = Obj$report()
-rep <- sdreport(Obj)
-with(rep, cbind(par.fixed, sqrt(diag(cov.fixed))))
-
-yy <- Report1$logdensity_sp
-par(mfrow=c(1,3))
-plot(yy[,1]+yy[,2], dat$Y_sp[,1]); abline(0,1)
-plot(yy[,2], dat$Y_sp[,2]); abline(0,1)
-plot(yy[,3], dat$Y_sp[,3]); abline(0,1)
-cov.est <- Report$Loadings_pf%*%t(Report$Loadings_pf)
-cov2cor(cov.est)
-
-
-#### Fit the same data with Stan's model
+## First fit the model with Stan's way (Model D)
 dat <- list(BSA=hauls$pred_sa, BD=hauls$depth,
             sum_SA1=at1, sum_SA2=atstar)
-pars <- list(log_q=2.5, log_a=8.5,
-             d2=-2.1, b_BD=0,
-             log_c=3.1,
-             logSigma=-.3,
-             cb_BD=0)
-
-## Run single iteration to see if NLL matches between TMB and ADMB (with
-## same initial values)
+pars <- list(log_q=2.5, log_a=8.5, d2=-2.1, b_BD=0, log_c=3.1,
+             logSigma=-.3, cb_BD=0)
 dyn.unload(dynlib('models/simplified'))
 compile('models/simplified.cpp')
 dyn.load(dynlib('models/simplified'))
-obj <- MakeADFun(data=dat, para=pars, DLL='simplified')
-obj$env$beSilent()
-Opt = TMBhelper::Optimize(obj=obj, getsd=TRUE, newtonsteps=1, control=list(trace=1))
-rep <- sdreport(obj)
-with(rep, cbind(value, sd))
-Report2 <- obj$report()
+obj1 <- MakeADFun(data=dat, para=pars, DLL='simplified')
+obj1$env$beSilent()
+opt1 <- Optimize(obj=obj1, getsd=TRUE, newtonsteps=1, control=list(trace=1))
+## rep <- sdreport(obj1)
+## with(rep, cbind(value, sd))
+Report1 <- obj1$report()
+
+### Now fit it with a non-spatial factor analysis using the lognormal distribution
+## Prepare the TMB inputs
+## Compile if necessary
+dyn.unload( dynlib(Version) )
+Version <- "models/factor_analysis"
+compile( paste0(Version,".cpp") )
+dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
+dat <- list(Y_sp=Y, n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+pars <- list(beta_jp=matrix(0,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
+              Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
+              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
+              logsigma=1)
+obj2 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
+                 inner.control=list(maxit=1000), DLL='factor_analysis')
+## table(names(Obj$env$last.par))
+obj2$env$beSilent()
+# Run model
+opt2 <- TMBhelper::Optimize( obj=obj2, getsd=TRUE, newtonsteps=1,
+                            control=list(trace=1) )
+Report2 <- obj2$report()
+## rep <- sdreport(Obj)
+## with(rep, cbind(par.fixed, sqrt(diag(cov.fixed))))
+## yy <- Report2$logdensity_sp
+## par(mfrow=c(1,3))
+## plot(yy[,1]+yy[,2], dat$Y_sp[,1]); abline(0,1)
+## plot(yy[,2], dat$Y_sp[,2]); abline(0,1)
+## plot(yy[,3], dat$Y_sp[,3]); abline(0,1)
+## cov.est <- Report2$Loadings_pf%*%t(Report2$Loadings_pf)
+## cov2cor(cov.est)
+
+
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
-resids1 <- (Y[,1]-Report1$BT_hat)
-resids2 <- (Y[,1]-log(Report2$BSA_hat))
+resids1 <- (Y[,1]-Report2$BT_hat)
+resids2 <- (Y[,1]-log(ReportXX$BSA_hat))
 
 par(mfrow=c(3,2))
-plot(log(Report2$BSA_hat), Y[,1], xlab='Predicted BT',
+plot(log(ReportXX$BSA_hat), Y[,1], xlab='Predicted BT',
      ylab='Observed BT', main='Stan model D');abline(0,1)
-plot(Report1$BT_hat, Y[,1], xlab='Predicted BT',
+plot(Report2$BT_hat, Y[,1], xlab='Predicted BT',
      ylab='Observed BT', main='Non-spatial factor analysis');abline(0,1)
 plot(log(at1), log(obj$report()$d1), xlab='AT 3-15m',
      ylab='Predicted log ADZ density', )
