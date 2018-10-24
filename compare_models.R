@@ -92,13 +92,14 @@ opt3 <- TMBhelper::Optimize( obj=obj3, getsd=TRUE, newtonsteps=1,
 Report3 <- obj3$report()
 
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
+## These are the predicted densities in the ADZ
+y1 <- log(Report1$d1)
 y2 <- Report2$logdensity_sp
 y3 <- Report3$logdensity
+## The residuals (log scale)
 resids1 <- (Y[,1]-log(Report1$BSA_hat))
 resids2 <- (Y[,1]-Report2$BT_hat)
 resids3 <- (Y[,1]-Report3$BT_hat)
-par(mfrow=c(1,3))
-hist(resids1); hist(resids2); hist(resids3)
 
 
 png('plots/method_comparison.png', width=6.5, height=6, res=500, units='in')
@@ -110,8 +111,8 @@ plot(Report2$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: lognormal');abline(0,1)
 plot(Report3$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: Poisson-link');abline(0,1)
-ylim <- range(c(log(Report1$d1), y2[,1], y3[,1]))
-plot(log(at1), log(Report1$d1), xlab='Observed log AT 3-15m',
+ylim <- range(c(y1, y2[,1], y3[,1]))
+plot(log(at1), y1, xlab='Observed log AT 3-15m',
      ylab='Predicted log ADZ density', ylim=ylim)
 abline(0,1)
 plot(log(at1), y2[,1], xlab='Observed log AT 3-15m',
