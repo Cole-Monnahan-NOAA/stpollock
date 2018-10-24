@@ -91,6 +91,27 @@ opt3 <- TMBhelper::Optimize( obj=obj3, getsd=TRUE, newtonsteps=1,
                             control=list(trace=1) )
 Report3 <- obj3$report()
 
+### Now fit it with a non-spatial factor analysis using the Poisson-link
+### likelihood
+dyn.unload( dynlib(Version) )
+Version <- "models/spatial_factor_analysis_pois"
+compile( paste0(Version,".cpp") )
+dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
+dat <- list(Y_sp=exp(Y), n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
+              Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
+              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
+              logsigma=1, logweight=1)
+obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
+                 inner.control=list(maxit=1000), DLL='factor_analysis_pois')
+## table(names(Obj$env$last.par))
+obj4$env$beSilent()
+# Run model
+opt4 <- TMBhelper::Optimize( obj=obj4, getsd=TRUE, newtonsteps=1,
+                            control=list(trace=1) )
+Report4 <- obj4$report()
+
+
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
 ## These are the predicted densities in the ADZ
 y1 <- log(Report1$d1)
