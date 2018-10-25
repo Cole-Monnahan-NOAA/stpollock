@@ -29,7 +29,7 @@ Type objective_function<Type>::operator() ()
   PARAMETER_VECTOR(Loadings_vec);
 
   // Random effect
-  PARAMETER_ARRAY(Omega_sf);
+  PARAMETER_ARRAY(Omega_xf);
   PARAMETER(logsigma); // obs variance
   PARAMETER(logweight); // log weight for Poisson-link
   PARAMETER(log_kappa);
@@ -83,7 +83,7 @@ Type objective_function<Type>::operator() ()
       lognumbers(s,p) = eta_sp(s,p);
       for(int f=0; f<n_f; f++){
 	// This is the log-density in each of the three strata (p)
-	lognumbers(s,p) += Omega_sf(s,f) * Loadings_pf(p,f);
+	lognumbers(s,p) += Omega_xf(x_s(s),f) * Loadings_pf(p,f);
       }
       logweights(s,p)=logweight; // assume constant weight
       encounter(s,p)=Type(1.0)-exp(-1*exp(lognumbers(s,p)));
@@ -116,7 +116,7 @@ Type objective_function<Type>::operator() ()
   REPORT( log_tau );
   REPORT( Range );
   REPORT(BT_hat);
-  REPORT( Omega_sf );
+  REPORT( Omega_xf );
   REPORT( Loadings_pf );
   REPORT( jnll );
   ADREPORT(sigma);

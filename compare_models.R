@@ -97,34 +97,44 @@ dyn.unload( dynlib(Version) )
 Version <- "models/spatial_factor_analysis_pois"
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
-dat <- list(Y_sp=exp(Y), n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+library(INLA)
+mesh <-  inla.mesh.create( hauls[,c('s_long', 's_lat')])
+spde <- inla.spde2.matern( mesh )
+dat <- list(Y_sp=exp(Y), n_f=2, n_x=mesh$n, x_s=mesh$idx$loc-1,
+            X_sj=cbind(rep(1, len=ntows),hauls$depth),
+            M0=spde$param.inla$M0, M1=spde$param.inla$M1,
+            M2=spde$param.inla$M2)
 pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
-              "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
-              logsigma=1, logweight=1)
-obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
-                 inner.control=list(maxit=1000), DLL='factor_analysis_pois')
+              "Omega_xf"=matrix(0,nrow=dat$n_x,ncol=dat$n_f),
+              logsigma=1, logweight=1, log_kappa=100)
+obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_xf",
+                  map=list(log_kappa=factor(NA)),
+                 inner.control=list(maxit=10000), DLL='spatial_factor_analysis_pois')
 ## table(names(Obj$env$last.par))
 obj4$env$beSilent()
 # Run model
-opt4 <- TMBhelper::Optimize( obj=obj4, getsd=TRUE, newtonsteps=1,
+opt4 <- TMBhelper::Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
                             control=list(trace=1) )
 Report4 <- obj4$report()
-
+obj4$gr()
 
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
 ## These are the predicted densities in the ADZ
 y1 <- log(Report1$d1)
 y2 <- Report2$logdensity_sp
 y3 <- Report3$logdensity
+y4 <- Report4$logdensity
 ## The residuals (log scale)
 resids1 <- (Y[,1]-log(Report1$BSA_hat))
 resids2 <- (Y[,1]-Report2$BT_hat)
 resids3 <- (Y[,1]-Report3$BT_hat)
+resids4 <- (Y[,1]-Report4$BT_hat)
 
 
 png('plots/method_comparison.png', width=6.5, height=6, res=500, units='in')
-par(mfrow=c(3,3), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
+
+par(mfrow=c(3,4), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
 xlim <- range(log(Report1$BSA_hat), Report2$BT_hat, Report3$BT_hat)
 plot(log(Report1$BSA_hat), Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Stan model D');abline(0,1)
@@ -132,6 +142,8 @@ plot(Report2$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: lognormal');abline(0,1)
 plot(Report3$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: Poisson-link');abline(0,1)
+plot(Report4$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
+     ylab='Observed BT', main='SFA: Poisson-link');abline(0,1)
 ylim <- range(c(y1, y2[,1], y3[,1]))
 plot(log(at1), y1, xlab='Observed log AT 3-15m',
      ylab='Predicted log ADZ density', ylim=ylim)
@@ -142,6 +154,9 @@ abline(0,1)
 plot(log(at1), y3[,1], xlab='Observed log AT 3-15m',
      ylab='Predicted log ADZ density', ylim=ylim)
 abline(0,1)
+plot(log(at1), y4[,1], xlab='Observed log AT 3-15m',
+     ylab='Predicted log ADZ density', ylim=ylim)
+abline(0,1)
 jitter <- rnorm(ntows, 0,.1)
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1),
      col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
@@ -149,10 +164,13 @@ plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids2),
      col=ifelse(resids2>0, 'black', 'red'), xlab='long', ylab='lat')
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids3),
      col=ifelse(resids3>0, 'black', 'red'), xlab='long', ylab='lat')
+plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids4),
+     col=ifelse(resids4>0, 'black', 'red'), xlab='long', ylab='lat')
+
 dev.off()
 
 png('plots/method_comparison_spatial_resids.png', width=5, height=6, res=500, units='in')
-par(mfrow=c(3,1), mgp=c(1,.2,0), mar=c(.5,.5,.5,.5), tck=-.02)
+par(mfrow=c(2,2), mgp=c(1,.2,0), mar=c(.5,.5,.5,.5), tck=-.02)
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1), axes=FALSE,
      col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
 mtext('Stan model D', line=-1.5); box()
@@ -162,5 +180,8 @@ mtext('Non-SFA: lognormal', line=-1.5); box()
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids3), axes=FALSE,
      col=ifelse(resids3>0, 'black', 'red'), xlab='long', ylab='lat')
 mtext('Non-SFA: Poisson-link', line=-1.5); box()
+plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids4), axes=FALSE,
+     col=ifelse(resids4>0, 'black', 'red'), xlab='long', ylab='lat')
+mtext('SFA: Poisson-link', line=-1.5); box()
 dev.off()
 
