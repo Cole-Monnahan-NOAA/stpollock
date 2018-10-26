@@ -100,20 +100,19 @@ dyn.load( dynlib(Version) )                                                     
 library(INLA)
 mesh <-  inla.mesh.create( hauls[,c('s_long', 's_lat')])
 spde <- inla.spde2.matern( mesh )
-dat <- list(Y_sp=exp(Y), n_f=2, n_x=mesh$n, x_s=mesh$idx$loc-1,
+dat <- list(Y_sp=exp(Y), n_f=1, n_x=mesh$n, x_s=mesh$idx$loc-1,
             X_sj=cbind(rep(1, len=ntows),hauls$depth),
             M0=spde$param.inla$M0, M1=spde$param.inla$M1,
             M2=spde$param.inla$M2)
-pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
+pars <- list(beta_jp=matrix(.1, nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_xf"=matrix(0,nrow=dat$n_x,ncol=dat$n_f),
-              logsigma=1, logweight=1, log_kappa=100)
+              logsigma=1, logweight=1, log_kappa=1)
 obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_xf",
-                  map=list(log_kappa=factor(NA)),
+                  map=list(log_kappa=factor(1)),
                  inner.control=list(maxit=10000), DLL='spatial_factor_analysis_pois')
 ## table(names(Obj$env$last.par))
 obj4$env$beSilent()
-# Run model
 opt4 <- TMBhelper::Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
                             control=list(trace=1) )
 Report4 <- obj4$report()
