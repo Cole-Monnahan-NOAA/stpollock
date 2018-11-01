@@ -91,9 +91,14 @@ Type objective_function<Type>::operator() ()
       encounter(s,p)=Type(1.0)-exp(-1*exp(lognumbers(s,p)));
       catchrate(s,p)=exp(lognumbers(s,p))*exp(logweights(s,p))/encounter(s,p);
       logdensity(s,p)=lognumbers(s,p)+logweights(s,p);
-      // Now calculate the likelihood
-      // Likelihood for the BT data (first column) I need to sum across the
-      // first two strata. I guess this is where the correlation is induced.
+    }
+  }
+  
+  // Now calculate the likelihood
+  // Likelihood for the BT data (first column) I need to sum across the
+  // first two strata. I guess this is where the correlation is induced.
+  for(int s=0; s<n_s; s++){
+    for(int p=0; p<n_p; p++){
       BT_hat(s)=log(exp(logdensity(s,0))+exp(logdensity(s,1)));
       if(Y_sp(s,p)==0){
 	jnll-=log(1-encounter(s,p));
