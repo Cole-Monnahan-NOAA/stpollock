@@ -37,7 +37,7 @@ Type objective_function<Type>::operator() ()
 
   Type sigma=exp(logsigma);
   Type sig22;
-  sig22=pow(sigma,2)/2;
+  sig22=0;//pow(sigma,2)/2;
   
   using namespace density;
   int n_p = Y_sp.row(0).size();    // n_p is number of species
@@ -102,15 +102,17 @@ Type objective_function<Type>::operator() ()
 	jnll-=log(1-encounter(s,p));
       } else {
 	jnll-=log(encounter(s,p));
-	// jnll-=dlnorm(catches(s,p), log(catchrate(s,p))-pow(sigma,2)/2, sigma, true);
 	if(p==0)
-	  jnll-=dlnorm(Y_sp(s,0), BT_hat(s) -sig22, sigma, true);
+	  // jnll-=dlnorm(Y_sp(s,0), BT_hat(s) -sig22, sigma, true);
+	jnll-=dnorm(Y_sp(s,0), BT_hat(s), sigma, true);
 	if(p==1)
 	  // The AT1 is just the middle strata
-	  jnll-=dlnorm(Y_sp(s,1), logdensity(s,1)-sig22, sigma, true);
+	  //jnll-=dlnorm(Y_sp(s,1), logdensity(s,1)-sig22, sigma, true);
+	  jnll-=dnorm(Y_sp(s,1), logdensity(s,1), sigma, true);
 	if(p==2)
 	  // and AT2 is the last strata
-	  jnll-=dlnorm(Y_sp(s,2), logdensity(s,2)-sig22, sigma, true);
+	  //	  jnll-=dlnorm(Y_sp(s,2), logdensity(s,2)-sig22, sigma, true);
+	  jnll-=dnorm(Y_sp(s,2), logdensity(s,2), sigma, true);
       }
     }
   }

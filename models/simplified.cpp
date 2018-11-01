@@ -34,17 +34,19 @@ Type objective_function<Type>::operator() ()
 
   eta = d2+b_BD*BD;
   eta_c = cb_BD*BD;
-  BSA_hat=1/(1/
-   (q*sum_SA1 +exp(eta)*sum_SA2 + exp(eta_c)*c)+1/a);
+  BSA_hat=
+    log(1/(1/ (q*sum_SA1 +exp(eta)*sum_SA2 + exp(eta_c)*c)+1/a));
   Type sigmasq=exp(2*logSigma);
-  nll=0.5*(ntows*log(2*PI*sigmasq)+
-	   pow(log(BSA)-log(BSA_hat),Type(2)).sum()/sigmasq);
+  // nll=0.5*(ntows*log(2*PI*sigmasq)+
+  // 	   pow(BSA-BSA_hat,Type(2)).sum()/sigmasq);
+  nll= -1*dnorm(BSA, BSA_hat, exp(logSigma), true).sum();
   ADREPORT(a);
   ADREPORT(q);
   ADREPORT(c);
   vector<Type> d1=exp(eta)*sum_SA2 + exp(eta_c)*c;
   REPORT(d1);
   REPORT(BSA_hat);
+  REPORT(nll);
   return(nll);
 }
 

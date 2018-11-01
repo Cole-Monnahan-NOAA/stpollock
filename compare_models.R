@@ -27,14 +27,15 @@ for (i in 1:ntows){
 }
 bt <- hauls$pred_sa
 Y <- cbind(log(bt), log(at1), log(at2))
-pairs(Y)
-plot(log(at1), log(bt))
+#pairs(Y)
+#plot(log(at1), log(bt))
 
 ## First fit the model with Stan's way (Model D)
-dat <- list(BSA=hauls$pred_sa, BD=hauls$depth,
+dat <- list(BSA=Y[,1], BD=hauls$depth,
             sum_SA1=at1, sum_SA2=atstar)
 pars <- list(log_q=2.5, log_a=8.5, d2=-2.1, b_BD=0, log_c=3.1,
              logSigma=-.3, cb_BD=0)
+dyn.unload(dynlib('models/simplified'))
 compile('models/simplified.cpp')
 dyn.load(dynlib('models/simplified'))
 obj1 <- MakeADFun(data=dat, para=pars, DLL='simplified')
@@ -59,7 +60,7 @@ obj2 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
 ## table(names(Obj$env$last.par))
 obj2$env$beSilent()
 # Run model
-opt2 <- TMBhelper::Optimize( obj=obj2, getsd=TRUE, newtonsteps=1,
+opt2 <- Optimize( obj=obj2, getsd=TRUE, newtonsteps=1,
                             control=list(trace=0) )
 Report2 <- obj2$report()
 ## rep <- sdreport(Obj)
@@ -75,55 +76,64 @@ Report2 <- obj2$report()
 ### Now fit it with a non-spatial factor analysis using the Poisson-link
 ### likelihood
 Version <- "models/factor_analysis_pois"
+dyn.unload( dynlib(Version) )
 compile( paste0(Version,".cpp") )
-dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
-dat <- list(Y_sp=exp(Y), n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+dyn.load( dynlib(Version) )
+dat <- list(Y_sp=(Y), n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
 pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
               logsigma=1, logweight=1)
-obj3 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf", hessian=FALSE,
-                 inner.control=list(maxit=1000), DLL='factor_analysis_pois')
+obj3 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf",
+                , DLL='factor_analysis_pois')
 ## table(names(Obj$env$last.par))
 obj3$env$beSilent()
 # Run model
-opt3 <- TMBhelper::Optimize( obj=obj3, getsd=TRUE, newtonsteps=1,
+opt3 <- Optimize( obj=obj3, getsd=TRUE, newtonsteps=1,
                             control=list(trace=1) )
 Report3 <- obj3$report()
 
 ### Now fit it with a non-spatial factor analysis using the Poisson-link
 ### likelihood
 Version <- "models/spatial_factor_analysis_pois"
+dyn.unload( dynlib(Version) )
 compile( paste0(Version,".cpp") )
-dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
+dyn.load( dynlib(Version) )
 library(INLA)
 mesh <-  inla.mesh.create( hauls[,c('s_long', 's_lat')])
 spde <- inla.spde2.matern( mesh )
-dat <- list(Y_sp=exp(Y), n_f=1, n_x=mesh$n, x_s=mesh$idx$loc-1,
+dat <- list(Y_sp=(Y), n_f=2, n_x=mesh$n, x_s=mesh$idx$loc-1,
             X_sj=cbind(rep(1, len=ntows),hauls$depth),
             M0=spde$param.inla$M0, M1=spde$param.inla$M1,
             M2=spde$param.inla$M2)
 pars <- list(beta_jp=matrix(.1, nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_xf"=matrix(0,nrow=dat$n_x,ncol=dat$n_f),
-              logsigma=1, logweight=1, log_kappa=1)
+              logsigma=1, logweight=1, log_kappa=.1)
 obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_xf",
-                  map=list(log_kappa=factor(1)),
-                 inner.control=list(maxit=10000), DLL='spatial_factor_analysis_pois')
+                 DLL='spatial_factor_analysis_pois')
 ## table(names(Obj$env$last.par))
 obj4$env$beSilent()
-opt4 <- TMBhelper::Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
+opt4 <- Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
                             control=list(trace=1) )
 Report4 <- obj4$report()
 
-## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
+## Model comparisons
+fits <- list(opt1, opt2, opt3, opt4)
+aics <- sapply(fits, function(x) round(x$AIC,1))
+npars <- sapply(fits, function(x) x$number_of_coefficients[2])
+nlls <- sapply(fits, function(x) round(x$objective,1))
+results <- data.frame(rbind(npars, nlls, aics))
+names(results) <- c('Stan', 'FA lognormal', 'FA CP', 'SFA CP')
+results
+
 ## These are the predicted densities in the ADZ
 y1 <- log(Report1$d1)
 y2 <- Report2$logdensity_sp
 y3 <- Report3$logdensity
 y4 <- Report4$logdensity
 ## The residuals (log scale)
-resids1 <- (Y[,1]-log(Report1$BSA_hat))
+resids1 <- (Y[,1]-Report1$BSA_hat)
 resids2 <- (Y[,1]-Report2$BT_hat)
 resids3 <- (Y[,1]-Report3$BT_hat)
 resids4 <- (Y[,1]-Report4$BT_hat)
@@ -131,8 +141,8 @@ resids4 <- (Y[,1]-Report4$BT_hat)
 
 png('plots/method_comparison.png', width=6.5, height=6, res=500, units='in')
 par(mfrow=c(3,4), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
-xlim <- range(log(Report1$BSA_hat), Report2$BT_hat, Report3$BT_hat)
-plot(log(Report1$BSA_hat), Y[,1], xlab='Predicted BT', xlim=xlim,
+xlim <- range(c(Report1$BSA_hat, Report2$BT_hat, Report3$BT_hat))
+plot(Report1$BSA_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Stan model D');abline(0,1)
 plot(Report2$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: lognormal');abline(0,1)
@@ -140,7 +150,7 @@ plot(Report3$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='Non-SFA: Poisson-link');abline(0,1)
 plot(Report4$BT_hat, Y[,1], xlab='Predicted BT', xlim=xlim,
      ylab='Observed BT', main='SFA: Poisson-link');abline(0,1)
-ylim <- range(c(y1, y2[,1], y3[,1]))
+ylim <- range(c(y1, y2[,1], y3[,1], y4[,1]))
 plot(log(at1), y1, xlab='Observed log AT 3-15m',
      ylab='Predicted log ADZ density', ylim=ylim)
 abline(0,1)
@@ -153,6 +163,7 @@ abline(0,1)
 plot(log(at1), y4[,1], xlab='Observed log AT 3-15m',
      ylab='Predicted log ADZ density', ylim=ylim)
 abline(0,1)
+set.seed(20)
 jitter <- rnorm(ntows, 0,.1)
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1),
      col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
@@ -168,13 +179,13 @@ png('plots/method_comparison_spatial_resids.png', width=5, height=6, res=500, un
 par(mfrow=c(2,2), mgp=c(1,.2,0), mar=c(.5,.5,.5,.5), tck=-.02)
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids1), axes=FALSE,
      col=ifelse(resids1>0, 'black', 'red'), xlab='long', ylab='lat')
-mtext('Stan model D', line=-1.5); box()
+mtext('Stan D', line=-1.5); box()
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids2), axes=FALSE,
      col=ifelse(resids2>0, 'black', 'red'), xlab='long', ylab='lat')
-mtext('Non-SFA: lognormal', line=-1.5); box()
+mtext('FA: lognormal', line=-1.5); box()
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids3), axes=FALSE,
      col=ifelse(resids3>0, 'black', 'red'), xlab='long', ylab='lat')
-mtext('Non-SFA: Poisson-link', line=-1.5); box()
+mtext('FA: Poisson-link', line=-1.5); box()
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids4), axes=FALSE,
      col=ifelse(resids4>0, 'black', 'red'), xlab='long', ylab='lat')
 mtext('SFA: Poisson-link', line=-1.5); box()
