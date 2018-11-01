@@ -9,7 +9,10 @@ library(TMBhelper)
 layers <- as.matrix(read.csv('data/layers.csv', header=FALSE, sep=','))
 hauls <- read.csv('data/hauls.csv')
 SA <- layers; dimnames(SA) <- NULL
-ntows <- 355
+## subset down to a single year to keep it simple
+layers <- layers[which(hauls$year==2006),]
+hauls <- hauls[which(hauls$year==2006),]
+ntows <- nrow(hauls)
 ## From Stan: first two columns are the ADZ so skip them. 3rd is 0.5-0.75m
 ## and should assume this is 'h2' or 'h' in the paper. More specifically:
 ## the first 20 columns are vertical layers from 0 to 5m, every 0.25m, rest
@@ -32,7 +35,6 @@ dat <- list(BSA=hauls$pred_sa, BD=hauls$depth,
             sum_SA1=at1, sum_SA2=atstar)
 pars <- list(log_q=2.5, log_a=8.5, d2=-2.1, b_BD=0, log_c=3.1,
              logSigma=-.3, cb_BD=0)
-dyn.unload(dynlib('models/simplified'))
 compile('models/simplified.cpp')
 dyn.load(dynlib('models/simplified'))
 obj1 <- MakeADFun(data=dat, para=pars, DLL='simplified')
@@ -44,7 +46,6 @@ Report1 <- obj1$report()
 
 ### Now fit it with a non-spatial factor analysis using the lognormal
 ### distribution
-dyn.unload( dynlib(Version) )
 Version <- "models/factor_analysis"
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
@@ -73,7 +74,6 @@ Report2 <- obj2$report()
 
 ### Now fit it with a non-spatial factor analysis using the Poisson-link
 ### likelihood
-dyn.unload( dynlib(Version) )
 Version <- "models/factor_analysis_pois"
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
@@ -93,7 +93,6 @@ Report3 <- obj3$report()
 
 ### Now fit it with a non-spatial factor analysis using the Poisson-link
 ### likelihood
-dyn.unload( dynlib(Version) )
 Version <- "models/spatial_factor_analysis_pois"
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
@@ -116,7 +115,6 @@ obj4$env$beSilent()
 opt4 <- TMBhelper::Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
                             control=list(trace=1) )
 Report4 <- obj4$report()
-obj4$gr()
 
 ## plot(log(obj$report()$BSA_hat), log(dat$BSA)); abline(0,1)
 ## These are the predicted densities in the ADZ
@@ -132,7 +130,6 @@ resids4 <- (Y[,1]-Report4$BT_hat)
 
 
 png('plots/method_comparison.png', width=6.5, height=6, res=500, units='in')
-
 par(mfrow=c(3,4), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
 xlim <- range(log(Report1$BSA_hat), Report2$BT_hat, Report3$BT_hat)
 plot(log(Report1$BSA_hat), Y[,1], xlab='Predicted BT', xlim=xlim,
@@ -165,7 +162,6 @@ plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids3),
      col=ifelse(resids3>0, 'black', 'red'), xlab='long', ylab='lat')
 plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids4),
      col=ifelse(resids4>0, 'black', 'red'), xlab='long', ylab='lat')
-
 dev.off()
 
 png('plots/method_comparison_spatial_resids.png', width=5, height=6, res=500, units='in')
