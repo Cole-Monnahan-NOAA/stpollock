@@ -47,10 +47,12 @@ Report1 <- obj1$report()
 
 ### Now fit it with a non-spatial factor analysis using the lognormal
 ### distribution
+n_f <- 2
 Version <- "models/factor_analysis"
+dyn.unload( dynlib(Version) )
 compile( paste0(Version,".cpp") )
-dyn.load( dynlib(Version) )                                                         # log_tau=0.0,
-dat <- list(Y_sp=Y, n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+dyn.load( dynlib(Version) )
+dat <- list(Y_sp=Y, n_f=n_f, X_sj=cbind(rep(1, len=ntows),hauls$depth))
 pars <- list(beta_jp=matrix(0,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
@@ -79,7 +81,7 @@ Version <- "models/factor_analysis_pois"
 dyn.unload( dynlib(Version) )
 compile( paste0(Version,".cpp") )
 dyn.load( dynlib(Version) )
-dat <- list(Y_sp=(Y), n_f=2, X_sj=cbind(rep(1, len=ntows),hauls$depth))
+dat <- list(Y_sp=(Y), n_f=n_f, X_sj=cbind(rep(1, len=ntows),hauls$depth))
 pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
@@ -102,7 +104,7 @@ dyn.load( dynlib(Version) )
 library(INLA)
 mesh <-  inla.mesh.create( hauls[,c('s_long', 's_lat')])
 spde <- inla.spde2.matern( mesh )
-dat <- list(Y_sp=(Y), n_f=2, n_x=mesh$n, x_s=mesh$idx$loc-1,
+dat <- list(Y_sp=(Y), n_f=n_f, n_x=mesh$n, x_s=mesh$idx$loc-1,
             X_sj=cbind(rep(1, len=ntows),hauls$depth),
             M0=spde$param.inla$M0, M1=spde$param.inla$M1,
             M2=spde$param.inla$M2)
@@ -114,17 +116,17 @@ obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_xf",
                  DLL='spatial_factor_analysis_pois')
 ## table(names(Obj$env$last.par))
 obj4$env$beSilent()
-opt4 <- Optimize( obj=obj4, getsd=FALSE, newtonsteps=1,
+opt4 <- Optimize( obj=obj4, getsd=TRUE, newtonsteps=1,
                             control=list(trace=1) )
 Report4 <- obj4$report()
 
 ## Model comparisons
 fits <- list(opt1, opt2, opt3, opt4)
-aics <- sapply(fits, function(x) round(x$AIC,1))
+aics <- sapply(fits, function(x) round(x$AIC,2))
 npars <- sapply(fits, function(x) x$number_of_coefficients[2])
-nlls <- sapply(fits, function(x) round(x$objective,1))
+nlls <- sapply(fits, function(x) round(x$objective,2))
 results <- data.frame(rbind(npars, nlls, aics))
-names(results) <- c('Stan', 'FA lognormal', 'FA CP', 'SFA CP')
+names(results) <- c('Stan', 'FA:lognormal', 'FA:Poisson', 'SFA:Poisson')
 results
 
 ## These are the predicted densities in the ADZ

@@ -93,5 +93,6 @@ Type objective_function<Type>::operator() ()
   REPORT( jnll );
   REPORT( logdensity_sp );
   ADREPORT(Sigma);
+  ADREPORT(Omega_sf(0,0));
   return jnll;
 }

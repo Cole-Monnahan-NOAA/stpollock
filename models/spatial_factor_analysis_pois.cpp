@@ -62,7 +62,8 @@ Type objective_function<Type>::operator() ()
   // Spatial variables
   Type log_tau = log( 1 / (exp(log_kappa) * sqrt(4*M_PI)) );  // Ensures that MargSD = 1
   Type Range = sqrt(8) / exp( log_kappa );
-  Eigen::SparseMatrix<Type> Q = exp(log_kappa*4)*M0 + Type(2.0)*exp(log_kappa*2)*M1 + M2;
+  Eigen::SparseMatrix<Type>
+    Q = exp(log_kappa*4)*M0 + Type(2.0)*exp(log_kappa*2)*M1 + M2;
   for(int f=0; f<n_f; f++){
     jnll += SCALE( GMRF(Q), 1/exp(log_tau))( Omega_xf.col(f) );
   }
@@ -127,5 +128,6 @@ Type objective_function<Type>::operator() ()
   REPORT( Loadings_pf );
   REPORT( jnll );
   ADREPORT(sigma);
+  ADREPORT(Range);
   return jnll;
 }
