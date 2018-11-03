@@ -108,6 +108,7 @@ dat <- list(Y_sp=(Y), n_f=n_f, n_x=mesh$n, x_s=mesh$idx$loc-1,
             X_sj=cbind(rep(1, len=ntows),hauls$depth),
             M0=spde$param.inla$M0, M1=spde$param.inla$M1,
             M2=spde$param.inla$M2)
+
 pars <- list(beta_jp=matrix(.1, nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_xf"=matrix(0,nrow=dat$n_x,ncol=dat$n_f),
@@ -193,3 +194,21 @@ plot(hauls$s_long+jitter, hauls$s_lat, cex=abs(resids4), axes=FALSE,
 mtext('SFA: Poisson-link', line=-1.5); box()
 dev.off()
 
+## make some plots to explore the spatial patterns
+par(mfrow=c(3,3), mgp=c(1,.2,0), mar=c(2,3,2,.5), tck=-.02)
+x <- hauls$s_long; y <- hauls$s_lat
+Z <- apply(Y, 2, function(x) sqrt(exp(x))/20)
+for(i in 1:3) plot(x,y, cex=Z[,i])
+## The non-spatial factor analysis
+Z <- apply(Report3$logdensity, 2, function(x) sqrt(exp(x))/20)
+for(i in 1:3) plot(x,y, cex=Z[,i])
+## SFA
+Z <- apply(Report4$logdensity, 2, function(x) sqrt(exp(x))/20)
+for(i in 1:3) plot(x,y, cex=Z[,i])
+
+## where are the differences from adding space?
+par(mfrow=c(1,3))
+for(i in 1:3){
+  plot(Report3$logdensity[,i], Report4$logdensity[,i])
+  abline(0,1)
+}
