@@ -47,7 +47,7 @@ Report1 <- obj1$report()
 
 ### Now fit it with a non-spatial factor analysis using the lognormal
 ### distribution
-n_f <- 2
+n_f <- 3
 Version <- "models/factor_analysis"
 dyn.unload( dynlib(Version) )
 compile( paste0(Version,".cpp") )
@@ -85,9 +85,10 @@ dat <- list(Y_sp=(Y), n_f=n_f, X_sj=cbind(rep(1, len=ntows),hauls$depth))
 pars <- list(beta_jp=matrix(.1,nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_sf"=matrix(0,nrow=ntows,ncol=dat$n_f),
-              logsigma=1, logweight=1)
+              logsigma=1, logweight=-6)
 obj3 <- MakeADFun(data=dat, parameters=pars, random="Omega_sf",
-                , DLL='factor_analysis_pois')
+                  DLL='factor_analysis_pois',
+                  map=list(logweight=factor(NA)))
 ## table(names(Obj$env$last.par))
 obj3$env$beSilent()
 # Run model
@@ -108,17 +109,16 @@ dat <- list(Y_sp=(Y), n_f=n_f, n_x=mesh$n, x_s=mesh$idx$loc-1,
             X_sj=cbind(rep(1, len=ntows),hauls$depth),
             M0=spde$param.inla$M0, M1=spde$param.inla$M1,
             M2=spde$param.inla$M2)
-
 pars <- list(beta_jp=matrix(.1, nrow=ncol(dat$X_sj),ncol=ncol(dat$Y_sp)),
               Loadings_vec=rep(1,dat$n_f*ncol(dat$Y_sp)-dat$n_f*(dat$n_f-1)/2),
               "Omega_xf"=matrix(0,nrow=dat$n_x,ncol=dat$n_f),
-              logsigma=1, logweight=1, log_kappa=.1)
+              logsigma=1, logweight=-6, log_kappa=.1)
 obj4 <- MakeADFun(data=dat, parameters=pars, random="Omega_xf",
-                 DLL='spatial_factor_analysis_pois')
+                  DLL='spatial_factor_analysis_pois',
+                  map=list(logweight=factor(NA)))
 ## table(names(Obj$env$last.par))
 obj4$env$beSilent()
-opt4 <- Optimize( obj=obj4, getsd=TRUE, newtonsteps=1,
-                            control=list(trace=1) )
+opt4 <- Optimize(obj=obj4, getsd=TRUE, control=list(trace=1))
 Report4 <- obj4$report()
 
 ## Model comparisons
