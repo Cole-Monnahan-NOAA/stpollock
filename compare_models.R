@@ -92,32 +92,95 @@ Report6 <- obj6$report()
 
 ### Now try fitting the same exact data in VAST
 Version <- "VAST_v4_0_0"
-TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir='models', Random=Random)
 ## Extract default values
-Map = TmbList$Map
-Params = TmbList$Parameters
+Map = TmbList0$Map
+Params = TmbList0$Parameters
 ## Fix SigmaM for all surveys to be equal
 Map$logSigmaM = factor( cbind( c(1,1,1), NA, NA) )
-TmbList = Build_TMB_Fn("TmbData"=TmbData, "RunDir"=DateFile,
-                       "Version"=Version,  "RhoConfig"=RhoConfig,
-                       "loc_x"=Spatial_List$loc_x, "Method"=Method,
-                       "TmbDir"=TmbDir, "Random"=Random, Map=Map)
-Obj = TmbList[["Obj"]]; Obj$env$beSilent()
+TmbList = Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random, Map=Map)
+Obj1 = TmbList[["Obj"]]; Obj1$env$beSilent()
 ## Estimate fixed effects and predict random effects
-Opt1 = TMBhelper::Optimize( obj=Obj, lower=TmbList[["Lower"]],
+Opt1 = TMBhelper::Optimize( obj=Obj1, lower=TmbList[["Lower"]],
                           upper=TmbList[["Upper"]], getsd=TRUE,
                           newtonsteps=1, savedir=DateFile,
                           bias.correct=FALSE ,
                           control=list(trace=1))
-ReportVast = Obj$report()
+ReportVast1 = Obj1$report()
+
+## Refit but try turning off spatial impact by setting logkappa big
+Params$logkappa1 <- 5
+Map$logkappa1 <- factor(NA)
+TmbList = Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random, Map=Map)
+Obj2 = TmbList[["Obj"]]; Obj2$env$beSilent()
+## Estimate fixed effects and predict random effects
+Opt2 = TMBhelper::Optimize( obj=Obj2, lower=TmbList[["Lower"]],
+                          upper=TmbList[["Upper"]], getsd=TRUE,
+                          newtonsteps=1, savedir=DateFile,
+                          bias.correct=FALSE ,
+                          control=list(trace=1))
+ReportVast2 = Obj2$report()
+
+
+## Refit without space at all and putting loadings matrix on overdispersion
+FieldConfig = c("Omega1"=0, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
+OverdispersionConfig = c("Delta1"=3, "Delta2"=0)
+TmbData3 = Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
+                  OverdispersionConfig=OverdispersionConfig,
+                  RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
+                  b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
+                  v_i=rep(factor(1:110-1), times=3),
+                  s_i=Data_Geostat[,'knot_i']-1,
+                  t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                  MeshList=Spatial_List$MeshList,
+                  GridList=Spatial_List$GridList,
+                  Method=Spatial_List$Method, Options=Options,
+                  Aniso=FALSE)
+## The function breaks below so manually construct the Par and Map inputs
+## Setup the new loadings
+Params$L2_z <- rep(1,6)
+Map$L2_z <- factor(1:6)
+Params$L_omega1_z <- Params$L_omega2_z
+Map$L_omega1_z <- Map$L_omega2_z
+## Now the GMRFs which were space but are now on vessel which is a proxy
+## for individual site
+Params$eta1_vf <- matrix(0, nrow=110, ncol=3)
+Map$eta1_vf <- NULL
+Params$Omegainput1_sf <- Params$Omegainput2_sf
+Map$Omegainput1_sf <- Map$Omegainput2_sf
+
+TmbList <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+                       Map=Map,
+                       Param=Params,
+                       Version=Version,  RhoConfig=RhoConfig, #
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random)
+Obj2 = TmbList[["Obj"]]; Obj2$env$beSilent()
+## Estimate fixed effects and predict random effects
+Opt2 = TMBhelper::Optimize( obj=Obj2, lower=TmbList[["Lower"]],
+                          upper=TmbList[["Upper"]], getsd=TRUE,
+                          newtonsteps=1, savedir=DateFile,
+                          bias.correct=FALSE ,
+                          control=list(trace=1))
+ReportVast2 = Obj2$report()
+
+
 
 ## Look at GRMFs for the different combinations. Have to do some crazy
 ## stuff to get them to compare to VAST.
 xx <- Spatial_List$MeshList$isotropic_mesh$loc
-xx <- data.frame(model='VAST', E_km=xx[,1], N_km=xx[,2], ReportVast$Omegainput1_sf)
+x1 <- data.frame(model='VAST', E_km=xx[,1], N_km=xx[,2], ReportVast1$Omegainput1_sf)
+x2 <- data.frame(model='VAST no space', E_km=xx[,1], N_km=xx[,2], ReportVast2$Omegainput1_sf)
+xx <- rbind(x1,x2)
 reps <- list(Report1, Report2, Report3, Report4, Report5, Report6)
 tmp <- data.frame(do.call(rbind, lapply(4:6, function(i)
   cbind(model=i, E_km=mesh$loc[,1], N_km=mesh$loc[,2], reps[[i]]$Omega_xf))))
