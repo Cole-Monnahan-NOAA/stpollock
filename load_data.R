@@ -48,7 +48,6 @@ spde <- inla.spde2.matern( mesh )
 
 ### The VAST inputs for the same data
 ### Fit VAST to this same data subset
-Version = "VAST_v4_0_0"
 Method = c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km = 50
 n_x = 100
@@ -107,5 +106,6 @@ TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
                   MeshList=Spatial_List$MeshList,
                   GridList=Spatial_List$GridList,
-                  Method=Spatial_List$Method, Options=Options )
+                  Method=Spatial_List$Method, Options=Options,
+                  Aniso=FALSE)
 Random = "generate"

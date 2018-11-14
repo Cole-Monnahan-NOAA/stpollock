@@ -90,16 +90,50 @@ opt6 <- Optimize(obj=obj6, getsd=TRUE, control=list(trace=0))
 opt6 <- opt6$opt # not converging so returned list is different
 Report6 <- obj6$report()
 
+### Now try fitting the same exact data in VAST
+Version <- "VAST_v4_0_0"
+TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir='models', Random=Random)
+## Extract default values
+Map = TmbList$Map
+Params = TmbList$Parameters
+## Fix SigmaM for all surveys to be equal
+Map$logSigmaM = factor( cbind( c(1,1,1), NA, NA) )
+TmbList = Build_TMB_Fn("TmbData"=TmbData, "RunDir"=DateFile,
+                       "Version"=Version,  "RhoConfig"=RhoConfig,
+                       "loc_x"=Spatial_List$loc_x, "Method"=Method,
+                       "TmbDir"=TmbDir, "Random"=Random, Map=Map)
+Obj = TmbList[["Obj"]]; Obj$env$beSilent()
+## Estimate fixed effects and predict random effects
+Opt1 = TMBhelper::Optimize( obj=Obj, lower=TmbList[["Lower"]],
+                          upper=TmbList[["Upper"]], getsd=TRUE,
+                          newtonsteps=1, savedir=DateFile,
+                          bias.correct=FALSE ,
+                          control=list(trace=1))
+ReportVast = Obj$report()
 
-## Model comparisons
+## Look at GRMFs for the different combinations. Have to do some crazy
+## stuff to get them to compare to VAST.
+xx <- Spatial_List$MeshList$isotropic_mesh$loc
+xx <- data.frame(model='VAST', E_km=xx[,1], N_km=xx[,2], ReportVast$Omegainput1_sf)
 reps <- list(Report1, Report2, Report3, Report4, Report5, Report6)
-tmp <- do.call(rbind, lapply(4:6, function(i)
-  cbind(model=i, lon=mesh$loc[,1], lat=mesh$loc[,2], reps[[i]]$Omega_xf)))
-sr <- melt(data.frame(tmp), id.vars=c('model', 'lon', 'lat'),
-  varnames=c('strata1', 'strata2', 'strata3'))
-ggplot(sr, aes(lon, lat, size=abs(value), col=value>0)) +
+tmp <- data.frame(do.call(rbind, lapply(4:6, function(i)
+  cbind(model=i, E_km=mesh$loc[,1], N_km=mesh$loc[,2], reps[[i]]$Omega_xf))))
+UTMlist <- Convert_LL_to_UTM_Fn( Lon=tmp[,2], Lat=tmp[,3],
+                                zone=Extrapolation_List$zone,
+                                flip_around_dateline=Extrapolation_List$flip_around_dateline )
+tmp$E_km <- UTMlist$X
+tmp$N_km <- UTMlist$Y
+tmp$model <- factor(mnames[tmp$model])
+names(xx) <- names(tmp) <- c("model", 'E_km', 'N_km', 'grmf1', 'grmf2', 'grmf3')
+tmp2 <- rbind(xx,tmp)
+sr <- melt(data.frame(tmp2), id.vars=c('model', 'E_km', 'N_km'))
+ggplot(sr, aes(E_km, N_km, size=abs(value), col=value>0)) +
   geom_point(alpha=.5) +
   facet_grid(model~variable)
+
 
 fits <- list(opt1, opt2, opt3, opt4, opt5, opt6)
 aics <- sapply(fits, function(x) round(x$AIC,2))
@@ -196,28 +230,3 @@ for(i in 1:3){
 
 
 
-### Now try fitting the same exact data in VAST
-TmbList = Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                       Version=Version,  RhoConfig=RhoConfig,
-                       loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir='models', Random=Random)
-# Extract default values
-Map = TmbList$Map
-Params = TmbList$Parameters
-# Fix SigmaM for all surveys to be equal
-Map$logSigmaM = factor( cbind( c(1,1,1), NA, NA) )
-
-# Re-build object
-TmbList = Build_TMB_Fn("TmbData"=TmbData, "RunDir"=DateFile,
-                       "Version"=Version,  "RhoConfig"=RhoConfig,
-                       "loc_x"=Spatial_List$loc_x, "Method"=Method,
-                       "TmbDir"=TmbDir, "Random"=Random, Map=Map)
-Obj = TmbList[["Obj"]]
-Obj$env$beSilent()
-## Estimate fixed effects and predict random effects
-Opt1 = TMBhelper::Optimize( obj=Obj, lower=TmbList[["Lower"]],
-                          upper=TmbList[["Upper"]], getsd=TRUE,
-                          newtonsteps=1, savedir=DateFile,
-                          bias.correct=FALSE ,
-                          control=list(trace=1))
-ReportVast = Obj$report()
