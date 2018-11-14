@@ -64,7 +64,7 @@ Region = "Eastern_Bering_Sea"
 ## Save settings
 DateFile = paste0(getwd(),'/VAST_output/')
 dir.create(DateFile)
-Record = list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
+Record = list("Version"="VAST_v4_0_0","Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
 save( Record, file=file.path(DateFile,"Record.RData"))
 capture.output( Record, file=paste0(DateFile,"Record.txt"))
 TmbDir <- DateFile
@@ -97,7 +97,7 @@ c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
 b_i = Data_Geostat[,'Catch_KG']
 ## b_i = ifelse( b_i<100, 0, b_i )
 # Build data
-TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
+TmbData = Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                   OverdispersionConfig=OverdispersionConfig,
                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                   b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
