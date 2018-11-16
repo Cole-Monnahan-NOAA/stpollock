@@ -90,6 +90,7 @@ opt6 <- Optimize(obj=obj6, getsd=TRUE, control=list(trace=0))
 opt6 <- opt6$opt # not converging so returned list is different
 Report6 <- obj6$report()
 
+### --------------------------------------------------
 ### Now try fitting the same exact data in VAST
 Version <- "VAST_v4_0_0"
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
@@ -97,44 +98,38 @@ TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir='models', Random=Random)
 ## Extract default values
-Map = TmbList0$Map
-Params = TmbList0$Parameters
+Map <- TmbList0$Map
+Params <- TmbList0$Parameters
 ## Fix SigmaM for all surveys to be equal
-Map$logSigmaM = factor( cbind( c(1,1,1), NA, NA) )
-TmbList = Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random=Random, Map=Map)
-Obj1 = TmbList[["Obj"]]; Obj1$env$beSilent()
-## Estimate fixed effects and predict random effects
-Opt1 = TMBhelper::Optimize( obj=Obj1, lower=TmbList[["Lower"]],
-                          upper=TmbList[["Upper"]], getsd=TRUE,
-                          newtonsteps=1, savedir=DateFile,
-                          bias.correct=FALSE ,
-                          control=list(trace=1))
-ReportVast1 = Obj1$report()
+Obj1 <- TmbList[["Obj"]]; Obj1$env$beSilent()
+Opt1 <- Optimize( obj=Obj1, lower=TmbList[["Lower"]],
+                 upper=TmbList[["Upper"]], savedir=DateFile,
+                 control=list(trace=1))
+ReportVast1 <- Obj1$report()
 
 ## Refit but try turning off spatial impact by setting logkappa big
 Params$logkappa1 <- 5
 Map$logkappa1 <- factor(NA)
-TmbList = Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random=Random, Map=Map)
-Obj2 = TmbList[["Obj"]]; Obj2$env$beSilent()
-## Estimate fixed effects and predict random effects
-Opt2 = TMBhelper::Optimize( obj=Obj2, lower=TmbList[["Lower"]],
-                          upper=TmbList[["Upper"]], getsd=TRUE,
-                          newtonsteps=1, savedir=DateFile,
-                          bias.correct=FALSE ,
-                          control=list(trace=1))
-ReportVast2 = Obj2$report()
+Obj2 <- TmbList[["Obj"]]; Obj2$env$beSilent()
+Opt2 <- Optimize( obj=Obj2, lower=TmbList[["Lower"]],
+                 upper=TmbList[["Upper"]], savedir=DateFile,
+                 control=list(trace=1))
+ReportVast2 <- Obj2$report()
 
 
 ## Refit without space at all and putting loadings matrix on overdispersion
-FieldConfig = c("Omega1"=0, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
-OverdispersionConfig = c("Delta1"=3, "Delta2"=0)
-TmbData3 = Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
+FieldConfig <- c("Omega1"=1, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
+OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
+TmbData3 <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                   OverdispersionConfig=OverdispersionConfig,
                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                   b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
@@ -147,40 +142,87 @@ TmbData3 = Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                   Aniso=FALSE)
 ## The function breaks below so manually construct the Par and Map inputs
 ## Setup the new loadings
-Params$L2_z <- rep(1,6)
-Map$L2_z <- factor(1:6)
-Params$L_omega1_z <- Params$L_omega2_z
-Map$L_omega1_z <- Map$L_omega2_z
-## Now the GMRFs which were space but are now on vessel which is a proxy
-## for individual site
-Params$eta1_vf <- matrix(0, nrow=110, ncol=3)
-Map$eta1_vf <- NULL
-Params$Omegainput1_sf <- Params$Omegainput2_sf
-Map$Omegainput1_sf <- Map$Omegainput2_sf
-
 TmbList <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
-                       Map=Map,
-                       Param=Params,
-                       Version=Version,  RhoConfig=RhoConfig, #
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random, build_model=FALSE)
+x <- TmbList$Map
+y <- TmbList$Parameters
+for(i in names(x)){
+  if(length(x[[i]]) != length(y[[i]]))
+    print(i)
+}
+## this is a bug in VAST?
+x$L2_z <- factor(NA)
+x$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+## Rebuild with altered map
+TmbList3 <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+                       Map=x, Param=y,
+                       Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random=Random)
-Obj2 = TmbList[["Obj"]]; Obj2$env$beSilent()
-## Estimate fixed effects and predict random effects
-Opt2 = TMBhelper::Optimize( obj=Obj2, lower=TmbList[["Lower"]],
-                          upper=TmbList[["Upper"]], getsd=TRUE,
-                          newtonsteps=1, savedir=DateFile,
-                          bias.correct=FALSE ,
-                          control=list(trace=1))
-ReportVast2 = Obj2$report()
+Obj3 <- TmbList3[["Obj"]]; Obj3$env$beSilent()
+## Not sure why passing lower and upper throws an error for this case
+Opt3 <- Optimize( obj=Obj3, savedir=DateFile, getsd=FALSE,
+                 control=list(trace=1))
+ReportVast3 <- Obj3$report()
 
+## now a version with just space
+FieldConfig <- c("Omega1"=1, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
+OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
+TmbData3 <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
+                  OverdispersionConfig=OverdispersionConfig,
+                  RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
+                  b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
+                  v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
+                  s_i=Data_Geostat[,'knot_i']-1,
+                  t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                  MeshList=Spatial_List$MeshList,
+                  GridList=Spatial_List$GridList,
+                  Method=Spatial_List$Method, Options=Options,
+                  Aniso=FALSE)
+## The function breaks below so manually construct the Par and Map inputs
+## Setup the new loadings
+TmbList <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random, build_model=FALSE)
+x <- TmbList$Map
+y <- TmbList$Parameters
+for(i in names(x)){
+  if(length(x[[i]]) != length(y[[i]]))
+    print(i)
+}
+## this is a bug in VAST?
+x$L2_z <- factor(NA)
+x$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+## Rebuild with altered map
+TmbList3 <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+                       Map=x, Param=y,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random=Random)
+Obj3 <- TmbList3[["Obj"]]; Obj3$env$beSilent()
+## Not sure why passing lower and upper throws an error for this case
+Opt3 <- Optimize( obj=Obj3, savedir=DateFile, getsd=FALSE,
+                 control=list(trace=1))
+ReportVast3 <- Obj3$report()
 
 
 ## Look at GRMFs for the different combinations. Have to do some crazy
 ## stuff to get them to compare to VAST.
 xx <- Spatial_List$MeshList$isotropic_mesh$loc
-x1 <- data.frame(model='VAST', E_km=xx[,1], N_km=xx[,2], ReportVast1$Omegainput1_sf)
-x2 <- data.frame(model='VAST no space', E_km=xx[,1], N_km=xx[,2], ReportVast2$Omegainput1_sf)
-xx <- rbind(x1,x2)
+x1 <- data.frame(model='VAST: full', E_km=xx[,1], N_km=xx[,2], ReportVast1$Omegainput1_sf)
+x2 <- data.frame(model='VAST: high kappa', E_km=xx[,1], N_km=xx[,2],
+                 ReportVast2$Omegainput1_sf)
+x3 <- data.frame(model='VAST: no space', E_km=hauls$s_long, N_km=hauls$s_lat,
+                 ReportVast3$eta1_vf)
+UTMlist <- Convert_LL_to_UTM_Fn( Lon=x3$E_km, Lat=x3$N_km,
+                                zone=Extrapolation_List$zone,
+                                flip_around_dateline=Extrapolation_List$flip_around_dateline )
+x3$E_km <- UTMlist$X
+x3$N_km <- UTMlist$Y
+xx <- rbind(x1,x2,x3)
 reps <- list(Report1, Report2, Report3, Report4, Report5, Report6)
 tmp <- data.frame(do.call(rbind, lapply(4:6, function(i)
   cbind(model=i, E_km=mesh$loc[,1], N_km=mesh$loc[,2], reps[[i]]$Omega_xf))))
@@ -189,11 +231,13 @@ UTMlist <- Convert_LL_to_UTM_Fn( Lon=tmp[,2], Lat=tmp[,3],
                                 flip_around_dateline=Extrapolation_List$flip_around_dateline )
 tmp$E_km <- UTMlist$X
 tmp$N_km <- UTMlist$Y
+mnames <- c('Stan', 'FA:lognormal', 'FA:Poisson', 'SFA:Poisson',
+                    'Spatial only', 'FA only')
 tmp$model <- factor(mnames[tmp$model])
 names(xx) <- names(tmp) <- c("model", 'E_km', 'N_km', 'grmf1', 'grmf2', 'grmf3')
 tmp2 <- rbind(xx,tmp)
 sr <- melt(data.frame(tmp2), id.vars=c('model', 'E_km', 'N_km'))
-ggplot(sr, aes(E_km, N_km, size=abs(value), col=value>0)) +
+ggplot(sr, aes(E_km, N_km, size=abs(value), col=value<0)) +
   geom_point(alpha=.5) +
   facet_grid(model~variable)
 
@@ -203,8 +247,6 @@ aics <- sapply(fits, function(x) round(x$AIC,2))
 npars <- sapply(fits, function(x) x$number_of_coefficients[2])
 nlls <- sapply(fits, function(x) round(x$objective,2))
 results <- data.frame(rbind(npars, nlls, aics))
-mnames <- c('Stan', 'FA:lognormal', 'FA:Poisson', 'SFA:Poisson',
-                    'Spatial only', 'FA only')
 names(results) <- mnames
 results
 
