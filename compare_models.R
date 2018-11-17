@@ -168,9 +168,9 @@ Opt3 <- Optimize( obj=Obj3, savedir=DateFile, getsd=FALSE,
 ReportVast3 <- Obj3$report()
 
 ## now a version with just space
-FieldConfig <- c("Omega1"=1, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
+FieldConfig <- c("Omega1"=3, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
-TmbData3 <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
+TmbData4 <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                   OverdispersionConfig=OverdispersionConfig,
                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                   b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
@@ -183,22 +183,14 @@ TmbData3 <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                   Aniso=FALSE)
 ## The function breaks below so manually construct the Par and Map inputs
 ## Setup the new loadings
-TmbList <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+TmbList0 <- Build_TMB_Fn(TmbData=TmbData4, RunDir=DateFile,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random=Random, build_model=FALSE)
-x <- TmbList$Map
-y <- TmbList$Parameters
-for(i in names(x)){
-  if(length(x[[i]]) != length(y[[i]]))
-    print(i)
-}
-## this is a bug in VAST?
-x$L2_z <- factor(NA)
-x$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+TmbList0$Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
 ## Rebuild with altered map
-TmbList3 <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
-                       Map=x, Param=y,
+TmbList4 <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
+                       Map=TmbList0$Map, Param=TmbList0$Parameters,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random=Random)
