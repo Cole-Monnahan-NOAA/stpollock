@@ -159,11 +159,12 @@ Params$Omegainput1_sf <- Params$Omegainput2_sf
 Map$Omegainput1_sf <- Map$Omegainput2_sf
 
 TmbList <- Build_TMB_Fn(TmbData=TmbData3, RunDir=DateFile,
-                       Map=Map,
-                       Param=Params,
+##                       Map=Map,
+  ##                     Param=Params,
                        Version=Version,  RhoConfig=RhoConfig, #
                        loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir=TmbDir, Random=Random)
+                       TmbDir=TmbDir, Random=Random,
+                       build_model=FALSE)
 Obj2 = TmbList[["Obj"]]; Obj2$env$beSilent()
 ## Estimate fixed effects and predict random effects
 Opt2 = TMBhelper::Optimize( obj=Obj2, lower=TmbList[["Lower"]],
