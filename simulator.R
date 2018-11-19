@@ -2,15 +2,36 @@
 #'
 #' @return A data.frame containing the spatial locations and densities
 #'   associated for each year
-generate.density <- function(st.list, nyrs, X){
-  NULL
+generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space){
+  lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth
+  D <- list()
+  for(y in 1:nyrs){
+    D[[y]] <- data.frame(year=y, lon=lon, lat=lat, depth=depth,
+          density=exp(abundance.trend[y] + rnorm(n=length(lon))))
+  }
+  D <- do.call(rbind, D)
+  return(D)
 }
 
 #' Distribute the spatial density in the vertical dimension
 #' @param density The output data.frame from generate.density function.
 #' @return The density cbinded with the binned densities
-distribution.density <- function(density, vertical.trend, X, vbins, obins){
-  NULL
+distribute.density <- function(density, vertical.trend, X, vbins, obins,
+                               eps=.0001){
+  dvert <- matrix(0, nrow=nrow(density), ncol=max(density$depth))
+  for(i in 1:nrow(density)){
+    x <- 1:density$depth[i]
+    y <- dnorm(x, 0, 1) +
+      dnorm(x=x, mean=vertical.trend[density$year[i]], sd=5)
+    ## Truncate really low probabilities to identically 0
+    ynorm <- y/sum(y)
+    ynorm[ynorm<eps] <- 0
+    ynorm <- ynorm/sum(ynorm) # renormalize to be probability
+    dvert[i,1:length(y)] <- density$density[i]*ynorm
+  }
+  ## max(abs(density$density-apply(dvert, 1, sum)))
+  out <- data.frame(density, dvert)
+  return(out)
 }
 
 #' Sample from the 3D density surface for the two gear types.
@@ -18,7 +39,16 @@ distribution.density <- function(density, vertical.trend, X, vbins, obins){
 #' @param density The density output from distribute.density.
 #' @return A data frame of locations and sampled gear types
 sample.data <- function(density, bt.cv, at.cv, pl.list, obins){
-  NULL
+  ## Bin down the vertical dimension
+  X <- density[,-(1:5)]
+  d1 <- rowSums(X[,1:3])                # ADZ
+  d2 <- rowSums(X[,4:16])               # ADZ to EFH
+  d3 <- rowSums(X[,-(1:16)])            # EFH to surface
+  BT <- exp(rnorm(n=length(d1), mean=log(d1+d2), sd=.2))
+  AT1 <- exp(rnorm(n=length(d1), mean=log(d2), sd=.2))
+  AT2 <- exp(rnorm(n=length(d1), mean=log(d3), sd=.2))
+  out <- cbind(density[,1:5], BT, AT1, AT2)
+  return(out)
 }
 
 #' Prepare simulated inputs for the different model types
@@ -94,13 +124,23 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
 
   ## Generate 2D density
   set.seed(replicate)
-  den2d <- generate.density(st.list, nyrs, X.space, beta.space)
+  nyrs <- 10
+  st.list <- list(lon=runif(100), lat=runif(100),
+                  depth = sample(50:100, size=100, replace=TRUE))
+  atrend <- sort(rnorm(nyrs))
+  den2d <- generate.density(st.list=st.list, abundance.trend=atrend,
+                            nyrs=nyrs, X.space=NULL, beta.space=NULL)
 
   ## Distribution density vertically
+  vertical.trend <- c(4,16,24,16, 18, 18,14, 12,12,12)
   den3d <- distribute.density(den2d, vertical.trend, X.vert, beta.vert,
-                              vbins, obins)
+                              obins)
+  ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
+  ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
 
   ## Simulate the sampling process for both gear types
+  bt.cv <- .2
+  at.cv <- .2
   data <- sample.data(den3d, bt.cv, at.cv, pl.list, obins)
 
   ## Reorganize data for models
