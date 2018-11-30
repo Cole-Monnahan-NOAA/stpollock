@@ -6,7 +6,7 @@ generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space
   lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth
   D <- list()
   for(y in 1:nyrs){
-    D[[y]] <- data.frame(year=y, lon=lon, lat=lat, depth=depth,
+    D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
           density=exp(abundance.trend[y] + rnorm(n=length(lon))))
   }
   D <- do.call(rbind, D)
@@ -22,7 +22,7 @@ distribute.density <- function(density, vertical.trend, X, vbins, obins,
   for(i in 1:nrow(density)){
     x <- 1:density$depth[i]
     y <- dnorm(x, 0, 1) +
-      dnorm(x=x, mean=vertical.trend[density$year[i]], sd=5)
+      dnorm(x=x, mean=vertical.trend[density$Year[i]], sd=5)
     ## Truncate really low probabilities to identically 0
     ynorm <- y/sum(y)
     ynorm[ynorm<eps] <- 0
@@ -61,6 +61,14 @@ prepare.inputs <- function(data){
   Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
   grid_size_km <- 50
   n_x <- 100
+  ## Stratification for results
+  strata.limits <- data.frame(STRATA='All_areas')
+  ## Derived objects
+  Region <- "Eastern_Bering_Sea"
+  ## Save settings
+  Extrapolation_List  <-
+    make_extrapolation_info( Region=Region, strata.limits=strata.limits )
+
   ## Model settings
   FieldConfig <- c(Omega1=3, Epsilon1=0, Omega2=0, Epsilon2=0)
   RhoConfig <- c(Beta1=0, Beta2=0, Epsilon1=0, Epsilon2=0)
@@ -69,17 +77,30 @@ prepare.inputs <- function(data){
   Options <-  c(SD_site_density=0, SD_site_logdensity=0, Calculate_Range=1,
                 Calculate_evenness=0, Calculate_effective_area=1, Calculate_Cov_SE=0,
                 Calculate_Synchrony=0, Calculate_Coherence=0)
-  ## Stratification for results
-  strata.limits <- data.frame(STRATA=All_areas)
-  ## Derived objects
-  Region <- "Eastern_Bering_Sea"
-  ## Save settings
+  Data_Geostat <- melt(data, id.vars=c('Lat', 'Lon', 'Year', 'density', 'depth'),
+                       value.name='Catch_KG',
+                       variable.name='Gear')
+  Data_Geostat$Vessel <- factor(1)
+  Data_Geostat$AreaSwept_km2 <- 1
+  ## Derived objects for spatio-temporal estimation
+  Spatial_List  <-  make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
+                                   Method=Method, Lon=Data_Geostat[,'Lon'],
+                                   Lat=Data_Geostat[,'Lat'],
+                                   Extrapolation_List=Extrapolation_List,
+                                   DirPath=DateFile, Save_Results=FALSE )
+  Data_Geostat$knot_i=Spatial_List$knot_i
   DateFile <- paste0(getwd(),'/VAST_output/')
   dir.create(DateFile)
   Record <- list("Version"="VAST_v4_0_0","Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
   save( Record, file=file.path(DateFile,"Record.RData"))
   capture.output( Record, file=paste0(DateFile,"Record.txt"))
   TmbDir <- DateFile
+
+  c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
+                ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+                                        # Add threshold
+  b_i = Data_Geostat[,'Catch_KG']
+  Random = "generate"
   TmbData <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
                       OverdispersionConfig=OverdispersionConfig,
                       RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
@@ -91,6 +112,20 @@ prepare.inputs <- function(data){
                       GridList=Spatial_List$GridList,
                       Method=Spatial_List$Method, Options=Options,
                       Aniso=FALSE)
+  TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                           Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
+                           loc_x=Spatial_List$loc_x, Method=Method,
+                           TmbDir='models', Random="generate")
+  ## Extract default values
+  Map <- TmbList0$Map
+  Params <- TmbList0$Parameters
+  ## Fix SigmaM for all surveys to be equal
+  Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+  TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                          Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
+                          loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir=TmbDir, Random='generate', Map=Map)
+
 
   ## Now two independent ST indices with VAST
 
@@ -98,7 +133,7 @@ prepare.inputs <- function(data){
   ## And the combined model from Stan's paper
 
 
-  NULL
+  return(list(vast.full=TmbList))
 }
 
 
@@ -124,10 +159,6 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
 
   ## Generate 2D density
   set.seed(replicate)
-  nyrs <- 10
-  st.list <- list(lon=runif(100), lat=runif(100),
-                  depth = sample(50:100, size=100, replace=TRUE))
-  atrend <- sort(rnorm(nyrs))
   den2d <- generate.density(st.list=st.list, abundance.trend=atrend,
                             nyrs=nyrs, X.space=NULL, beta.space=NULL)
 
@@ -139,6 +170,7 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
   ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
 
   ## Simulate the sampling process for both gear types
+
   bt.cv <- .2
   at.cv <- .2
   data <- sample.data(den3d, bt.cv, at.cv, pl.list, obins)
@@ -147,24 +179,31 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
   inputs <- prepare.inputs(data)
 
   ## Fit the full VAST model
-  Version <- ''
-  x <- inputs$vast.full
-  build.full <- Build_TMB_Fn(TmbData=x$TmbData, RunDir=DateFile,
-                          Version=Version,  RhoConfig=x$RhoConfig,
-                          loc_x=x$Spatial_List$loc_x, Method=x$Method,
-                          TmbDir=TmbDir, Random=Random)
-  obj.full <- build.full$obj; obj.full$env$beSilent()
+  ## x <- inputs$vast.full
+  ## build.full <- Build_TMB_Fn(TmbData=x$TmbData, RunDir=x$DateFile,
+  ##                         Version=x$Version,  RhoConfig=x$RhoConfig,
+  ##                         loc_x=x$Spatial_List$loc_x, Method=x$Method,
+  ##                         TmbDir=x$TmbDir, Random=x$Random)
+  obj.full <- inputs$vast.full$Obj; obj.full$env$beSilent()
   ## Not sure why passing lower and upper throws an error for this case
-  Opt.full <- Optimize( obj=obj3, savedir=DateFile, getsd=TRUE,
-                   lower=build.full$lower, upper=build.full$upper,
+  Opt.full <- Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
+                       ##                   lower=build.full$lower, upper=build.full$upper,
                    control=list(trace=0))
   rep.full <- obj.full$report()
-
+  fit.full <- list(index=apply(rep.full$Index_cyl, 2, sum))
   ## Fit the independent VAST models, one for BT and one for AT
 
   ## and the combined model
 
-  NULL
+  return(list(fit.full))
 
 }
 
+
+set.seed(1)
+atrend <- sort(rnorm(10))
+out <- simulate(replicate=1,
+                st.list=list(lon=runif(100), lat=runif(100),
+                             depth = sample(50:100, size=100, replace=TRUE)),
+                nyrs=10, abundance.trend=atrend)
+plot(atrend,out[[1]]$index)
