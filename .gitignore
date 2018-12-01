@@ -16,5 +16,6 @@ init.pin
 admodel.cov
 admodel.dep
 admodel.hes
-VAST_output
+VAST_output*
+simulation_progress.txt
 
