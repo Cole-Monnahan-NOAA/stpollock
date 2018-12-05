@@ -101,9 +101,9 @@ prepare.inputs <- function(data, replicate){
   Options <-  c(SD_site_density=0, SD_site_logdensity=0, Calculate_Range=1,
                 Calculate_evenness=0, Calculate_effective_area=1, Calculate_Cov_SE=0,
                 Calculate_Synchrony=0, Calculate_Coherence=0)
-  Data_Geostat <- reshape2::melt(data, id.vars=c('Lat', 'Lon', 'Year', 'density', 'depth'),
-                       value.name='Catch_KG',
-                       variable.name='Gear')
+  Data_Geostat <-
+    reshape2::melt(data, id.vars=c('Lat', 'Lon', 'Year', 'density', 'depth', 'd1', 'd2', 'd3'),
+                   value.name='Catch_KG', variable.name='Gear')
   Data_Geostat$Vessel <- factor(1)
   Data_Geostat$AreaSwept_km2 <- 1
   ## Derived objects for spatio-temporal estimation
