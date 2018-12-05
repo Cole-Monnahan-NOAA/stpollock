@@ -6,9 +6,12 @@ generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space
   lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth; beta0 <- st.list$beta0
   D <- list()
   for(y in 1:nyrs){
+    ## Generate true density, including some real zeroes
+    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon)))
+    den <- den*rbinom(n=length(den), size=1, prob=.9)
     ## for each year create a 2d spatial grid of densities
     D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
-                         density=exp( beta0 + abundance.trend[y] + rnorm(n=length(lon))))
+                         density=den)
   }
   D <- do.call(rbind, D)
   ##  ggplot(D, aes(Lon, Lat, size=sqrt(density))) + geom_point() + facet_wrap('Year')
@@ -177,7 +180,7 @@ fit.models <- function(data, replicate, plot=TRUE){
     Year_Set  <-  seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
     Years2Include <-  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
     plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-                   TmbData=TmbData, Report=Report, Q=Q, savedir=DateFile,
+                   TmbData=TmbData, Report=rep.full, Q=Q, savedir=DateFile,
                    MappingDetails=MapDetails_List[["MappingDetails"]],
                    PlotDF=MapDetails_List[["PlotDF"]],
                    MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
@@ -192,8 +195,7 @@ fit.models <- function(data, replicate, plot=TRUE){
 
 
   ## And the combined model from Stan's paper
-
-
+  ##  dyn.unload(dynlib(paste0(DateFile, 'VAST_v4_0_0')))
   return(list(vast.full=fit.full))
 }
 
