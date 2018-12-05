@@ -3,34 +3,49 @@
 #' @return A data.frame containing the spatial locations and densities
 #'   associated for each year
 generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space){
-  lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth
+  lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth; beta0 <- st.list$beta0
   D <- list()
   for(y in 1:nyrs){
+    ## for each year create a 2d spatial grid of densities
     D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
-          density=exp(abundance.trend[y] + rnorm(n=length(lon))))
+                         density=exp( beta0 + abundance.trend[y] + rnorm(n=length(lon))))
   }
   D <- do.call(rbind, D)
+  ##  ggplot(D, aes(Lon, Lat, size=sqrt(density))) + geom_point() + facet_wrap('Year')
   return(D)
 }
 
 #' Distribute the spatial density in the vertical dimension
 #' @param density The output data.frame from generate.density function.
 #' @return The density cbinded with the binned densities
-distribute.density <- function(density, vertical.trend, X, vbins, obins,
+distribute.density <- function(dat, vertical.trend, X, vbins, obins,
                                eps=.0001){
-  dvert <- matrix(0, nrow=nrow(density), ncol=max(density$depth))
-  for(i in 1:nrow(density)){
-    x <- 1:density$depth[i]
-    y <- dnorm(x, 0, 1) +
-      dnorm(x=x, mean=vertical.trend[density$Year[i]], sd=5)
+
+  max.depth <- max(dat$depth)
+  x.all <- 1:max.depth
+  dvert <- matrix(0, nrow=nrow(dat), ncol=max.depth)
+  for(i in 1:nrow(dat)){
+    ## For each point (row) distribute the density vertically from the
+    ## bottom to the surface, which for now is in 1m bins. For now using a
+    ## mixture of normals to concentrate fish near bottom
+    x <- 1:dat$depth[i] # the vertical bins
+    p <- runif(1, .01,.99)
+    y <- p*dnorm(x=x, 0, 3) +
+      (1-p)*dnorm(x=x, mean=vertical.trend[dat$Year[i]], sd=15)
     ## Truncate really low probabilities to identically 0
     ynorm <- y/sum(y)
     ynorm[ynorm<eps] <- 0
     ynorm <- ynorm/sum(ynorm) # renormalize to be probability
-    dvert[i,1:length(y)] <- density$density[i]*ynorm
+    dvert[i,1:length(y)] <- dat$density[i]*ynorm
   }
-  ## max(abs(density$density-apply(dvert, 1, sum)))
-  out <- data.frame(density, dvert)
+  ## check we didn't lose density
+  if(max(abs(dat$density-apply(dvert, 1, sum)))>.01)
+    warning("Lost density when generating vertical distribution")
+  ## quick visual check of distributions
+  ##  matplot(t(dvert[1:50,]), type='l')
+  dvert <- as.data.frame(dvert)
+  names(dvert) <- paste0('d', x.all)
+  out <- data.frame(dat, dvert)
   return(out)
 }
 
@@ -38,16 +53,25 @@ distribute.density <- function(density, vertical.trend, X, vbins, obins,
 #'
 #' @param density The density output from distribute.density.
 #' @return A data frame of locations and sampled gear types
-sample.data <- function(density, bt.cv, at.cv, pl.list, obins){
+sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
   ## Bin down the vertical dimension
-  X <- density[,-(1:5)]
+  X <- dat[,-(1:5)]
   d1 <- rowSums(X[,1:3])                # ADZ
   d2 <- rowSums(X[,4:16])               # ADZ to EFH
   d3 <- rowSums(X[,-(1:16)])            # EFH to surface
-  BT <- exp(rnorm(n=length(d1), mean=log(d1+d2), sd=.2))
-  AT1 <- exp(rnorm(n=length(d1), mean=log(d2), sd=.2))
-  AT2 <- exp(rnorm(n=length(d1), mean=log(d3), sd=.2))
-  out <- cbind(density[,1:5], BT, AT1, AT2)
+  BT <- exp(rnorm(n=length(d1), mean=log(d1+d2), sd=bt.sd))
+  AT1 <- exp(rnorm(n=length(d1), mean=log(d2), sd=at.sd))
+  AT2 <- exp(rnorm(n=length(d1), mean=log(d3), sd=at.sd))
+  out <- cbind(dat[,1:5], BT, AT1, AT2, d1, d2, d3)
+  if(FALSE){
+    par(mfrow=c(1,3))
+    plot(log(d1+d2), log(BT))
+    plot(log(d2), log(AT1))
+    plot(log(d3), log(AT2))
+    out.long <- melt(out, measure.vars=c('d1', 'd2', 'd3'))
+    ggplot(out.long, aes(Lon, Lat, size=sqrt(value), col=value==0)) +
+      geom_point() + facet_grid(Year~variable)
+  }
   return(out)
 }
 
@@ -148,15 +172,17 @@ prepare.inputs <- function(data, replicate){
 #'   height (thus bin widths vary with depth).
 #' @param X A matrix of environmental covariates associated for each
 #'   spatial point
-#' @param bt.cv The variance for the BT sampling process.
-#' @param at.cv The variance for the AT sampling process.
+#' @param bt.sd The variance for the BT sampling process.
+#' @param at.sd The variance for the AT sampling process.
 #' @param pl.list Other Poisson-link parameters?
 #' @param obins The observation bins, assuming 0-3, 3-16, 16-surface
 simulate <- function(replicate, st.list, nyrs, abundance.trend,
-                     vertical.trend, vbins, X, bt.cv, at.cv, pl.list,
+                     vertical.trend, vbins, X, bt.sd, at.sd, pl.list,
                      obins){
-  ## Check inputs
+  ## load libraries again in case run in parallel
   library(VAST); library(TMB); library(TMBhelper)
+  ## Check inputs TODO
+
   ## Generate 2D density
   set.seed(replicate)
   den2d <- generate.density(st.list=st.list, abundance.trend=atrend,
@@ -171,9 +197,9 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
 
   ## Simulate the sampling process for both gear types
 
-  bt.cv <- .2
-  at.cv <- .2
-  data <- sample.data(den3d, bt.cv, at.cv, pl.list, obins)
+  bt.sd <- .2
+  at.sd <- .2
+  data <- sample.data(den3d, bt.sd, at.sd, pl.list, obins)
 
   ## Reorganize data for models
   inputs <- prepare.inputs(data, replicate)
