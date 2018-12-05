@@ -123,10 +123,9 @@ fit.models <- function(data, replicate, plot=TRUE){
   save( Record, file=file.path(DateFile,"Record.RData"))
   capture.output( Record, file=paste0(DateFile,"Record.txt"))
   TmbDir <- DateFile
-
   c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                 ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-                                        # Add threshold
+  ## Add threshold
   b_i = Data_Geostat[,'Catch_KG']
   Random = "generate"
   TmbData <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
@@ -150,6 +149,10 @@ fit.models <- function(data, replicate, plot=TRUE){
   Params <- TmbList0$Parameters
   ## Fix SigmaM for all surveys to be equal
   Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+  ##  Map$beta1_ct <- factor(rep(1, 30))
+  Map$beta2_ct <- factor(rep(1, 30))
+  ## Map$logkappa1 <- factor(NA)
+  ## Params$logkappa1 <- 5
   TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                           Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
@@ -159,7 +162,7 @@ fit.models <- function(data, replicate, plot=TRUE){
   obj.full <- TmbList$Obj; obj.full$env$beSilent()
   ## Not sure why passing lower and upper throws an error for this case
   Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
-                   control=list(trace=0))
+                   control=list(trace=1))
   rep.full <- obj.full$report()
   fit.full <- list(Opt=Opt.full, Report=rep.full,
                    ## ParHat=obj.full$env$parList(Opt.full$par),
@@ -168,9 +171,9 @@ fit.models <- function(data, replicate, plot=TRUE){
     message("Making plots..")
     plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
               Data_Geostat=Data_Geostat, PlotDir=DateFile )
-    ## Enc_prob  <-
-    ##   plot_encounter_diagnostic(Report=rep.full, Data_Geostat=Data_Geostat,
-    ##                             DirName=DateFile)
+    Enc_prob  <-
+      plot_encounter_diagnostic(Report=rep.full, Data_Geostat=Data_Geostat,
+                                DirName=DateFile)
     Q  <-  plot_quantile_diagnostic( TmbData=TmbData, Report=rep.full, FileName_PP="Posterior_Predictive",
                                     FileName_Phist="Posterior_Predictive-Histogram",
                                     FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile)
@@ -189,6 +192,16 @@ fit.models <- function(data, replicate, plot=TRUE){
                    Rotate=MapDetails_List[["Rotate"]], Cex=MapDetails_List[["Cex"]],
                    Legend=MapDetails_List[["Legend"]], zone=MapDetails_List[["Zone"]],
                    mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8)
+    Index <-
+      plot_biomass_index( DirName=DateFile, TmbData=TmbData,
+                         Sdreport=Opt.full[["SD"]], Year_Set=Year_Set,
+                         Years2Include=Years2Include,
+                         strata_names=strata.limits[,1], use_biascorr=TRUE,
+                         category_names=levels(Data_Geostat[,'Gear']) )
+    Index$Table[,c("Category","Year","Estimate_metric_tons","SD_mt")]
+    Plot_factors( Report=rep.full, ParHat=obj.full$env$parList(), Data=TmbData,
+                 SD=Opt$SD, mapdetails_list=MapDetails_List, Year_Set=Year_Set,
+                 category_names=levels(Data_Geostat[,'Gear']), plotdir=DateFile )
   }
 
   ## Now two independent ST indices with VAST
