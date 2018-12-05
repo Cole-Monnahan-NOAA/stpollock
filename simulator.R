@@ -78,8 +78,9 @@ sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
 #' Prepare simulated inputs for the different model types
 #'
 #' @param data The output from sample.data
-#' @return A list of lists for the data inputs for all of the model types
-prepare.inputs <- function(data, replicate){
+#' @param replicate Replicate number, used for parallel
+#' @return A list of fitted objects for each model type
+fit.models <- function(data, replicate, plot=TRUE){
 
   ## Setup the VAST inputs
   Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
@@ -126,16 +127,17 @@ prepare.inputs <- function(data, replicate){
   b_i = Data_Geostat[,'Catch_KG']
   Random = "generate"
   TmbData <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
-                      OverdispersionConfig=OverdispersionConfig,
-                      RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
-                      b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
-                      v_i=rep(factor(1:110-1), times=3),
-                      s_i=Data_Geostat[,'knot_i']-1,
-                      t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
-                      MeshList=Spatial_List$MeshList,
-                      GridList=Spatial_List$GridList,
-                      Method=Spatial_List$Method, Options=Options,
-                      Aniso=FALSE)
+                     OverdispersionConfig=OverdispersionConfig,
+                     RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
+                     b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
+                     ## v_i=rep(factor(1:110-1), times=3),
+                     v_i=Data_Geostat$vessel-1,
+                     s_i=Data_Geostat[,'knot_i']-1,
+                     t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                     MeshList=Spatial_List$MeshList,
+                     GridList=Spatial_List$GridList,
+                     Method=Spatial_List$Method, Options=Options,
+                     Aniso=FALSE)
   TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                            Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
                            loc_x=Spatial_List$loc_x, Method=Method,
@@ -149,7 +151,42 @@ prepare.inputs <- function(data, replicate){
                           Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random='generate', Map=Map)
-  TmbList$DateFile <- DateFile
+
+  ## Fit the full VAST model
+  obj.full <- TmbList$Obj; obj.full$env$beSilent()
+  ## Not sure why passing lower and upper throws an error for this case
+  Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
+                   control=list(trace=0))
+  rep.full <- obj.full$report()
+  fit.full <- list(Opt=Opt.full, Report=rep.full,
+                   ## ParHat=obj.full$env$parList(Opt.full$par),
+                   TmbData=TmbData)
+  if(plot){
+    message("Making plots..")
+    plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
+              Data_Geostat=Data_Geostat, PlotDir=DateFile )
+    ## Enc_prob  <-
+    ##   plot_encounter_diagnostic(Report=rep.full, Data_Geostat=Data_Geostat,
+    ##                             DirName=DateFile)
+    Q  <-  plot_quantile_diagnostic( TmbData=TmbData, Report=rep.full, FileName_PP="Posterior_Predictive",
+                                    FileName_Phist="Posterior_Predictive-Histogram",
+                                    FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile)
+    ## Spatial residuals
+    MapDetails_List  <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+    ## Decide which years to plot
+    Year_Set  <-  seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include <-  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+    plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
+                   TmbData=TmbData, Report=Report, Q=Q, savedir=DateFile,
+                   MappingDetails=MapDetails_List[["MappingDetails"]],
+                   PlotDF=MapDetails_List[["PlotDF"]],
+                   MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
+                   Xlim=MapDetails_List[["Xlim"]], Ylim=MapDetails_List[["Ylim"]],
+                   FileName=DateFile, Year_Set=Year_Set, Years2Include=Years2Include,
+                   Rotate=MapDetails_List[["Rotate"]], Cex=MapDetails_List[["Cex"]],
+                   Legend=MapDetails_List[["Legend"]], zone=MapDetails_List[["Zone"]],
+                   mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8)
+  }
 
   ## Now two independent ST indices with VAST
 
@@ -157,7 +194,7 @@ prepare.inputs <- function(data, replicate){
   ## And the combined model from Stan's paper
 
 
-  return(list(vast.full=TmbList))
+  return(list(vast.full=fit.full))
 }
 
 
@@ -202,25 +239,16 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
   data <- sample.data(den3d, bt.sd, at.sd, pl.list, obins)
 
   ## Reorganize data for models
-  inputs <- prepare.inputs(data, replicate)
+  out <- fit.models(data, replicate, plot=TRUE)
 
-  ## Fit the full VAST model
-  ## x <- inputs$vast.full
-  ## build.full <- Build_TMB_Fn(TmbData=x$TmbData, RunDir=x$DateFile,
-  ##                         Version=x$Version,  RhoConfig=x$RhoConfig,
-  ##                         loc_x=x$Spatial_List$loc_x, Method=x$Method,
-  ##                         TmbDir=x$TmbDir, Random=x$Random)
-  obj.full <- inputs$vast.full$Obj; obj.full$env$beSilent()
-  ## Not sure why passing lower and upper throws an error for this case
-  Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=inputs$vast.full$DateFile, getsd=TRUE,
-                   control=list(trace=0))
-  rep.full <- obj.full$report()
-  fit.full <- list(index=apply(rep.full$Index_cyl, 2, sum))
+
+
+
   ## Fit the independent VAST models, one for BT and one for AT
 
   ## and the combined model
 
-  return(list(fit.full))
+  return(out)
 
 }
 
