@@ -7,7 +7,7 @@ generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space
   D <- list()
   for(y in 1:nyrs){
     ## Generate true density, including some real zeroes
-    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon)))
+    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon), sd=.0001))
     den <- den*rbinom(n=length(den), size=1, prob=.9)
     ## for each year create a 2d spatial grid of densities
     D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
@@ -39,6 +39,8 @@ distribute.density <- function(dat, vertical.trend, X, vbins, obins,
     ynorm <- y/sum(y)
     ynorm[ynorm<eps] <- 0
     ynorm <- ynorm/sum(ynorm) # renormalize to be probability
+    ## temp test
+    ynorm <- rep(1, len=dat$depth[i])/dat$depth[i]
     dvert[i,1:length(y)] <- dat$density[i]*ynorm
   }
   ## check we didn't lose density
@@ -72,8 +74,9 @@ sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
     plot(log(d2), log(AT1))
     plot(log(d3), log(AT2))
     out.long <- melt(out, measure.vars=c('d1', 'd2', 'd3'))
-    ggplot(out.long, aes(Lon, Lat, size=sqrt(value), col=value==0)) +
+    g <- ggplot(out.long, aes(Lon, Lat, size=sqrt(value), col=value==0)) +
       geom_point() + facet_grid(Year~variable)
+    print(g)
   }
   return(out)
 }
@@ -150,9 +153,16 @@ fit.models <- function(data, replicate, plot=TRUE){
   ## Fix SigmaM for all surveys to be equal
   Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
-  Map$beta2_ct <- factor(rep(1, 30))
+  ## Map$beta2_ct <- factor(rep(1, 30))
   ## turn off estimation of space
   Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
+  ## turn off estimation of factor analysis
+  n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
+  lvec <- tmp[lower.tri(tmp, TRUE)] # init values
+  ## This map will turn off estimation of off diagonals but estimate the
+  ## diagonal which turns off the FA part of the model
+  Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
+  Params$L_omega1_z <- lvec
   TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                           Version=Version,  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
@@ -176,7 +186,7 @@ fit.models <- function(data, replicate, plot=TRUE){
   index <- data.frame(year=1:10,
        value=apply(rep.full$Index_cyl, 2, sum),
        se=sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])}))
-  fit.full <- list(index=index, Opt=Opt.full, Report=rep.full,
+  fit.full <- list(index=index, est=est, Opt=Opt.full, Report=rep.full,
                    ## ParHat=obj.full$env$parList(Opt.full$par),
                    TmbData=TmbData)
 
@@ -190,6 +200,7 @@ fit.models <- function(data, replicate, plot=TRUE){
     Q  <-  plot_quantile_diagnostic( TmbData=TmbData, Report=rep.full, FileName_PP="Posterior_Predictive",
                                     FileName_Phist="Posterior_Predictive-Histogram",
                                     FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile)
+
     ## Spatial residuals
     MapDetails_List  <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
     ## Decide which years to plot
@@ -254,7 +265,7 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
                             nyrs=nyrs, X.space=NULL, beta.space=NULL)
 
   ## Distribution density vertically
-  vertical.trend <- c(4,16,24,16, 18, 18,14, 12,12,12)
+  vertical.trend <- rep(1,10)#c(4,16,24,16, 18, 18,14, 12,12,12)
   den3d <- distribute.density(den2d, vertical.trend, X.vert, beta.vert,
                               obins)
   ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))

@@ -18,13 +18,14 @@ Nsamples <- 200
 st.list <- list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62), beta0=3,
                 depth = sample(50:100, size=Nsamples, replace=TRUE))
 out <- simulate(replicate=1, st.list=st.list, nyrs=10,
-                abundance.trend=atrend, plot=FALSE)
+                abundance.trend=atrend, plot=TRUE)
 
-par(mfrow=c(1,2))
-plot(1:10, atrend)
-plot(1:10, out$vast.full$index$value, ylim=c(0, 6e6))
-with(out$vast.full$index, lines(1:10, value+1.96*se))
-with(out$vast.full$index, plot(1:10, value-1.96*se))
+## par(mfrow=c(1,2))
+## plot(1:10, atrend)
+
+est <- out$vast
+ggplot(out$vast.full$index, aes(year, y=value)) +
+  geom_errorbar(aes(ymin=value-1.96*se, ymax=value+1.96*se))
 
 chains <- cores <- 6
 sfStop()
