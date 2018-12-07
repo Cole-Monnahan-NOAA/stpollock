@@ -119,7 +119,7 @@ fit.models <- function(data, replicate, plot=TRUE){
                                    DirPath=DateFile, Save_Results=FALSE )
   Data_Geostat$knot_i=Spatial_List$knot_i
   dir.create(DateFile)
-  Record <- list("Version"="VAST_v4_0_0","Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
+  Record <- list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
   save( Record, file=file.path(DateFile,"Record.RData"))
   capture.output( Record, file=paste0(DateFile,"Record.txt"))
   TmbDir <- DateFile
@@ -128,7 +128,7 @@ fit.models <- function(data, replicate, plot=TRUE){
   ## Add threshold
   b_i = Data_Geostat[,'Catch_KG']
   Random = "generate"
-  TmbData <- Data_Fn(Version="VAST_v4_0_0", FieldConfig=FieldConfig,
+  TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                      OverdispersionConfig=OverdispersionConfig,
                      RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                      b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
@@ -141,7 +141,7 @@ fit.models <- function(data, replicate, plot=TRUE){
                      Method=Spatial_List$Method, Options=Options,
                      Aniso=FALSE)
   TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                           Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
+                           Version=Version,  RhoConfig=RhoConfig,
                            loc_x=Spatial_List$loc_x, Method=Method,
                            TmbDir='models', Random="generate")
   ## Extract default values
@@ -154,7 +154,7 @@ fit.models <- function(data, replicate, plot=TRUE){
   ## Map$logkappa1 <- factor(NA)
   ## Params$logkappa1 <- 5
   TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                          Version="VAST_v4_0_0",  RhoConfig=RhoConfig,
+                          Version=Version,  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir=TmbDir, Random='generate', Map=Map)
 
