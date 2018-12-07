@@ -185,7 +185,7 @@ fit.models <- function(data, replicate, plot=TRUE){
   cov.index <- Opt.full$SD$cov[tmp,tmp]
   index <- data.frame(year=1:10,
        value=apply(rep.full$Index_cyl, 2, sum),
-       se=sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])}))
+       se=sqrt(sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])})))
   fit.full <- list(index=index, est=est, Opt=Opt.full, Report=rep.full,
                    ## ParHat=obj.full$env$parList(Opt.full$par),
                    TmbData=TmbData)
