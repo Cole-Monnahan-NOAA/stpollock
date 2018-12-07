@@ -7,7 +7,7 @@ generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space
   D <- list()
   for(y in 1:nyrs){
     ## Generate true density, including some real zeroes
-    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon), sd=.0001))
+    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon), sd=.5))
     den <- den*rbinom(n=length(den), size=1, prob=.9)
     ## for each year create a 2d spatial grid of densities
     D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
@@ -155,14 +155,12 @@ fit.models <- function(data, replicate, plot=TRUE){
   ##  Map$beta1_ct <- factor(rep(1, 30))
   ## Map$beta2_ct <- factor(rep(1, 30))
   ## turn off estimation of space
-  Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
-  ## turn off estimation of factor analysis
-  n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
-  lvec <- tmp[lower.tri(tmp, TRUE)] # init values
-  ## This map will turn off estimation of off diagonals but estimate the
-  ## diagonal which turns off the FA part of the model
-  Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
-  Params$L_omega1_z <- lvec
+  ## Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
+  ## ## turn off estimation of factor analysis
+  ## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
+  ## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
+  ## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
+  ## Params$L_omega1_z <- lvec
   TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                           Version=Version,  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
@@ -180,7 +178,8 @@ fit.models <- function(data, replicate, plot=TRUE){
   ## into VAST yet so have to do it manually. also note that the order of
   ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
   ## Index_12,.. etc. This effects the subsetting below
-  est <- cbind(Opt.full$SD$value, Opt.full$SD$sd)
+  est <- data.frame(par=names(Opt.full$SD$value), value=Opt.full$SD$value,
+                    se=Opt.full$SD$sd)
   tmp <- which(names(Opt.full$SD$value) %in% 'Index_cyl')
   cov.index <- Opt.full$SD$cov[tmp,tmp]
   index <- data.frame(year=1:10,
