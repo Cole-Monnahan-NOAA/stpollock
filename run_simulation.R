@@ -3,6 +3,7 @@ library(TMB)
 library(VAST)
 library(reshape2)
 library(ggplot2)
+library(plyr)
 library(TMBhelper)
 library(snowfall)
 library(maps)
@@ -20,10 +21,6 @@ st.list <- list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62), beta
 out <- simulate(replicate=1, st.list=st.list, nyrs=10,
                 abundance.trend=atrend, plot=TRUE)
 
-## par(mfrow=c(1,2))
-## plot(1:10, atrend)
-
-est <- out$vast
 ggplot(out$vast.full$index, aes(year, y=value)) +
   geom_errorbar(aes(ymin=value-1.96*se, ymax=value+1.96*se))
 
@@ -32,7 +29,10 @@ sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='simulation_progress.txt')
 snowfall::sfExportAll()
 sfLibrary(VAST)
-mcmc.out <- snowfall::sfLapply(1:chains, function(i)
+out.parallel <- snowfall::sfLapply(1:chains, function(i)
  simulate(replicate=i, st.list=st.list, nyrs=10, abundance.trend=atrend))
 sfStop()
-
+indices <- ldply(1:cores, function(x) cbind(x,out.parallel[[x]]$vast.full$index))
+indices$year <- indices$year+ ((1:10)/10)[indices$x]
+ggplot(indices, aes(year, y=value, group=x)) +
+  geom_errorbar(aes(ymin=value-1.96*se, ymax=value+1.96*se))
