@@ -151,8 +151,8 @@ fit.models <- function(data, replicate, plot=TRUE){
   Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
   Map$beta2_ct <- factor(rep(1, 30))
-  ## Map$logkappa1 <- factor(NA)
-  ## Params$logkappa1 <- 5
+  ## turn off estimation of space
+  Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
   TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
                           Version=Version,  RhoConfig=RhoConfig,
                           loc_x=Spatial_List$loc_x, Method=Method,
@@ -162,11 +162,24 @@ fit.models <- function(data, replicate, plot=TRUE){
   obj.full <- TmbList$Obj; obj.full$env$beSilent()
   ## Not sure why passing lower and upper throws an error for this case
   Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
-                   control=list(trace=1))
+                   control=list(trace=10))
   rep.full <- obj.full$report()
-  fit.full <- list(Opt=Opt.full, Report=rep.full,
+  ## Manually calculate SE for the total biomass index. Since it's a sum of
+  ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
+  ## of all of the variances and covariances. This feature is not coded
+  ## into VAST yet so have to do it manually. also note that the order of
+  ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
+  ## Index_12,.. etc. This effects the subsetting below
+  est <- cbind(Opt.full$SD$value, Opt.full$SD$sd)
+  tmp <- which(names(Opt.full$SD$value) %in% 'Index_cyl')
+  cov.index <- Opt.full$SD$cov[tmp,tmp]
+  index <- data.frame(year=1:10,
+       value=apply(rep.full$Index_cyl, 2, sum),
+       se=sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])}))
+  fit.full <- list(index=index, Opt=Opt.full, Report=rep.full,
                    ## ParHat=obj.full$env$parList(Opt.full$par),
                    TmbData=TmbData)
+
   if(plot){
     message("Making plots..")
     plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
@@ -230,7 +243,7 @@ fit.models <- function(data, replicate, plot=TRUE){
 #' @param obins The observation bins, assuming 0-3, 3-16, 16-surface
 simulate <- function(replicate, st.list, nyrs, abundance.trend,
                      vertical.trend, vbins, X, bt.sd, at.sd, pl.list,
-                     obins){
+                     obins, ...){
   ## load libraries again in case run in parallel
   library(VAST); library(TMB); library(TMBhelper)
   ## Check inputs TODO
@@ -254,7 +267,7 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
   data <- sample.data(den3d, bt.sd, at.sd, pl.list, obins)
 
   ## Reorganize data for models
-  out <- fit.models(data, replicate, plot=TRUE)
+  out <- fit.models(data, replicate, ...)
 
 
 

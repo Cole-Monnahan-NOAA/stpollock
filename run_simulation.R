@@ -12,13 +12,19 @@ source("simulator.R")
 
 ## Basic simulation
 set.seed(1)
-atrend <- rnorm(10)
+atrend <- c(seq(0,1, len=5), seq(1,-1, len=5))
 ## currently depth has no impact but should add that and other covariates later
-st.list <- list(lon=runif(100,-175, -160), lat=runif(100, 55,62), beta0=3,
-                depth = sample(50:100, size=100, replace=TRUE))
-out <- simulate(replicate=1, st.list=st.list, nyrs=10, abundance.trend=atrend)
-plot(atrend,out[[1]]$index)
-tmp-out$vast.full$Opt$par
+Nsamples <- 200
+st.list <- list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62), beta0=3,
+                depth = sample(50:100, size=Nsamples, replace=TRUE))
+out <- simulate(replicate=1, st.list=st.list, nyrs=10,
+                abundance.trend=atrend, plot=FALSE)
+
+par(mfrow=c(1,2))
+plot(1:10, atrend)
+plot(1:10, out$vast.full$index$value, ylim=c(0, 6e6))
+with(out$vast.full$index, lines(1:10, value+1.96*se))
+with(out$vast.full$index, plot(1:10, value-1.96*se))
 
 chains <- cores <- 6
 sfStop()
