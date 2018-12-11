@@ -6,7 +6,7 @@
 n_x <- 100 # number of knots
 model <- 'combined'
 space <- 'NS'
-source("load_read_data.R")
+source("prepare_inputs.R")
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
 Opt <- Optimize( obj=Obj, lower=TmbList[["Lower"]],
