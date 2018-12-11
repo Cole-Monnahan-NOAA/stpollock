@@ -1,15 +1,3 @@
-rm(list=ls())
-library(TMB)
-library(VAST)
-library(reshape2)
-library(ggplot2)
-library(plyr)
-library(TMBhelper)
-library(snowfall)
-library(maps)
-library(mapdata)
-Version <- "VAST_v5_3_0"
-source("simulator.R")
 
 ## Basic simulation
 set.seed(1)

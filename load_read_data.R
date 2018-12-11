@@ -1,20 +1,24 @@
-Version <- "VAST_v5_3_0"
+## This file is meant to be sourced given some global options, resulting in
+## inputs ready for use in VAST.
 
+## Load in the real data
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
 ## The ats data is really high resolution so truncating this for now to
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
-
+years <- sort(unique(bts$year))
+nyr <- length(years)
 ## bts <- subset(bts, year==2007)
 ## ats <- subset(ats, year==2007)
 
+## Setup VAST inputs
 Method = c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km = 50
-n_x = 100
+
 ## Model settings
-FieldConfig = c("Omega1"=3, "Epsilon1"=0, "Omega2"=0, "Epsilon2"=0)
+FieldConfig = c("Omega1"=3, "Epsilon1"=ifelse(model=='ST', 3, 0), "Omega2"=0, "Epsilon2"=0)
 RhoConfig = c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
 OverdispersionConfig = c("Delta1"=0, "Delta2"=0)
 ObsModel = c(1,1)
@@ -24,7 +28,8 @@ strata.limits <- data.frame('STRATA'="All_areas")
 ## Derived objects
 Region = "Eastern_Bering_Sea"
 ## Save settings
-DateFile = paste0(getwd(),'/VAST_output_real/')
+DateFile <- paste0(getwd(), '/VAST_output_', model, "_", space)
+## DateFile = paste0(getwd(),'/VAST_output_real/')
 dir.create(DateFile)
 Record = list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
 save( Record, file=file.path(DateFile,"Record.RData"))
@@ -66,6 +71,34 @@ TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 Random = "generate"
+
+
+
+
+TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                         Version=Version,  RhoConfig=RhoConfig,
+                         loc_x=Spatial_List$loc_x, Method=Method,
+                         TmbDir='models', Random="generate")
+Map <- TmbList0$Map
+Params <- TmbList0$Parameters
+## Fix SigmaM for all surveys to be equal
+Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+##  Map$beta1_ct <- factor(rep(1, 30))
+Map$beta2_ct <- factor(rep(1, 3*nyr))
+if(model == 'NS'){
+  ## turn off estimation of space
+  Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
+}
+  ## ## turn off estimation of factor analysis
+## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
+## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
+## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
+## Params$L_omega1_z <- lvec
+TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+                        Version=Version,  RhoConfig=RhoConfig,
+                        loc_x=Spatial_List$loc_x, Method=Method,
+                        Param=Params, TmbDir=TmbDir, Random='generate',
+                         Map=Map)
 
 
 

@@ -1,51 +1,18 @@
-## Central file to fit the pollock data using the modified VAST model
+## File to run the fits to the real data
 
-## library(devtools)
-## remove.packages('VAST')
-## install_github('James-Thorson/VAST')
-library(VAST)
-library(TMB)
-library(maps)
-library(mapdata)
-library(ggplot2)
-library(TMBhelper)
+## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
+
+
+n_x <- 100 # number of knots
+model <- 'combined'
+space <- 'NS'
 source("load_read_data.R")
-years <- sort(unique(bts$year))
-nyr <- length(years)
-
-
-TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                         Version=Version,  RhoConfig=RhoConfig,
-                         loc_x=Spatial_List$loc_x, Method=Method,
-                         TmbDir='models', Random="generate")
-Map <- TmbList0$Map
-Params <- TmbList0$Parameters
-## Fix SigmaM for all surveys to be equal
-## Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
-##  Map$beta1_ct <- factor(rep(1, 30))
-Map$beta2_ct <- factor(rep(1, 3*nyr))
-## turn off estimation of space
-## Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
-## ## turn off estimation of factor analysis
-## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
-## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
-## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
-## Params$L_omega1_z <- lvec
-TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                        Version=Version,  RhoConfig=RhoConfig,
-                          loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir=TmbDir, Random='generate', Map=Map)
-
-
-## TmbList = Build_TMB_Fn("TmbData"=TmbData, "RunDir"=DateFile,
-##                   "Version"=Version, "RhoConfig"=RhoConfig,
-##                   "loc_x"=Spatial_List$loc_x, "Method"=Method)
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
 Opt <- Optimize( obj=Obj, lower=TmbList[["Lower"]],
                   upper=TmbList[["Upper"]], getsd=TRUE, savedir=DateFile,
                   bias.correct=FALSE, newtonsteps=1, control=list(trace=10))
-TMBhelper::Check_Identifiable(Obj)
+## TMBhelper::Check_Identifiable(Obj)
 Report = Obj$report()
 Save = list("Opt"=Opt, "Report"=Report, "ParHat"=Obj$env$parList(Opt$par), "TmbData"=TmbData)
 save(Save, file=paste0(DateFile,"Save.RData"))
