@@ -2,9 +2,13 @@ Version <- "VAST_v5_3_0"
 
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
+## The ats data is really high resolution so truncating this for now to
+## make things faster and fix the mesh which is overly weighted to the ats
+## data otherwise
+ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
 
-bts <- subset(bts, year==2007)
-ats <- subset(ats, year==2007)
+## bts <- subset(bts, year==2007)
+## ats <- subset(ats, year==2007)
 
 Method = c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km = 50
@@ -62,4 +66,6 @@ TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 Random = "generate"
+
+
 
