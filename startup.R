@@ -52,7 +52,7 @@ plot.vastfit <- function(results){
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), fill=gray(.8)) +
-    geom_line() + theme_bw() + ylim(0, max(index$est+2*index$se))
+    geom_line() + theme_bw() + ylim(0, max(Index$est+2*Index$se))
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
 
   Enc_prob <- plot_encounter_diagnostic(Report=Report,

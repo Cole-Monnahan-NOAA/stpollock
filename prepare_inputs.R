@@ -1,7 +1,7 @@
 ## This file is meant to be sourced given some global options, resulting in
 ## inputs ready for use in VAST.
 
-neps <- ifelse(model=='ST', 3, 0) # number of factors for ST
+neps <- ifelse(space=='ST', 3, 0) # number of factors for ST
 
 
 ## Load in the real data
@@ -98,11 +98,13 @@ if(model == 'NS'){
   ## turn off estimation of space
   Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
 }
-  ## ## turn off estimation of factor analysis
-## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
-## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
-## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
-## Params$L_omega1_z <- lvec
+if(space=='ST'){
+  ## turn off estimation of factor analysis
+  n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
+  lvec <- tmp[lower.tri(tmp, TRUE)] # init values
+  Map$L_epsilon1_z <- factor(ifelse(lvec==0, NA, lvec))
+  Params$L_epsilon_z <- lvec
+}
 TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
