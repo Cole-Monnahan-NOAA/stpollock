@@ -36,12 +36,11 @@ calculate.index <- function(Opt, Report, model){
   ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
   ## Index_12,.. etc. This effects the subsetting below
     cov.index <- Opt$SD$cov[tmp,tmp]
-
-  index <- data.frame(index, est=apply(Report$Index_cyl, 2, sum),
+    index <- data.frame(index, est=apply(Report$Index_cyl, 2, sum),
                       se=sqrt(sapply(1:nyr, function(i) {j=1:3+3*(i-1);
                         sum(cov.index[j,j])})))
   } else {
-    stop('not implemented yet')
+    index <- data.frame(index, est=Opt$SD$value[tmp], se=Opt$SD$sd[tmp])
   }
   index <- within(index, {lwr <- est-1.96*se; upr <- est+1.96*se})
   return(index)

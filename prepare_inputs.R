@@ -1,7 +1,19 @@
 ## This file is meant to be sourced given some global options, resulting in
 ## inputs ready for use in VAST.
 
-neps <- ifelse(space=='ST', 3, 0) # number of factors for ST
+## number of factors for ST
+if(space=='ST'){
+  ## was having convergence issues with ST model so try a simpler ST
+  ## component by turning off estimation of L_espilon1_z below.
+  neps <- ifelse(model=='combined', 3, 1)
+} else {
+  neps <- 0
+}
+
+## Factors for space
+n_f <- ifelse(model=='combined', 3,1)
+FieldConfig <- c("Omega1"=n_f, "Epsilon1"=neps, "Omega2"=0, "Epsilon2"=0)
+
 
 
 ## Load in the real data
@@ -11,19 +23,19 @@ ats <- read.csv('data/ats.csv')
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
-years <- sort(unique(bts$year))
-nyr <- length(years)
 
 ## Setup VAST inputs
 Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km <- 50
 
 ## Model settings
-FieldConfig <- c("Omega1"=3, "Epsilon1"=neps, "Omega2"=0, "Epsilon2"=0)
 RhoConfig <- c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 ObsModel <- c(1,1)
-Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0, "Calculate_Range"=1, "Calculate_evenness"=0, "Calculate_effective_area"=1, "Calculate_Cov_SE"=0, 'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
+Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
+              "Calculate_Range"=1, "Calculate_evenness"=0,
+              "Calculate_effective_area"=1, "Calculate_Cov_SE"=0,
+              'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
 ## Stratification for results
 strata.limits <- data.frame('STRATA'="All_areas")
 ## Derived objects
@@ -53,7 +65,30 @@ DF_p2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
 DF_p3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
                    Vessel='none')
-Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
+
+if(model=='combined'){
+  Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
+  c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
+              ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+} else if(model=='ats'){
+  ## For this one sum across the two strata to create a single one, akin to
+  ## what they'd do without the BTS
+  Data_Geostat <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
+                   Catch_KG=ats$strata2+ats$strata3,
+                   Gear='Acoustic_3-surface', AreaSwept_km2=1,
+                   Vessel='none')
+  c_iz <- rep(0, nrow(Data_Geostat))
+  years <- sort(unique(ats$year))
+  nyr <- length(years)
+} else if(model=='bts'){
+  Data_Geostat <- DF_p1
+  years <- sort(unique(bts$year))
+  nyr <- length(years)
+  c_iz <- rep(0, nrow(Data_Geostat))
+} else {
+  stop("invalid model type")
+}
+
 Extrapolation_List =
   make_extrapolation_info( Region=Region, strata.limits=strata.limits )
 ## Derived objects for spatio-temporal estimation
@@ -63,8 +98,7 @@ Spatial_List <- make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
                                  Extrapolation_List=Extrapolation_List,
                                  DirPath=savedir, Save_Results=FALSE )
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
-c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
-              ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+
 # Add threshold
 b_i <- Data_Geostat[,'Catch_KG']
 # Build data
@@ -80,26 +114,28 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 Random <- "generate"
-
-
-
-
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                          Version=Version,  RhoConfig=RhoConfig,
                          loc_x=Spatial_List$loc_x, Method=Method,
                          TmbDir='models', Random="generate")
+
+
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 ## Fix SigmaM for all surveys to be equal
-Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
-##  Map$beta1_ct <- factor(rep(1, 30))
-Map$beta2_ct <- factor(rep(1, 3*nyr))
-if(model == 'NS'){
+if(model=='combined'){
+  Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+  ##  Map$beta1_ct <- factor(rep(1, 30))
+}
+## Estimate a single parameter for the second LP regardless of model
+Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
+
+if(space == 'NS'){
   ## turn off estimation of space
   Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
 }
-if(space=='ST'){
-  ## turn off estimation of factor analysis
+if(space=='ST' & model =='combined'){
+  ## turn off estimation of factor analysis and just do diagonal (for now)
   n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
   lvec <- tmp[lower.tri(tmp, TRUE)] # init values
   Map$L_epsilon1_z <- factor(ifelse(lvec==0, NA, lvec))
