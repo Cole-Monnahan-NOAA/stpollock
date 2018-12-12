@@ -112,4 +112,6 @@ TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
 
+plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
+          Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") )
 
