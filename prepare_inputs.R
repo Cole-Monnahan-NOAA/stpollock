@@ -1,6 +1,9 @@
 ## This file is meant to be sourced given some global options, resulting in
 ## inputs ready for use in VAST.
 
+neps <- ifelse(model=='ST', 3, 0) # number of factors for ST
+
+
 ## Load in the real data
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
@@ -10,56 +13,62 @@ ats <- read.csv('data/ats.csv')
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
 years <- sort(unique(bts$year))
 nyr <- length(years)
-## bts <- subset(bts, year==2007)
-## ats <- subset(ats, year==2007)
 
 ## Setup VAST inputs
-Method = c("Grid", "Mesh", "Spherical_mesh")[2]
-grid_size_km = 50
+Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
+grid_size_km <- 50
 
 ## Model settings
-FieldConfig = c("Omega1"=3, "Epsilon1"=ifelse(model=='ST', 3, 0), "Omega2"=0, "Epsilon2"=0)
-RhoConfig = c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
-OverdispersionConfig = c("Delta1"=0, "Delta2"=0)
-ObsModel = c(1,1)
-Options =  c("SD_site_density"=0, "SD_site_logdensity"=0, "Calculate_Range"=1, "Calculate_evenness"=0, "Calculate_effective_area"=1, "Calculate_Cov_SE"=0, 'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
+FieldConfig <- c("Omega1"=3, "Epsilon1"=neps, "Omega2"=0, "Epsilon2"=0)
+RhoConfig <- c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
+OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
+ObsModel <- c(1,1)
+Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0, "Calculate_Range"=1, "Calculate_evenness"=0, "Calculate_effective_area"=1, "Calculate_Cov_SE"=0, 'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
 ## Stratification for results
 strata.limits <- data.frame('STRATA'="All_areas")
 ## Derived objects
-Region = "Eastern_Bering_Sea"
+Region <- "Eastern_Bering_Sea"
 ## Save settings
-DateFile <- paste0(getwd(), '/VAST_output_', model, "_", space)
-## DateFile = paste0(getwd(),'/VAST_output_real/')
-dir.create(DateFile)
-Record = list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
-save( Record, file=file.path(DateFile,"Record.RData"))
-capture.output( Record, file=paste0(DateFile,"Record.txt"))
-TmbDir <- DateFile
-DF_p1 = data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
+savedir <- paste0(getwd(), '/VAST_output_', model, "_", space)
+## savedir <- paste0(getwd(),'/VAST_output_real/')
+dir.create(savedir, showWarnings=FALSE)
+## Copy over the DLL so I don't have to compile each time.
+trash <- file.copy(file.path('models', paste0(Version, '.cpp')),
+          to=file.path(savedir, paste0(Version, '.cpp')))
+trash <- file.copy(file.path('models', paste0(Version, '.dll')),
+          to=file.path(savedir, paste0(Version, '.dll')))
+trash <- file.copy(file.path('models', paste0(Version, '.o')),
+          to=file.path(savedir, paste0(Version, '.o')))
+
+Record <- list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
+save( Record, file=file.path(savedir,"Record.RData"))
+capture.output( Record, file=paste0(savedir,"/Record.txt"))
+TmbDir <- savedir
+DF_p1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
                    Vessel='none')
-DF_p2 = data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
+DF_p2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
                    Vessel='none')
-DF_p3 = data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
+DF_p3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
                    Vessel='none')
-Data_Geostat = rbind( DF_p1, DF_p2, DF_p3 )
+Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
 Extrapolation_List =
   make_extrapolation_info( Region=Region, strata.limits=strata.limits )
 ## Derived objects for spatio-temporal estimation
-Spatial_List = make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
+Spatial_List <- make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
                                  Method=Method, Lon=Data_Geostat[,'Lon'],
                                  Lat=Data_Geostat[,'Lat'],
                                  Extrapolation_List=Extrapolation_List,
-                                 DirPath=DateFile, Save_Results=FALSE )
-Data_Geostat = cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
-c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
+                                 DirPath=savedir, Save_Results=FALSE )
+Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
+c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
               ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
 # Add threshold
-b_i = Data_Geostat[,'Catch_KG']
+b_i <- Data_Geostat[,'Catch_KG']
 # Build data
-TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
+TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   OverdispersionConfig=OverdispersionConfig,
                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                   b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
@@ -70,12 +79,12 @@ TmbData = Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   GridList=Spatial_List$GridList,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
-Random = "generate"
+Random <- "generate"
 
 
 
 
-TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                          Version=Version,  RhoConfig=RhoConfig,
                          loc_x=Spatial_List$loc_x, Method=Method,
                          TmbDir='models', Random="generate")
@@ -94,11 +103,13 @@ if(model == 'NS'){
 ## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
 ## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
 ## Params$L_omega1_z <- lvec
-TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
+TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
                         Param=Params, TmbDir=TmbDir, Random='generate',
                          Map=Map)
 
+Obj  <-  TmbList[["Obj"]]
+Obj$env$beSilent()
 
 

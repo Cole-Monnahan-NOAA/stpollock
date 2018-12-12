@@ -7,15 +7,12 @@ n_x <- 100 # number of knots
 model <- 'combined'
 space <- 'NS'
 source("prepare_inputs.R")
-Obj  <-  TmbList[["Obj"]]
-Obj$env$beSilent()
-Opt <- Optimize( obj=Obj, lower=TmbList[["Lower"]],
-                  upper=TmbList[["Upper"]], getsd=TRUE, savedir=DateFile,
-                  bias.correct=FALSE, newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
-Report = Obj$report()
-Save = list("Opt"=Opt, "Report"=Report, "ParHat"=Obj$env$parList(Opt$par), "TmbData"=TmbData)
-save(Save, file=paste0(DateFile,"Save.RData"))
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=1, control=list(trace=10))
+Report  <-  Obj$report()
+Save  <-  list("Opt"=Opt, "Report"=Report, "ParHat"=Obj$env$parList(Opt$par), "TmbData"=TmbData)
+save(Save, file=paste0(savedir,"/Save.RData"))
 
 ## Manually calculate SE for the total biomass index. Since it's a sum of
 ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
