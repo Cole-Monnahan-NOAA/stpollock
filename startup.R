@@ -40,6 +40,9 @@ calculate.index <- function(Opt, Report, model){
                       se=sqrt(sapply(1:nyr, function(i) {j=1:3+3*(i-1);
                         sum(cov.index[j,j])})))
   } else {
+    ## chop off missing years for ATS case
+    tmp2 <- which(min(years):max(years) %in% years)
+    tmp <- tmp[tmp2]
     index <- data.frame(index, est=Opt$SD$value[tmp], se=Opt$SD$sd[tmp])
   }
   index <- within(index, {lwr <- est-1.96*se; upr <- est+1.96*se})

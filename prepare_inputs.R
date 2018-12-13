@@ -127,8 +127,16 @@ if(model=='combined'){
   Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
 }
-## Estimate a single parameter for the second LP regardless of model
-Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
+## Estimate a single parameter for the second LP regardless of model. Need
+## to be careful to not estimate years without data in the 'ats' case where
+## VAST already uses a map with NA for missing years.
+if(model=='ats'){
+  Map$beta2_ct[which(!is.na(Map$beta2_ct))] <- 1
+  Map$beta2_ct <- droplevels(as.factor(Map$beta2_ct))
+} else {
+  ## This has no NA b/c all years represented in the data
+  Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
+}
 
 if(space == 'NS'){
   ## turn off estimation of space
