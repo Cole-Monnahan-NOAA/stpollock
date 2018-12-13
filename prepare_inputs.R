@@ -68,6 +68,7 @@ DF_p3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
 
 if(model=='combined'){
   Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
+  years <- sort(unique(bts$year))
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
               ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
 } else if(model=='ats'){
@@ -79,15 +80,14 @@ if(model=='combined'){
                    Vessel='none')
   c_iz <- rep(0, nrow(Data_Geostat))
   years <- sort(unique(ats$year))
-  nyr <- length(years)
 } else if(model=='bts'){
   Data_Geostat <- DF_p1
   years <- sort(unique(bts$year))
-  nyr <- length(years)
   c_iz <- rep(0, nrow(Data_Geostat))
 } else {
   stop("invalid model type")
 }
+nyr <- length(years)
 
 Extrapolation_List =
   make_extrapolation_info( Region=Region, strata.limits=strata.limits )
@@ -122,9 +122,9 @@ TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
 
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
-## Fix SigmaM for all surveys to be equal
 if(model=='combined'){
-  Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
+  ## Assume that the two ATS strata have the same observation error
+  Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
 }
 ## Estimate a single parameter for the second LP regardless of model. Need
