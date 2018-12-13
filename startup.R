@@ -17,17 +17,17 @@ Version <- "VAST_v5_3_0"
 source("simulator.R")
 
 
-process.results <- function(Opt, Obj, model, savedir){
+process.results <- function(Opt, Obj, model, space, savedir){
   Report  <-  Obj$report()
   ParHat <- Opt$par #Obj$env$parList(Opt$par)
-  Index <- calculate.index(Opt, Report, model)
+  Index <- calculate.index(Opt, Report, model, space)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat)
   save(Save, file=paste0(savedir,"/Save.RData"))
   return(Save)
 }
-calculate.index <- function(Opt, Report, model){
+calculate.index <- function(Opt, Report, model, space){
   tmp <- which(names(Opt$SD$value) %in% 'Index_cyl')
-  index <- data.frame(model=model, year=years)
+  index <- data.frame(model=model, space=space,  year=years)
   if(model=='combined'){
   ## Manually calculate SE for the total biomass index. Since it's a sum of
   ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
@@ -36,14 +36,25 @@ calculate.index <- function(Opt, Report, model){
   ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
   ## Index_12,.. etc. This effects the subsetting below
     cov.index <- Opt$SD$cov[tmp,tmp]
-    index <- data.frame(index, est=apply(Report$Index_cyl, 2, sum),
+    ## combined is all three strata summed
+    index1 <- data.frame(index, strata='total',  est=apply(Report$Index_cyl[1:3,,], 2, sum),
                       se=sqrt(sapply(1:nyr, function(i) {j=1:3+3*(i-1);
                         sum(cov.index[j,j])})))
+    ## sum the top two to get what the ATS sees
+    index2 <- data.frame(index, strata='ats', est=apply(Report$Index_cyl[2:3,,], 2, sum),
+                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-1];
+                        sum(cov.index[j,j])})))
+    ## likewise the BTS is just the first strata
+    index3 <- data.frame(index, strata='bts', est=Report$Index_cyl[1,,],
+                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[1];
+                        sum(cov.index[j,j])})))
+    index <- rbind(index1,index2, index3)
+
   } else {
     ## chop off missing years for ATS case
     tmp2 <- which(min(years):max(years) %in% years)
     tmp <- tmp[tmp2]
-    index <- data.frame(index, est=Opt$SD$value[tmp], se=Opt$SD$sd[tmp])
+    index <- data.frame(index, strata=model, est=Opt$SD$value[tmp], se=Opt$SD$sd[tmp])
   }
   index <- within(index, {lwr <- est-1.96*se; upr <- est+1.96*se})
   return(index)
@@ -52,9 +63,9 @@ calculate.index <- function(Opt, Report, model){
 plot.vastfit <- function(results){
   Report <- results$Report
   Index <- results$Index
-  g <- ggplot(Index, aes(year, y=est)) +
-    geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), fill=gray(.8)) +
-    geom_line() + theme_bw() + ylim(0, max(Index$est+2*Index$se))
+  g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
+    geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
+    geom_line() + geom_point()+ theme_bw() + ylim(0, max(Index$est+2*Index$se))
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
 
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
