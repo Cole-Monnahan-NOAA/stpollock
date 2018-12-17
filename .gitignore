@@ -16,6 +16,12 @@ init.pin
 admodel.cov
 admodel.dep
 admodel.hes
-VAST_output*
+VAST_output_*/*.png
+VAST_output_*/*.txt
+VAST_output_*/*.cpp
+VAST_output_*/*.csv
+VAST_output_*/*Record.RData
+VAST_output_*/parameter_estimates.RData
+QQ_Fn
 simulation_progress.txt
 

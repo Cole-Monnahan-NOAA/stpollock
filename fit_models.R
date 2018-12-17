@@ -3,7 +3,7 @@ source('startup.R')
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
 
 
-n_x <- 500 # number of knots
+n_x <- 400 # number of knots
 for(m in 1:3){
 for(s in 2:3){
 model <- c('ats', 'bts', 'combined')[m]
@@ -50,14 +50,13 @@ ests <- ldply(dirs, function(x) {
       y <- est$par[est$par==x]
       1:length(y)})))
     est$par2 <- paste(est$par, tmp, sep='_')
-    est$parnum <- tmp
+    est$parnum <- tmp+switch(as.character(m), ats=1/3, bts=2/3, combined=0) +
+      ifelse(s=='S', 0,.5)
     return(est)
   } else {
     return(NULL)
   }
 })
-ests$parnum <- ests$parnum+rnorm(nrow(ests), 0,.1)
-
 ggplot(ests, aes(parnum, est, color=model, shape=space)) +
   geom_point(size=3) + facet_wrap('par', scales='free') +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
