@@ -72,8 +72,8 @@ if(model=='combined'){
   years <- sort(unique(bts$year))
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
-                ifelse(Data_Geostat$Gear=='Trawl', 0, 1))
+  ## Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
+  ##               ifelse(Data_Geostat$Gear=='Trawl', 0, 1))
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
@@ -113,7 +113,8 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   s_i=Data_Geostat[,'knot_i']-1,
                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
                   MeshList=Spatial_List$MeshList,
-                  GridList=Spatial_List$GridList, Q_ik=Q_ik,
+                  GridList=Spatial_List$GridList,
+                  Q_ik=Q_ik,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 Random <- "generate"
@@ -130,10 +131,10 @@ if(model=='combined'){
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
   ## Carefully build the catchability
-  Params$lambda1_k <- c(0,0)
-  ## Leave the first fixed otherwise confounded with the betas (RIGHT?)
-  Map$lambda1_k <- as.factor(c(NA,1))
-  Map$lambda2_k <- as.factor(c(NA,NA))
+  ## Params$lambda1_k <- c(0,0)
+  ## ## Leave the first fixed otherwise confounded with the betas (RIGHT?)
+  ## Map$lambda1_k <- as.factor(c(NA,1))
+  ## Map$lambda2_k <- as.factor(c(NA,NA))
 }
 ## Estimate a single parameter for the second LP regardless of model. Need
 ## to be careful to not estimate years without data in the 'ats' case where
