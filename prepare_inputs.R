@@ -31,6 +31,7 @@ grid_size_km <- 50
 ## Model settings
 RhoConfig <- c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
+Q_ik <- NULL ## catchability covariates, updated below for combined model
 ObsModel <- c(1,1)
 Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
               "Calculate_Range"=1, "Calculate_evenness"=0,
@@ -70,7 +71,9 @@ if(model=='combined'){
   Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
   years <- sort(unique(bts$year))
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
-              ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+                 ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+  Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
+                ifelse(Data_Geostat$Gear=='Trawl', 0, 1))
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
@@ -106,11 +109,11 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   OverdispersionConfig=OverdispersionConfig,
                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                   b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
-                  v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
+                  ## v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
                   s_i=Data_Geostat[,'knot_i']-1,
                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
                   MeshList=Spatial_List$MeshList,
-                  GridList=Spatial_List$GridList,
+                  GridList=Spatial_List$GridList, Q_ik=Q_ik,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 Random <- "generate"
@@ -126,6 +129,11 @@ if(model=='combined'){
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
+  ## Carefully build the catchability
+  Params$lambda1_k <- c(0,0)
+  ## Leave the first fixed otherwise confounded with the betas (RIGHT?)
+  Map$lambda1_k <- as.factor(c(NA,1))
+  Map$lambda2_k <- as.factor(c(NA,NA))
 }
 ## Estimate a single parameter for the second LP regardless of model. Need
 ## to be careful to not estimate years without data in the 'ats' case where
