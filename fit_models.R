@@ -32,10 +32,11 @@ indices <- ldply(dirs, function(x) {
     return(NULL)
   }
 })
-ggplot(indices, aes(year, est, group=strata, color=strata,  fill=strata)) +
+g <- ggplot(indices, aes(year, est, group=strata, color=strata,  fill=strata)) +
   geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
   geom_line() + geom_point()+
   facet_grid(model~space)
+ggsave('plots/initial_fits.png', g, width=7, height=5)
 
 ests <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
@@ -57,6 +58,43 @@ ests <- ldply(dirs, function(x) {
     return(NULL)
   }
 })
-ggplot(ests, aes(parnum, est, color=model, shape=space)) +
-  geom_point(size=3) + facet_wrap('par', scales='free') +
+g <- ggplot(subset(ests, par=='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
+  geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
+ggsave('plots/initial_fits_beta1.png', g, width=7, height=5)
+g <- ggplot(subset(ests, par!='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
+  geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
+  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
+ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
+
+
+## Get the correlation matrices out for the combined models
+ff <- file.path('VAST_output_combined_ST', 'Save.RData')
+load(ff)
+L_vec <- Save$ParHat[names(Save$ParHat)=='L_omega1_z']
+Loadings_pf <- matrix(NA, 3,3)
+Count <- 1
+for(f in 1:3){
+  for(p in 1:3){
+    if(p>=f){
+      Loadings_pf[p,f] = L_vec[Count]
+      Count <- Count + 1
+    }else{
+      Loadings_pf[p,f] = 0.0;
+    }
+  }
+}
+
+Cov <- t(Loadings_pf) %*% Loadings_pf
+Cor <- round(cov2cor(Cov),3)
+
+
+
+### Some MCMC tests
+library(tmbstan)
+options(mc.cores = 4)
+n_x <- 400
+model <- 'combined'
+space <- 'S'
+source("prepare_inputs.R")
+mcmc <- tmbstan(obj=Obj, iter=1000, chains=4, lower=TmbList$Lower, upper=TmbList$Upper)
