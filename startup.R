@@ -21,7 +21,7 @@ process.results <- function(Opt, Obj, model, space, savedir){
   Report  <-  Obj$report()
   ParHat <- Opt$par #Obj$env$parList(Opt$par)
   Index <- calculate.index(Opt, Report, model, space)
-  Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat)
+  Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat, savedir=savedir)
   save(Save, file=paste0(savedir,"/Save.RData"))
   return(Save)
 }
@@ -67,7 +67,11 @@ plot.vastfit <- function(results){
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() + ylim(0, max(Index$est+2*Index$se))
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
-
+  Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
+                              Extrapolation_List=Extrapolation_List)
+  Plot_factors(Report, results$ParHat, Data=TmbData, SD=Opt$SD,
+               mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
+  ParHat2 <- obj$env$parList()
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
