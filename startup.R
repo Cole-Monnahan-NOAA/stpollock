@@ -71,7 +71,6 @@ plot.vastfit <- function(results){
                               Extrapolation_List=Extrapolation_List)
   Plot_factors(Report, results$ParHat, Data=TmbData, SD=Opt$SD,
                mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
-  ParHat2 <- obj$env$parList()
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)

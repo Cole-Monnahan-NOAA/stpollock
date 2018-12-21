@@ -15,6 +15,21 @@ indices <- ldply(dirs, function(x) {
     return(NULL)
   }
 })
+
+fields <- llply(dirs, function(x) {
+  ff <- file.path(x, 'Save.RData')
+  ## for now just getting the combined fits
+  if(length(grep('combined', x=x))>0 & file.exists(ff)){
+    load(ff)
+    return(data.frame(model=Save$Index$model[1], space=Save$Index$space[1],
+                      omegainput=Save$Report$Omegainput1_sf,
+                      omega=Save$Report$Omega1_sc))
+  } else {
+    return(NULL)
+  }
+})
+fields <- do.call(rbind.fill, fields)
+
 ests <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
   if(file.exists(ff)){
