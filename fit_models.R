@@ -3,9 +3,9 @@ source('startup.R')
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
 
 
-n_x <- 400 # number of knots
+n_x <- 300 # number of knots
 for(m in 1:3){
-for(s in 2:3){
+for(s in 2){
 model <- c('ats', 'bts', 'combined')[m]
 space <- c('NS', 'S', 'ST')[s]
 source("prepare_inputs.R")

@@ -69,10 +69,11 @@ plot.vastfit <- function(results){
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
                               Extrapolation_List=Extrapolation_List)
-  if(TmbData$n_c>1){
-    Plot_factors(Report, results$ParHat, Data=TmbData, SD=Opt$SD,
-                 mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
-  }
+  ## This was causing problems and not sure why. Will fix later.
+  ## if(TmbData$n_c>1){
+  ##   Plot_factors(Report, results$ParHat, Data=TmbData, SD=Opt$SD,
+  ##                mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
+  ## }
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
