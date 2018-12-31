@@ -42,7 +42,7 @@ strata.limits <- data.frame('STRATA'="All_areas")
 ## Derived objects
 Region <- "Eastern_Bering_Sea"
 ## Save settings
-savedir <- paste0(getwd(), '/VAST_output_', model, "_", space)
+savedir <- paste0(getwd(), '/fit_', model, "_", space)
 ## savedir <- paste0(getwd(),'/VAST_output_real/')
 dir.create(savedir, showWarnings=FALSE)
 ## Copy over the DLL so I don't have to compile each time.
