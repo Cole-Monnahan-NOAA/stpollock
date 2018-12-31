@@ -29,7 +29,7 @@ Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km <- 50
 
 ## Model settings
-RhoConfig <- c("Beta1"=0, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
+RhoConfig <- c("Beta1"=4, "Beta2"=4, "Epsilon1"=0, "Epsilon2"=0)
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 Q_ik <- NULL ## catchability covariates, updated below for combined model
 ObsModel <- c(1,1)
@@ -139,13 +139,13 @@ if(model=='combined'){
 ## Estimate a single parameter for the second LP regardless of model. Need
 ## to be careful to not estimate years without data in the 'ats' case where
 ## VAST already uses a map with NA for missing years.
-if(model=='ats'){
-  Map$beta2_ct[which(!is.na(Map$beta2_ct))] <- 1
-  Map$beta2_ct <- droplevels(as.factor(Map$beta2_ct))
-} else {
-  ## This has no NA b/c all years represented in the data
-  Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
-}
+## if(model=='ats'){
+##   Map$beta2_ct[which(!is.na(Map$beta2_ct))] <- 1
+##   Map$beta2_ct <- droplevels(as.factor(Map$beta2_ct))
+## } else {
+##   ## This has no NA b/c all years represented in the data
+##   Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
+## }
 
 if(space == 'NS'){
   ## turn off estimation of space
@@ -158,6 +158,7 @@ if(space=='ST' & model =='combined'){
   Map$L_epsilon1_z <- factor(ifelse(lvec==0, NA, lvec))
   Params$L_epsilon_z <- lvec
 }
+## Map$beta1_ct <- NULL
 TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
