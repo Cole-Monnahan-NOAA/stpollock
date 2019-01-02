@@ -92,6 +92,8 @@ if(model=='combined'){
 }
 nyr <- length(years)
 
+
+
 Extrapolation_List =
   make_extrapolation_info( Region=Region, strata.limits=strata.limits )
 ## Derived objects for spatio-temporal estimation
@@ -176,6 +178,11 @@ TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
 
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
+
+loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
+names(loc) <- c('E_km', 'N_km')
+Inputs <- list(loc=loc)
+
 
 plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
           Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") )

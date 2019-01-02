@@ -4,6 +4,7 @@
 
 
 ## Pull out the results for different quantities
+library(plyr)
 xx <- list.dirs(, full.names=FALSE, recursive=FALSE)
 dirs <- xx[grep('fit_', xx)]
 indices <- ldply(dirs, function(x) {
@@ -21,6 +22,7 @@ fields <- llply(dirs, function(x) {
   ## for now just getting the combined fits
   if(length(grep('combined', x=x))>0 & file.exists(ff)){
     load(ff)
+    kappa <- exp(Save$Opt$SD$par.fixed['logkappa1'])
     return(data.frame(model=Save$Index$model[1], space=Save$Index$space[1],
                       omegainput=Save$Report$Omegainput1_sf,
                       omega=Save$Report$Omega1_sc))
@@ -29,9 +31,23 @@ fields <- llply(dirs, function(x) {
   }
 })
 fields <- do.call(rbind.fill, fields)
+fields <- cbind(fields, loc)
+fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
+                    factorsAsStrings=FALSE)
+fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+       function(x) x[2])))
+fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+       function(x) x[1]))
+fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
+fields.long <- ddply(fields.long, .(type, space), mutate,
+                     normalized=value/sd(value))
+Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
 
-PlotMap_Fn(MappingDetails=Mapdetails,
-
+g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
+  geom_point(alpha=.5, size=1) +
+  facet_grid(space+type~strata) +
+  scale_colour_gradientn(colours = Col(15))
+ggsave('plots/map_omegas.png', width=9, height=6, units='in')
 
 ests <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
@@ -55,6 +71,7 @@ ests <- ldply(dirs, function(x) {
 })
 
 
+library(ggplot2)
 g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
   geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
   geom_line() + geom_point()+
@@ -90,3 +107,22 @@ for(f in 1:3){
 Cov <- t(Loadings_pf) %*% Loadings_pf
 Cor <- round(cov2cor(Cov),3)
 
+
+## Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
+##                             Extrapolation_List=Extrapolation_List)
+## Plot_factors(Save$Report, Save$ParHat, Data=TmbData, SD=Save$Opt$SD,
+##              mapdetails_list=Mapdetails)
+## FishStatsUtils::PlotMap_Fn(
+##              MappingDetails=mapdetails_list[["MappingDetails"]],
+##              Mat=Mat_sf, PlotDF=mapdetails_list[["PlotDF"]],
+##              MapSizeRatio=mapdetails_list[["MapSizeRatio"]],
+##              Xlim=mapdetails_list[["Xlim"]],
+##              Ylim=mapdetails_list[["Ylim"]],
+##              Format='none',
+##              ## FileName=paste0(plotdir,"Factor_maps--",Par_name),
+##              Year_Set=paste0("Factor_",1:ncol(Mat_sf)),
+##              Rotate=mapdetails_list[["Rotate"]],
+##              zone=mapdetails_list[["Zone"]], mar=c(0,0,2,0),
+##              oma=c(2.5,2.5,0,0), Cex=0.01, mfrow=Dim_factor, pch=20,
+##              Legend=mapdetails_list[["Legend"]], plot_legend_fig=FALSE,
+##              land_color=land_color)
