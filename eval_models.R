@@ -5,7 +5,7 @@
 
 ## Pull out the results for different quantities
 xx <- list.dirs(, full.names=FALSE, recursive=FALSE)
-dirs <- xx[grep('VAST_', xx)]
+dirs <- xx[grep('fit_', xx)]
 indices <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
   if(file.exists(ff)){
@@ -30,6 +30,9 @@ fields <- llply(dirs, function(x) {
 })
 fields <- do.call(rbind.fill, fields)
 
+PlotMap_Fn(MappingDetails=Mapdetails,
+
+
 ests <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
   if(file.exists(ff)){
@@ -39,7 +42,7 @@ ests <- ldply(dirs, function(x) {
                       est=Save$Opt$SD$par.fixed,
                       se=sqrt(diag(Save$Opt$SD$cov.fixed)), stringsAsFactors=FALSE)
     ## Add a number after each par to make them unique for plotting
-    tmp <- as.vector(do.call(c, sapply(unique(est$par), function(x) {
+    tmp <- as.vector(do.call(c, lapply(unique(est$par), function(x) {
       y <- est$par[est$par==x]
       1:length(y)})))
     est$par2 <- paste(est$par, tmp, sep='_')
@@ -52,15 +55,15 @@ ests <- ldply(dirs, function(x) {
 })
 
 
-g <- ggplot(indices, aes(year, est, group=strata, color=strata,  fill=strata)) +
+g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
   geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
   geom_line() + geom_point()+
-  facet_grid(model~space)
+  facet_grid(strata~space)
 ggsave('plots/initial_fits.png', g, width=7, height=5)
-g <- ggplot(subset(ests, par=='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
-  geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
-  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
-ggsave('plots/initial_fits_beta1.png', g, width=7, height=5)
+## g <- ggplot(subset(ests, par=='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
+##   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
+##   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
+## ggsave('plots/initial_fits_beta1.png', g, width=7, height=5)
 g <- ggplot(subset(ests, par!='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
@@ -68,7 +71,7 @@ ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
 
 
 ## Get the correlation matrices out for the combined models
-ff <- file.path('VAST_output_combined_ST', 'Save.RData')
+ff <- file.path('fit_combined_S', 'Save.RData')
 load(ff)
 L_vec <- Save$ParHat[names(Save$ParHat)=='L_omega1_z']
 Loadings_pf <- matrix(NA, 3,3)
