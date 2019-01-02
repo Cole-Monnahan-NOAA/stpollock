@@ -19,7 +19,8 @@ source("simulator.R")
 
 process.results <- function(Opt, Obj, model, space, savedir){
   Report  <-  Obj$report()
-  ParHat <- Opt$par #Obj$env$parList(Opt$par)
+  ParHatList <- Obj$env$parList(Opt$par)
+  ParHat <- Opt$par
   Index <- calculate.index(Opt, Report, model, space)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat, savedir=savedir)
   save(Save, file=paste0(savedir,"/Save.RData"))
