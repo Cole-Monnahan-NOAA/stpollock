@@ -29,7 +29,7 @@ Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km <- 50
 
 ## Model settings
-RhoConfig <- c("Beta1"=4, "Beta2"=4, "Epsilon1"=0, "Epsilon2"=0)
+RhoConfig <- c("Beta1"=2, "Beta2"=0, "Epsilon1"=0, "Epsilon2"=0)
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 Q_ik <- NULL ## catchability covariates, updated below for combined model
 ObsModel <- c(1,1)
@@ -139,13 +139,22 @@ if(model=='combined'){
 ## Estimate a single parameter for the second LP regardless of model. Need
 ## to be careful to not estimate years without data in the 'ats' case where
 ## VAST already uses a map with NA for missing years.
-## if(model=='ats'){
-##   Map$beta2_ct[which(!is.na(Map$beta2_ct))] <- 1
-##   Map$beta2_ct <- droplevels(as.factor(Map$beta2_ct))
-## } else {
-##   ## This has no NA b/c all years represented in the data
-##   Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
-## }
+if(model=='ats'){
+  Map$beta2_ct[which(!is.na(Map$beta2_ct))] <- 1
+  Map$beta2_ct <- droplevels(as.factor(Map$beta2_ct))
+} else if(model=='bts'){
+  ## This has no NA b/c all years represented in the data
+  Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
+} else {
+  ## the combined model we assume a constant beta across years but unique
+  ## for each stratum
+  Map$beta2_ct <- Params$beta2_ct
+  Map$beta2_ct[1,] <- 1
+  Map$beta2_ct[2,] <- 1
+  Map$beta2_ct[3,] <- 1
+  Map$beta2_ct <- as.factor(Map$beta2_ct)
+}
+
 
 if(space == 'NS'){
   ## turn off estimation of space
