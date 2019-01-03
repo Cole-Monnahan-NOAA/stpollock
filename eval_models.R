@@ -106,14 +106,14 @@ ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
 ### Resolution test
 xx <- list.dirs(full.names=FALSE, recursive=FALSE)
 dirs <- xx[grep('knots_', xx)]
-ests <- ldply(dirs, function(x) {
+ests <- llply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
   if(file.exists(ff)){
     load(ff)
     m <- Save$Index$model[1]; s <- Save$Index$space[1]
     res <- as.numeric(strsplit(x, '_')[[1]][4])
     est <- data.frame(model=m, space=s, par=names(Save$Opt$SD$par.fixed),
-                      est=Save$Opt$SD$par.fixed, res=res,
+                      est=Save$Opt$SD$par.fixed, res=res, AIC=as.numeric(Save$Opt$AIC),
                       se=sqrt(diag(Save$Opt$SD$cov.fixed)), stringsAsFactors=FALSE)
     ## Add a number after each par to make them unique for plotting
     tmp <- as.vector(do.call(c, lapply(unique(est$par), function(x) {
@@ -122,15 +122,24 @@ ests <- ldply(dirs, function(x) {
     est$par2 <- paste(est$par, tmp, sep='_')
     est$parnum <- tmp+switch(as.character(m), ats=1/3, bts=2/3, combined=0) +
       ifelse(s=='S', 0,.5)
-    return(est)
+    index <- cbind(Save$Index, res=res)
+    x <- list(est=est, index=index)
+    return(x)
   } else {
     return(NULL)
   }
 })
-g <- ggplot(ests, aes(res, est,  shape=space)) +
-  geom_point(size=3) + facet_wrap('par2', scales='free', ncol=2) +
-  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
-ggsave('plots/resolution_tests.png', g, width=7, height=5)
+pars <- do.call(rbind, lapply(ests, function(x) x[[1]]))
+indices <- do.call(rbind, lapply(ests, function(x) x[[2]]))
+g <- ggplot(pars, aes(log2(res), est)) +
+  geom_point() + geom_line() + facet_wrap('par2', scales='free_y', ncol=4) +
+  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se)) + xlab("log2(# knots)")
+ggsave('plots/resolution_pars.png', g, width=7, height=5)
+g <- ggplot(indices, aes(log2(res), est, group=strata, color=strata)) +
+  geom_point() + geom_line() + facet_wrap('year', ncol=4) +
+  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se)) +
+  xlab("log2(# knots)") + scale_y_log10()
+ggsave('plots/resolution_indices.png', g, width=7, height=5)
 
 
 
