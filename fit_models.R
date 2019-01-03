@@ -20,14 +20,15 @@ plot.vastfit(results)
 }
 
 ## Test increasing resolution
-for(n_x in c(50,100)){
-savedir <- paste0(getwd(), '/knots_combined_S_',n_x)
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
-                upper=TmbList$Upper,  savedir=savedir,
+for(n_x in 2^(5:10)){
+  space <- "S"; model <- 'combined'
+  savedir <- paste0(getwd(), '/knots_combined_S_',n_x)
+  source("prepare_inputs.R")
+  Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
+                  upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+  ## TMBhelper::Check_Identifiable(Obj)
+  results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 }
 
 

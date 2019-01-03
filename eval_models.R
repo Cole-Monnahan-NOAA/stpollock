@@ -5,7 +5,7 @@
 
 ## Pull out the results for different quantities
 library(plyr)
-xx <- list.dirs(, full.names=FALSE, recursive=FALSE)
+xx <- list.dirs(full.names=FALSE, recursive=FALSE)
 dirs <- xx[grep('fit_', xx)]
 indices <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
@@ -70,6 +70,22 @@ ests <- ldply(dirs, function(x) {
   }
 })
 
+load("fit_combined_NS/Save.RData")
+beta1.NS <- data.frame(space='NS', t(Save$Report$beta1_ct))
+load("fit_combined_S/Save.RData")
+beta1.S <- data.frame(space='S', t(Save$Report$beta1_ct))
+beta1 <- rbind(beta1.NS, beta1.S)
+names(beta1) <- c('space', 'stratum1', 'stratum2', 'stratum3')
+beta1$year.missing <-2007:2018 %in% c(2011, 2013, 2015, 2017)
+beta1.long <- melt(beta1, id.vars=c('space', 'stratum3', 'year.missing'))
+
+g <- ggplot(beta1.long, aes(y=stratum3, x=value, group=space, fill=space,
+                            col=space, shape=year.missing)) +
+  geom_abline(slope=1, intercept=0) +
+  geom_point(size=1.5) +
+  facet_grid(variable~space, scales='free') +
+  stat_smooth(alpha=.25, method=loess) + theme_bw()
+ggsave('plots/beta1_correlations.png', g, width=7, height=3)
 
 library(ggplot2)
 g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
@@ -85,6 +101,37 @@ g <- ggplot(ests, aes(parnum, est, color=model, shape=space)) +
   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
 ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
+
+
+### Resolution test
+xx <- list.dirs(full.names=FALSE, recursive=FALSE)
+dirs <- xx[grep('knots_', xx)]
+ests <- ldply(dirs, function(x) {
+  ff <- file.path(x, 'Save.RData')
+  if(file.exists(ff)){
+    load(ff)
+    m <- Save$Index$model[1]; s <- Save$Index$space[1]
+    res <- as.numeric(strsplit(x, '_')[[1]][4])
+    est <- data.frame(model=m, space=s, par=names(Save$Opt$SD$par.fixed),
+                      est=Save$Opt$SD$par.fixed, res=res,
+                      se=sqrt(diag(Save$Opt$SD$cov.fixed)), stringsAsFactors=FALSE)
+    ## Add a number after each par to make them unique for plotting
+    tmp <- as.vector(do.call(c, lapply(unique(est$par), function(x) {
+      y <- est$par[est$par==x]
+      1:length(y)})))
+    est$par2 <- paste(est$par, tmp, sep='_')
+    est$parnum <- tmp+switch(as.character(m), ats=1/3, bts=2/3, combined=0) +
+      ifelse(s=='S', 0,.5)
+    return(est)
+  } else {
+    return(NULL)
+  }
+})
+g <- ggplot(ests, aes(res, est,  shape=space)) +
+  geom_point(size=3) + facet_wrap('par2', scales='free', ncol=2) +
+  geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
+ggsave('plots/resolution_tests.png', g, width=7, height=5)
+
 
 
 ## Get the correlation matrices out for the combined models
