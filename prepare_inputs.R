@@ -24,6 +24,11 @@ ats <- read.csv('data/ats.csv')
 ## data otherwise
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
 
+## fake depth data to test
+bts$depth <- rnorm(nrow(bts))
+ats$depth <- rnorm(nrow(ats))
+
+
 ## Setup VAST inputs
 Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
 grid_size_km <- 50
@@ -59,13 +64,13 @@ capture.output( Record, file=paste0(savedir,"/Record.txt"))
 TmbDir <- savedir
 DF_p1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
-                   Vessel='none')
+                   Vessel='none', depth=bts$depth)
 DF_p2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
-                   Vessel='none')
+                   Vessel='none', depth=ats$depth)
 DF_p3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
-                   Vessel='none')
+                   Vessel='none', depth=ats$depth)
 
 if(model=='combined'){
   Data_Geostat <- rbind( DF_p1, DF_p2, DF_p3 )
@@ -78,7 +83,7 @@ if(model=='combined'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
   Data_Geostat <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                   Catch_KG=ats$strata2+ats$strata3,
+                   Catch_KG=ats$strata2+ats$strata3, depth=ats$depth,
                    Gear='Acoustic_3-surface', AreaSwept_km2=1,
                    Vessel='none')
   c_iz <- rep(0, nrow(Data_Geostat))
@@ -92,8 +97,6 @@ if(model=='combined'){
 }
 nyr <- length(years)
 
-
-
 Extrapolation_List =
   make_extrapolation_info( Region=Region, strata.limits=strata.limits )
 ## Derived objects for spatio-temporal estimation
@@ -103,6 +106,17 @@ Spatial_List <- make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
                                  Extrapolation_List=Extrapolation_List,
                                  DirPath=savedir, Save_Results=FALSE )
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
+XX <- (FishStatsUtils::format_covariates(
+    Lat_e = Data_Geostat$Lat,
+    Lon_e = Data_Geostat$Lon,
+    t_e = Data_Geostat$Year,
+    Cov_ep = Data_Geostat[,'depth'],
+    Extrapolation_List = Extrapolation_List,
+    Spatial_List = Spatial_List, FUN = mean,
+    na.omit = "time-average"))
+##dimnames(X_xtp)[[1]] <- dimnames(covsperknot$Cov_xtp)[[1]]
+X_xtp <- XX$Cov_xtp
+
 
 # Add threshold
 b_i <- Data_Geostat[,'Catch_KG']
@@ -117,8 +131,10 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   MeshList=Spatial_List$MeshList,
                   GridList=Spatial_List$GridList,
                   Q_ik=Q_ik,
+                  X_xtp=X_xtp,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
+
 Random <- "generate"
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                          Version=Version,  RhoConfig=RhoConfig,
@@ -157,6 +173,9 @@ if(model=='ats'){
   Map$beta2_ct <- as.factor(Map$beta2_ct)
 }
 
+## Turn off the depth effect for the second LP
+Map$gamma1_ctp  <- factor(rep(1,length(Params$gamma1_ctp)))
+Map$gamma2_ctp  <- factor(Params$gamma2_ctp*NA)
 
 if(space == 'NS'){
   ## turn off estimation of space
