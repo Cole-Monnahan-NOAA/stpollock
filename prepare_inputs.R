@@ -198,6 +198,8 @@ TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
 
+## bundle together some of the inputs that will be needed later for
+## plotting and such that aren't included in the standard VAST output
 loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
 names(loc) <- c('E_km', 'N_km')
 Inputs <- list(loc=loc)

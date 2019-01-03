@@ -17,7 +17,8 @@ indices <- ldply(dirs, function(x) {
   }
 })
 
-fields <- llply(dirs, function(x) {
+dirs2 <- dirs[-grep('ST', x=dirs)]
+fields <- llply(dirs2, function(x) {
   ff <- file.path(x, 'Save.RData')
   ## for now just getting the combined fits
   if(length(grep('combined', x=x))>0 & file.exists(ff)){
@@ -25,13 +26,13 @@ fields <- llply(dirs, function(x) {
     kappa <- exp(Save$Opt$SD$par.fixed['logkappa1'])
     return(data.frame(model=Save$Index$model[1], space=Save$Index$space[1],
                       omegainput=Save$Report$Omegainput1_sf,
-                      omega=Save$Report$Omega1_sc))
+                      omega=Save$Report$Omega1_sc, E_km=Save$Inputs$loc$E_km,
+                      N_km=Save$Inputs$loc$N_km))
   } else {
     return(NULL)
   }
 })
 fields <- do.call(rbind.fill, fields)
-fields <- cbind(fields, loc)
 fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
                     factorsAsStrings=FALSE)
 fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
@@ -42,7 +43,6 @@ fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
 fields.long <- ddply(fields.long, .(type, space), mutate,
                      normalized=value/sd(value))
 Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
-
 g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
   geom_point(alpha=.5, size=1) +
   facet_grid(space+type~strata) +
@@ -81,7 +81,7 @@ ggsave('plots/initial_fits.png', g, width=7, height=5)
 ##   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
 ##   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
 ## ggsave('plots/initial_fits_beta1.png', g, width=7, height=5)
-g <- ggplot(subset(ests, par!='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
+g <- ggplot(ests, aes(parnum, est, color=model, shape=space)) +
   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
 ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
