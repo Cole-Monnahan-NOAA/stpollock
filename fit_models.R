@@ -20,7 +20,7 @@ plot.vastfit(results)
 }
 
 ## Test increasing resolution
-for(n_x in 2^(5:10)){
+for(n_x in 2^(11:12)){
   space <- "S"; model <- 'combined'
   savedir <- paste0(getwd(), '/knots_combined_S_',n_x)
   source("prepare_inputs.R")
