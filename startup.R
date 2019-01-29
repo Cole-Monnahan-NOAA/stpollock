@@ -12,7 +12,7 @@ library(TMBhelper)
 library(snowfall)
 library(maps)
 library(mapdata)
-Version <- "VAST_v5_3_0"
+Version <- "VAST_v7_0_0"
 
 source("simulator.R")
 
@@ -52,7 +52,6 @@ calculate.index <- function(Opt, Report, model, space){
                       se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[1];
                         sum(cov.index[j,j])})))
     index <- rbind(index1,index2, index3)
-
   } else {
     ## chop off missing years for ATS case
     tmp2 <- which(min(years):max(years) %in% years)

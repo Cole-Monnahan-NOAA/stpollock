@@ -16,6 +16,7 @@ Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
 ## TMBhelper::Check_Identifiable(Obj)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
+pairs(results$Report$beta2_tc)
 }
 }
 
