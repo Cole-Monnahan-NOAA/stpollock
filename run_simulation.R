@@ -1,3 +1,7 @@
+### This files runs the simulation testing component of the analysis.
+source("startup.R")
+## the simulated data is based on the real data so process that now
+
 
 ## Basic simulation
 set.seed(1)
