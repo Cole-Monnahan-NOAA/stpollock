@@ -11,18 +11,17 @@ source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=F,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
+ TMBhelper::Check_Identifiable(Obj)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 
 ## Fit all versions of model
-n_x <- 100 # number of knots
-for(m in 1:3){
-for(s in 3){
-m <- 3; s <- 2
+n_x <- 200 # number of knots
+for(m in 3){
+for(s in 1:3){
 model <- c('ats', 'bts', 'combined')[m]
 space <- c('NS', 'S', 'ST')[s]
-savedir <- paste0(getwd(), '/fit_', model, "_", space)
+savedir <- paste0(getwd(), '/fit_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
                 upper=TmbList$Upper,  savedir=savedir,

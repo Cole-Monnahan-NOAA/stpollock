@@ -67,7 +67,7 @@ plot.vastfit <- function(results){
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + ylim(0, max(Index$est+2*Index$se))
+    geom_line() + geom_point()+ theme_bw() #+ ylim(0, max(Index$est+2*Index$se))
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
                               Extrapolation_List=Extrapolation_List)

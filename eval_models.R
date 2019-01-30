@@ -1,10 +1,8 @@
 ## Read in results and evalulate the models
-
-
-
-
-## Pull out the results for different quantities
 library(plyr)
+library(ggplot2)
+
+## Pull out the results for the main fits to the model and plot key results
 xx <- list.dirs(full.names=FALSE, recursive=FALSE)
 dirs <- xx[grep('fit_', xx)]
 indices <- ldply(dirs, function(x) {
@@ -16,8 +14,13 @@ indices <- ldply(dirs, function(x) {
     return(NULL)
   }
 })
+g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
+  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
+  geom_line() + geom_point()+
+  facet_grid(strata~space)
+ggsave('plots/initial_fits.png', g, width=7, height=5)
 
-dirs2 <- dirs[-grep('ST', x=dirs)]
+dirs2 <- dirs[-grep('NS', x=dirs)]
 fields <- llply(dirs2, function(x) {
   ff <- file.path(x, 'Save.RData')
   ## for now just getting the combined fits
@@ -46,8 +49,8 @@ Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","y
 g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
   geom_point(alpha=.5, size=1) +
   facet_grid(space+type~strata) +
-  scale_colour_gradientn(colours = Col(15))
-ggsave('plots/map_omegas.png', width=9, height=6, units='in')
+  scale_colour_gradientn(colours = Col(15)) + theme_bw()
+ggsave('plots/map_omegas.png', g, width=9, height=6, units='in')
 
 ests <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
@@ -69,30 +72,6 @@ ests <- ldply(dirs, function(x) {
     return(NULL)
   }
 })
-
-load("fit_combined_NS/Save.RData")
-beta1.NS <- data.frame(space='NS', t(Save$Report$beta1_ct))
-load("fit_combined_S/Save.RData")
-beta1.S <- data.frame(space='S', t(Save$Report$beta1_ct))
-beta1 <- rbind(beta1.NS, beta1.S)
-names(beta1) <- c('space', 'stratum1', 'stratum2', 'stratum3')
-beta1$year.missing <-2007:2018 %in% c(2011, 2013, 2015, 2017)
-beta1.long <- melt(beta1, id.vars=c('space', 'stratum3', 'year.missing'))
-
-g <- ggplot(beta1.long, aes(y=stratum3, x=value, group=space, fill=space,
-                            col=space, shape=year.missing)) +
-  geom_abline(slope=1, intercept=0) +
-  geom_point(size=1.5) +
-  facet_grid(variable~space, scales='free') +
-  stat_smooth(alpha=.25, method=loess) + theme_bw()
-ggsave('plots/beta1_correlations.png', g, width=7, height=3)
-
-library(ggplot2)
-g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
-  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
-  geom_line() + geom_point()+
-  facet_grid(strata~space)
-ggsave('plots/initial_fits.png', g, width=7, height=5)
 ## g <- ggplot(subset(ests, par=='beta1_ct'), aes(parnum, est, color=model, shape=space)) +
 ##   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
 ##   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
@@ -100,7 +79,27 @@ ggsave('plots/initial_fits.png', g, width=7, height=5)
 g <- ggplot(ests, aes(parnum, est, color=model, shape=space)) +
   geom_point(size=3) + facet_wrap('par', scales='free', ncol=2) +
   geom_linerange(aes(ymin=est-2*se, ymax=est+2*se), lwd=1.5)
+g
 ggsave('plots/initial_fits_pars.png', g, width=7, height=5)
+
+
+##
+load("fit_combined_NS/Save.RData")
+beta1.NS <- data.frame(space='NS', Save$Report$beta1_tc)
+load("fit_combined_S/Save.RData")
+beta1.S <- data.frame(space='S', Save$Report$beta1_tc)
+beta1 <- rbind(beta1.NS, beta1.S)
+names(beta1) <- c('space', 'stratum1', 'stratum2', 'stratum3')
+beta1$year.missing <-2007:2018 %in% c(2011, 2013, 2015, 2017)
+beta1.long <- melt(beta1, id.vars=c('space', 'stratum3', 'year.missing'))
+g <- ggplot(beta1.long, aes(y=stratum3, x=value, group=space, fill=space,
+                            col=space, shape=year.missing)) +
+  geom_abline(slope=1, intercept=0) +
+  geom_point(size=1.5) +
+  facet_grid(variable~space, scales='free') +
+  stat_smooth(alpha=.25, method='lm') + theme_bw()
+ggsave('plots/beta1_correlations.png', g, width=7, height=3)
+
 
 
 ### Resolution test
