@@ -20,10 +20,15 @@ source("simulator.R")
 process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Report  <-  Obj$report()
   ParHatList <- Obj$env$parList(Opt$par)
+  SE <- sqrt(diag(Opt$SD$cov.fixed))
   ParHat <- Opt$par
+  est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
+                    upr=ParHat+1.96*SE)
+  est$significant <- !(est$lwr<0 & est$upr>0)
   Index <- calculate.index(Opt, Report, model, space)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
-                 Inputs=Inputs, savedir=savedir)
+                 ParHatList=ParHatList, est=est,
+                 SE=SE, Inputs=Inputs, savedir=savedir)
   save(Save, file=paste0(savedir,"/Save.RData"))
   return(Save)
 }

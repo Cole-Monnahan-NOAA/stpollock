@@ -13,15 +13,7 @@ silent.fn <- function(expr){
 }
 
 ### Step 1: Load in the real data
-DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
-                   Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
-                   Vessel='none', depth=bts$depth)
-DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                   Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth)
-DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                   Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth)
+source("load_data.R")
 
 ### Step 2: Configure the spatial factors which depend on inputs
 n_f <- ifelse(model=='combined', 3,1) # number of factors to use
@@ -31,14 +23,14 @@ FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
                         "Epsilon1"=ifelse(space=='ST', n_f,0),
                         "Beta1"=n_f,
                         "Omega2"=0,
-                        "Epsilon2"=0, "Beta2"=n_f), ncol=2 )
+                        "Epsilon2"=0, "Beta2"=n_f-1), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
 ### walk; 3: constant among years as fixed effect; 4: each year as random
 ### following AR1 process
 ## For now using IID for combined model and temporal on ATS/BTS since
 ## missing years there.
-x <- switch(model, combined=1, ats=4, bts=4)
+x <- switch(model, combined=2, ats=4, bts=4)
 RhoConfig <- c("Beta1"=x, "Beta2"=x, "Epsilon1"=0, "Epsilon2"=0)
 
 
@@ -108,12 +100,10 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
     Lat_e = Data_Geostat$Lat,
     Lon_e = Data_Geostat$Lon,
     t_e = Data_Geostat$Year,
-    Cov_ep = Data_Geostat[,'depth'],
+    Cov_ep = Data_Geostat[,c('depth', 'depth2')],
     Extrapolation_List = Extrapolation_List,
     Spatial_List = Spatial_List, FUN = mean,
     na.omit = "time-average")))
-##dimnames(X_xtp)[[1]] <- dimnames(covsperknot$Cov_xtp)[[1]]
-X_xtp <- XX$Cov_xtp
 
 ## Build data and object for first time
 TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
@@ -127,7 +117,7 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   MeshList=Spatial_List$MeshList,
                   GridList=Spatial_List$GridList,
                   Q_ik=Q_ik,
-                  X_xtp=X_xtp,
+                  X_xtp=XX$Cov_xtp,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
@@ -139,7 +129,7 @@ Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 if(model=='combined'){
   ## Assume that the two ATS strata have the same observation error
-  Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
+ ## Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
   ##  Map$beta1_ct <- factor(rep(1, 30))
   ## Carefully build the catchability
   ## Params$lambda1_k <- c(0,0)
@@ -156,10 +146,12 @@ if(model=='combined'){
   ## This has no NA b/c all years represented in the data
   Map$beta2_ct <- factor(rep(1, length(Params$beta2_ct)))
 }
-## Turn off the depth effect for the second LP and initialize at 0
+## Set depth and depth2 coefficients to be constant across years and strata
+## but affecting p1 and p2
 Params$gamma1_ctp <- Params$gamma2_ctp <- Params$gamma1_ctp*0
-## Map$gamma1_ctp  <- factor(rep(1,length(Params$gamma1_ctp)))
-Map$gamma2_ctp  <- factor(Params$gamma2_ctp*NA)
+tmp <- Params$gamma1_ctp
+tmp[,,1] <- 1; tmp[,,2] <- 2 # depth and depth2 are separate
+Map$gamma1_ctp <- Map$gamma2_ctp <- factor(tmp)
 
 ## if(space=='ST' & model =='combined'){
 ##   ## turn off estimation of factor analysis and just do diagonal (for now)
