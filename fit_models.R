@@ -5,13 +5,13 @@ source('startup.R')
 
 ## Test combined spatial model
 n_x <- 200
-model <- 'combined'; space <- 'S'
+model <- 'combined'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
+ TMBhelper::Check_Identifiable(Obj)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 

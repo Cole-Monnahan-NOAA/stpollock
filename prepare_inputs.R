@@ -16,14 +16,14 @@ silent.fn <- function(expr){
 source("load_data.R")
 
 ### Step 2: Configure the spatial factors which depend on inputs
-n_f <- ifelse(model=='combined', 3,1) # number of factors to use
+n_f <- ifelse(model=='combined', 2,1) # number of factors to use
 ## This puts a FA on beta1 and beta2, which means I need to set Rho
 ## accordingly below
 FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
                         "Epsilon1"=ifelse(space=='ST', n_f,0),
-                        "Beta1"=n_f,
-                        "Omega2"=0,
-                        "Epsilon2"=0, "Beta2"=n_f-1), ncol=2 )
+                        "Beta1"='IID',
+                        "Omega2"=0,#ifelse(space=='NS', 0, n_f),
+                        "Epsilon2"=0, "Beta2"='IID'), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
 ### walk; 3: constant among years as fixed effect; 4: each year as random
@@ -69,6 +69,7 @@ capture.output( Record, file=paste0(savedir,"/Record.txt"))
 Q_ik <- NULL ## catchability covariates, updated below for combined model?
 if(model=='combined'){
   Data_Geostat <- rbind( DF1, DF2, DF3 )
+  Data_Geostat <- subset(Data_Geostat, !Year %in% c(2011, 2013, 2015, 2017))
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
   ## Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
