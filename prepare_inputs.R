@@ -16,13 +16,13 @@ silent.fn <- function(expr){
 source("load_data.R")
 
 ### Step 2: Configure the spatial factors which depend on inputs
-n_f <- ifelse(model=='combined', 2,1) # number of factors to use
+n_f <- ifelse(model=='combined', 3,1) # number of factors to use
 ## This puts a FA on beta1 and beta2, which means I need to set Rho
 ## accordingly below
 FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
                         "Epsilon1"=ifelse(space=='ST', n_f,0),
                         "Beta1"='IID',
-                        "Omega2"=0,#ifelse(space=='NS', 0, n_f),
+                        "Omega2"=ifelse(space=='NS', 0, n_f),
                         "Epsilon2"=0, "Beta2"='IID'), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
@@ -69,7 +69,12 @@ capture.output( Record, file=paste0(savedir,"/Record.txt"))
 Q_ik <- NULL ## catchability covariates, updated below for combined model?
 if(model=='combined'){
   Data_Geostat <- rbind( DF1, DF2, DF3 )
-  Data_Geostat <- subset(Data_Geostat, !Year %in% c(2011, 2013, 2015, 2017))
+ ## Data_Geostat <- subset(Data_Geostat, Year < 2011)
+  ## tmp <- Data_Geostat
+  ## tmp$Year <- tmp$Year-4
+  ## Data_Geostat <- rbind(Data_Geostat, tmp)
+  ## tmp$Year <- tmp$Year-4
+  ## Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
   ## Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
@@ -118,7 +123,7 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   MeshList=Spatial_List$MeshList,
                   GridList=Spatial_List$GridList,
                   Q_ik=Q_ik,
-                  X_xtp=XX$Cov_xtp,
+                  X_xtp=NULL,#XX$Cov_xtp,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
@@ -149,10 +154,10 @@ if(model=='combined'){
 }
 ## Set depth and depth2 coefficients to be constant across years and strata
 ## but affecting p1 and p2
-Params$gamma1_ctp <- Params$gamma2_ctp <- Params$gamma1_ctp*0
-tmp <- Params$gamma1_ctp
-tmp[,,1] <- 1; tmp[,,2] <- 2 # depth and depth2 are separate
-Map$gamma1_ctp <- Map$gamma2_ctp <- factor(tmp)
+## Params$gamma1_ctp <- Params$gamma2_ctp <- Params$gamma1_ctp*0
+## tmp <- Params$gamma1_ctp
+## tmp[,,1] <- 1; tmp[,,2] <- 2 # depth and depth2 are separate
+## Map$gamma1_ctp <- Map$gamma2_ctp <- factor(tmp)
 
 ## if(space=='ST' & model =='combined'){
 ##   ## turn off estimation of factor analysis and just do diagonal (for now)
@@ -169,7 +174,7 @@ TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Param=Params, TmbDir='models', Random='generate',
                          Map=Map)
 Obj  <-  TmbList[["Obj"]]
-Obj$env$beSilent()
+ Obj$env$beSilent()
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output

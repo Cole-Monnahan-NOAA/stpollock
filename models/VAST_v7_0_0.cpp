@@ -1092,7 +1092,9 @@ Type objective_function<Type>::operator() ()
         for( int zc=0; zc<c_iz.row(0).size(); zc++ ){
           if( (c_iz(i,zc)>=0) & (c_iz(i,zc)<n_c) ){
             tmp_calc1 += exp(P1_iz(i,zc));
-            tmp_calc2 += exp(P1_iz(i,zc)) * exp(P2_iz(i,zc));
+	    // cole changed this to be more stable
+            // tmp_calc2 += exp(P1_iz(i,zc)) * exp(P2_iz(i,zc));
+	    tmp_calc2+=exp(P1_iz(i,zc)+P2_iz(i,zc));
           }
         }
         R1_i(i) = Type(1.0) - exp( -1*a_i(i)*tmp_calc1 );
@@ -1336,8 +1338,9 @@ Type objective_function<Type>::operator() ()
     }
     if( (ObsModel_ez(c,1)==1) | (ObsModel_ez(c,1)==4) ){
       R1_xcy(x,c,y) = Type(1.0) - exp( -exp(P1_xcy(x,c,y)) );
-      R2_xcy(x,c,y) = exp(P1_xcy(x,c,y)) / R1_xcy(x,c,y) * exp( P2_xcy(x,c,y) );
-      D_xcy(x,c,y) = exp( P1_xcy(x,c,y) ) * exp( P2_xcy(x,c,y) );        // Use this line to prevent numerical over/underflow
+      // cole changed this
+      R2_xcy(x,c,y) = exp(P1_xcy(x,c,y)+P2_xcy(x,c,y)) / R1_xcy(x,c,y));
+      D_xcy(x,c,y) = exp( P1_xcy(x,c,y) + P2_xcy(x,c,y) );        // Use this line to prevent numerical over/underflow
     }
     if( ObsModel_ez(c,1)==2 ){
       R1_xcy(x,c,y) = exp( P1_xcy(x,c,y) );
