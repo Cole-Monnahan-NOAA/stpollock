@@ -68,6 +68,33 @@ calculate.index <- function(Opt, Report, model, space){
 }
 
 plot.vastfit <- function(results){
+  if(results$Index$space[1]=="S"){
+    fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
+                         omegainput1=results$Report$Omegainput1_sf,
+                         omega1=results$Report$Omega1_sc,
+                         omegainput2=results$Report$Omegainput2_sf,
+                         omega2=results$Report$Omega2_sc,
+                         E_km=results$Inputs$loc$E_km,
+                         N_km=results$Inputs$loc$N_km)
+    fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
+                        factorsAsStrings=FALSE)
+    fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+                                                         function(x) x[2])))
+    fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+                                      function(x) x[1]))
+    fields.long$component <- 'Component=1'
+    fields.long$component[grep(fields.long$type, pattern='2')] <- 'Component=2'
+    fields.long$type <- gsub("1|2", "", x=fields.long$type)
+    fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
+    fields.long <- ddply(fields.long, .(type, space, component), mutate,
+                         normalized=value/sd(value))
+    Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
+    g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
+      geom_point(size=1) +
+      facet_grid(component+type~strata) +
+      scale_colour_gradientn(colours = Col(15)) + theme_bw()
+    ggsave(file.path(savedir, 'map_omegas.png'), g, width=9, height=6, units='in')
+  }
   Report <- results$Report
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +

@@ -20,17 +20,18 @@ n_f <- ifelse(model=='combined', 3,1) # number of factors to use
 ## This puts a FA on beta1 and beta2, which means I need to set Rho
 ## accordingly below
 FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
-                        "Epsilon1"=ifelse(space=='ST', n_f,0),
-                        "Beta1"='IID',
+                        "Epsilon1"=0,
+                        "Beta1"="IID",
                         "Omega2"=ifelse(space=='NS', 0, n_f),
-                        "Epsilon2"=0, "Beta2"='IID'), ncol=2 )
+                        "Epsilon2"=ifelse(space=='ST', n_f,0),
+                        "Beta2"="IID"), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
 ### walk; 3: constant among years as fixed effect; 4: each year as random
 ### following AR1 process
 ## For now using IID for combined model and temporal on ATS/BTS since
 ## missing years there.
-x <- switch(model, combined=2, ats=4, bts=4)
+x <- switch(model, combined=1, ats=4, bts=4)
 RhoConfig <- c("Beta1"=x, "Beta2"=x, "Epsilon1"=0, "Epsilon2"=0)
 
 
@@ -42,7 +43,7 @@ OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 ObsModel <- c(1,1)
 Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
               "Calculate_Range"=1, "Calculate_evenness"=0,
-              "Calculate_effective_area"=1, "Calculate_Cov_SE"=0,
+              "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
 ## Stratification for results
 strata.limits <- data.frame('STRATA'="All_areas")
@@ -70,15 +71,15 @@ Q_ik <- NULL ## catchability covariates, updated below for combined model?
 if(model=='combined'){
   Data_Geostat <- rbind( DF1, DF2, DF3 )
  ## Data_Geostat <- subset(Data_Geostat, Year < 2011)
-  ## tmp <- Data_Geostat
-  ## tmp$Year <- tmp$Year-4
-  ## Data_Geostat <- rbind(Data_Geostat, tmp)
-  ## tmp$Year <- tmp$Year-4
-  ## Data_Geostat <- rbind(Data_Geostat, tmp)
+ ##  tmp <- Data_Geostat
+ ##  tmp$Year <- tmp$Year-4
+ ##  Data_Geostat <- rbind(Data_Geostat, tmp)
+ ##  tmp$Year <- tmp$Year-4
+ ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  ## Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
-  ##               ifelse(Data_Geostat$Gear=='Trawl', 0, 1))
+  Q_ik <- cbind(ifelse(Data_Geostat$Gear=='Trawl', 1, 0),
+                ifelse(Data_Geostat$Gear=='Trawl', 0, 1))
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
@@ -123,7 +124,7 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                   MeshList=Spatial_List$MeshList,
                   GridList=Spatial_List$GridList,
                   Q_ik=Q_ik,
-                  X_xtp=NULL,#XX$Cov_xtp,
+                  X_xtp=XX$Cov_xtp,
                   Method=Spatial_List$Method, Options=Options,
                   Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
@@ -133,6 +134,13 @@ TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
 ## Tweak the Map based on inputs
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
+Params$Beta_mean1_c <- c(0,0,0)
+Params$Beta_mean2_c <- c(5,5,5)
+Params$L_beta1_z <- c(.2,.3,.5)
+Params$L_beta2_z <- c(.6,.3,1)
+Params$logSigmaM[1:3] <- c(.6,.7,.8)
+
+## Params$beta2_ft <- Params$beta2_ft+5
 if(model=='combined'){
   ## Assume that the two ATS strata have the same observation error
  ## Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
@@ -171,10 +179,12 @@ if(model=='combined'){
 TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
-                        Param=Params, TmbDir='models', Random='generate',
+                        Param=Params, TmbDir='models',
+                         Random='generate',
+                        ##Random=c('beta1_ft'),
                          Map=Map)
 Obj  <-  TmbList[["Obj"]]
- Obj$env$beSilent()
+## Obj$env$beSilent()
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output

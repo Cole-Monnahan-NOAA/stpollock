@@ -32,3 +32,33 @@ DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
                    Vessel='none', depth=ats$depth, depth2=ats$depth2)
 
+## ## Simulate a fake process
+## f <- function(mu, sd, p){
+##   o <- rbinom(1,1,p)
+##   o <- 1
+##   if(!o){
+##     return(0)
+##   } else
+##     return(exp(rnorm(1, mu,sd)))
+## }
+## fake <- data.frame(lat=ats$lat[1:1000], lon=ats$lon[1:1000] , year=rep(1:10, times=100),
+##                    strata1=sapply(1:1000, function(i) f(5, .1, .8)),
+##                    strata2=sapply(1:1000, function(i) f(6, .1, .8)),
+##                    strata3=sapply(1:1000, function(i) f(4, .1, .8)),
+##                    depth=0, depth2=0)
+
+
+## DF1 <- data.frame(Lat=fake$lat, Lon=fake$lon, Year=fake$year,
+##                   Catch_KG=fake$strata1+fake$strata2,
+##                   Gear='Trawl', AreaSwept_km2=1,
+##                   Vessel='none', depth=fake$depth, depth2=fake$depth2)
+## DF2 <- data.frame(Lat=fake$lat, Lon=fake$lon, Year=fake$year,
+##                   Catch_KG=fake$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
+##                   Vessel='none', depth=fake$depth, depth2=fake$depth2)
+## DF3 <- data.frame( Lat=fake$lat, Lon=fake$lon, Year=fake$year,
+##                    Catch_KG=fake$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
+##                    Vessel='none', depth=fake$depth, depth2=fake$depth2)
+
+## DF1$Catch_KG[sample(1:1000, size=80)] <- 0
+## DF2$Catch_KG[sample(1:1000, size=80)] <- 0
+## DF3$Catch_KG[sample(1:1000, size=80)] <- 0

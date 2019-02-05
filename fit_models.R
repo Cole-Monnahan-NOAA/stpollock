@@ -3,26 +3,6 @@ rm(list=ls())
 source('startup.R')
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
 
-## Test combined spatial model
-n_x <- 150
-model <- 'combined'; space <- 'S'
-savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
-source("prepare_inputs.R")
-Obj$fn()
-## [1] 64255.1
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=T, loopnum=3,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=1, control=list(trace=10))
-TMBhelper::Check_Identifiable(Obj)
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
-
-report <- Obj$report()
-report$beta1_tc
-report$beta2_tc
-test <- ddply(Data_Geostat, .(Gear, Year), summarize, pct0=mean(Catch_KG==0))
-ggplot(test, aes(Year, pct0, group=Gear)) + geom_line()
-(t(results$ParHatList$beta2_ft))
 
 
 
@@ -60,13 +40,16 @@ for(n_x in 2^(11:12)){
 library(tmbstan)
 library(shinystan)
 options(mc.cores = 7)
-n_x <- 200
-model <- 'combined'
-space <- 'S'
-source("prepare_inputs.R")
-mcmc <- tmbstan(obj=Obj, iter=1000, chains=7, lower=TmbList$Lower,
-                init='last.par.best',
-                upper=TmbList$Upper, control=list(max_treedepth=12),
+## n_x <- 200
+## model <- 'combined'
+## space <- 'S'
+## source("prepare_inputs.R")
+lwr <- TmbList$Lower
+lwr[grep('L_', names(lwr))] <- 0
+mcmc <- tmbstan(obj=Obj, iter=1000, chains=7,
+                init='par', upper= TmbList$Upper,
+                lower=lwr,
+                 control=list(max_treedepth=8, adapt_delta=.9),
                 open_progress=FALSE)
 saveRDS(mcmc, file='mcmc.RDS')
 launch_shinystan(mcmc)
