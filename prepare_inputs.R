@@ -139,6 +139,9 @@ Params$Beta_mean2_c <- c(5,5,5)
 Params$L_beta1_z <- c(.2,.3,.5)
 Params$L_beta2_z <- c(.6,.3,1)
 Params$logSigmaM[1:3] <- c(.6,.7,.8)
+Params$logkappa1 <- Params$logkappa2 <- -5
+
+
 
 ## Params$beta2_ft <- Params$beta2_ft+5
 if(model=='combined'){
