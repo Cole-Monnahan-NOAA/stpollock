@@ -96,10 +96,10 @@ options(mc.cores = 7)
 lwr <- TmbList$Lower
 ## L_betas are variances so bound below
 lwr[grep('L_beta', names(lwr))] <- 0
-mcmc <- tmbstan(obj=Obj, iter=1000, chains=1,
+mcmc <- tmbstan(obj=Obj, iter=1000, chains=7,
                 init='par', upper= TmbList$Upper,
                 lower=lwr,
-                 control=list(max_treedepth=10, adapt_delta=.9),
+                 control=list(max_treedepth=12, adapt_delta=.8),
                 open_progress=FALSE)
 saveRDS(mcmc, file='mcmc.RDS')
 launch_shinystan(mcmc)
