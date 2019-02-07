@@ -20,8 +20,12 @@ source("simulator.R")
 process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Report  <-  Obj$report()
   ParHatList <- Obj$env$parList(Opt$par)
-  SE <- sqrt(diag(Opt$SD$cov.fixed))
   ParHat <- Opt$par
+  if(is.null(Opt$SD$cov.fixed)){ # no SD
+    SE <- rep(Inf, len=length(ParHat))
+  } else {
+    SE <- sqrt(diag(Opt$SD$cov.fixed))
+  }
   est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
@@ -68,6 +72,13 @@ calculate.index <- function(Opt, Report, model, space){
 }
 
 plot.vastfit <- function(results){
+  df <- data.frame(obs=Data_Geostat$Catch_KG,
+                   predicted=results$Report$R2_i, gear=Data_Geostat$Gear,
+                   year=Data_Geostat$Year)
+  df <- subset(df, obs>0) ## drop zeroes
+  g <- ggplot(df, aes(log(obs), log(predicted))) + facet_grid(gear~year) + geom_point(alpha=.5) +
+    geom_abline(slope=1, intercept=0)
+  ggsave(file.path(savedir, 'obs_vs_pred.png'), g, width=10, height=5)
   if(results$Index$space[1]=="S"){
     fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
                          omegainput1=results$Report$Omegainput1_sf,
