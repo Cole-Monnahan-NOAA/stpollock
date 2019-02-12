@@ -99,7 +99,7 @@ plot.vastfit <- function(results){
   g <- ggplot(df, aes(log(obs), log(predicted))) + facet_grid(gear~year) + geom_point(alpha=.5) +
     geom_abline(slope=1, intercept=0)
   ggsave(file.path(savedir, 'obs_vs_pred.png'), g, width=10, height=5)
-  if(results$Index$space[1]=="S"){
+  if(results$Index$space[1]!="NS"){
     fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
                          omegainput1=results$Report$Omegainput1_sf,
                          omega1=results$Report$Omega1_sc,
@@ -109,8 +109,12 @@ plot.vastfit <- function(results){
                          N_km=results$Inputs$loc$N_km)
     fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
                         factorsAsStrings=FALSE)
-    fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
-                                                         function(x) x[2])))
+    if(results$Index$model[1]=='combined'){
+      fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+                                                           function(x) x[2])))
+    } else {
+      fields.long$strata <- results$Index$model[1]
+    }
     fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
                                       function(x) x[1]))
     fields.long$component <- 'Component=1'
@@ -120,7 +124,7 @@ plot.vastfit <- function(results){
     fields.long <- ddply(fields.long, .(type, space, component), mutate,
                          normalized=value/sd(value))
     Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
-    g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
+    g <- ggplot(fields.long, aes(E_km, N_km, col=value)) +
       geom_point(size=1) +
       facet_grid(component+type~strata) +
       scale_colour_gradientn(colours = Col(15)) + theme_bw()
