@@ -57,8 +57,8 @@ calculate.index <- function(Opt, Report, model, space){
                       se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-1];
                         sum(cov.index[j,j])})))
     ## likewise the BTS is just the first strata
-    index3 <- data.frame(index, strata='bts', est=Report$Index_cyl[1,,],
-                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[1];
+    index3 <- data.frame(index, strata='bts', est=apply(Report$Index_cyl[1:2,,], 2, sum),
+                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-3];
                         sum(cov.index[j,j])})))
     index <- rbind(index1,index2, index3)
   } else {
