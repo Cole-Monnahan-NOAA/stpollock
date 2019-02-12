@@ -103,3 +103,9 @@ mcmc <- tmbstan(obj=Obj, iter=1000, chains=7,
                 open_progress=FALSE)
 saveRDS(mcmc, file='mcmc.RDS')
 launch_shinystan(mcmc)
+
+pars <- names(mcmc)[-grep('Omega', x = names(mcmc))]
+pars <- names(mcmc)[grep(x=names(mcmc), 'beta1_ft')][(1:12)*3-1]
+png('pairs.png', width=12, height=8, res=500, units='in')
+pairs(mcmc, pars=pars)
+dev.off()
