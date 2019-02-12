@@ -29,39 +29,59 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
-  Index <- calculate.index(Opt, Report, model, space)
+  Index <- calculate.index(Opt, Report, model, space, log=FALSE, strata=FALSE)
+  Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
-                 ParHatList=ParHatList, est=est,
+                 ParHatList=ParHatList, est=est, Index.strata=Index.strata,
                  SE=SE, Inputs=Inputs, savedir=savedir)
   save(Save, file=paste0(savedir,"/Save.RData"))
   return(Save)
 }
 
-calculate.index <- function(Opt, Report, model, space){
-  tmp <- which(names(Opt$SD$value) %in% 'Index_cyl')
+calculate.index <- function(Opt, Report, model, space, log, strata){
+  if(log){
+    ## calculate in log space?
+    if(!strata)
+      stop("Doesnt make sense to have combined model in log space")
+    tmp <- which(names(Opt$SD$value) %in% 'ln_Index_cyl')
+    ii <- log(Report$Index_cyl[,,1])
+  } else {
+    tmp <- which(names(Opt$SD$value) %in% 'Index_cyl')
+    ii <- Report$Index_cyl[,,1]
+  }
   index <- data.frame(model=model, space=space,  year=years)
   if(model=='combined'){
-  ## Manually calculate SE for the total biomass index. Since it's a sum of
-  ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
-  ## of all of the variances and covariances. This feature is not coded
-  ## into VAST yet so have to do it manually. also note that the order of
-  ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
-  ## Index_12,.. etc. This effects the subsetting below
-    cov.index <- Opt$SD$cov[tmp,tmp]
-    ## combined is all three strata summed
-    index1 <- data.frame(index, strata='total',  est=apply(Report$Index_cyl[1:3,,], 2, sum),
-                      se=sqrt(sapply(1:nyr, function(i) {j=1:3+3*(i-1);
-                        sum(cov.index[j,j])})))
-    ## sum the top two to get what the ATS sees
-    index2 <- data.frame(index, strata='ats', est=apply(Report$Index_cyl[2:3,,], 2, sum),
-                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-1];
-                        sum(cov.index[j,j])})))
-    ## likewise the BTS is just the first strata
-    index3 <- data.frame(index, strata='bts', est=Report$Index_cyl[1,,],
-                      se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[1];
-                        sum(cov.index[j,j])})))
-    index <- rbind(index1,index2, index3)
+    if(!strata){
+      ## Manually calculate SE for the total biomass index. Since it's a sum of
+      ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
+      ## of all of the variances and covariances. This feature is not coded
+      ## into VAST yet so have to do it manually. also note that the order of
+      ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
+      ## Index_12,.. etc. This effects the subsetting below
+      cov.index <- Opt$SD$cov[tmp,tmp]
+      ## combined is all three strata summed
+      index1 <- data.frame(index, strata='total',  est=apply(ii[1:3,], 2, sum),
+                           se=sqrt(sapply(1:nyr, function(i) {j=1:3+3*(i-1);
+                             sum(cov.index[j,j])})))
+      ## sum the top two to get what the ATS sees
+      index2 <- data.frame(index, strata='ats', est=apply(ii[2:3,], 2, sum),
+                           se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-1];
+                             sum(cov.index[j,j])})))
+      ## likewise the BTS is just the first strata
+      index3 <- data.frame(index, strata='bts', est=apply(ii[1:2,], 2, sum),
+                           se=sqrt(sapply(1:nyr, function(i) {j=(1:3+3*(i-1))[-3];
+                             sum(cov.index[j,j])})))
+      index <- rbind(index1,index2, index3)
+    } else {
+      ## If we just want to get the 3 strata without the summation
+      sdtmp <- matrix(sqrt(diag(Opt$SD$cov[tmp,tmp])), nrow=3)
+      index1 <- data.frame(index, strata='strata1', est=ii[1,], se=sdtmp[1,])
+      index2 <- data.frame(index, strata='strata2', est=ii[2,], se=sdtmp[2,])
+      index3 <- data.frame(index, strata='strata3', est=ii[3,], se=sdtmp[3,])
+      index <- rbind(index1,index2, index3)
+    }
   } else {
+    ## Either BTS or ATS so single
     ## chop off missing years for ATS case
     tmp2 <- which(min(years):max(years) %in% years)
     tmp <- tmp[tmp2]
@@ -79,7 +99,7 @@ plot.vastfit <- function(results){
   g <- ggplot(df, aes(log(obs), log(predicted))) + facet_grid(gear~year) + geom_point(alpha=.5) +
     geom_abline(slope=1, intercept=0)
   ggsave(file.path(savedir, 'obs_vs_pred.png'), g, width=10, height=5)
-  if(results$Index$space[1]=="S"){
+  if(results$Index$space[1]!="NS"){
     fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
                          omegainput1=results$Report$Omegainput1_sf,
                          omega1=results$Report$Omega1_sc,
@@ -89,8 +109,12 @@ plot.vastfit <- function(results){
                          N_km=results$Inputs$loc$N_km)
     fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
                         factorsAsStrings=FALSE)
-    fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
-                                                         function(x) x[2])))
+    if(results$Index$model[1]=='combined'){
+      fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+                                                           function(x) x[2])))
+    } else {
+      fields.long$strata <- results$Index$model[1]
+    }
     fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
                                       function(x) x[1]))
     fields.long$component <- 'Component=1'
@@ -100,7 +124,7 @@ plot.vastfit <- function(results){
     fields.long <- ddply(fields.long, .(type, space, component), mutate,
                          normalized=value/sd(value))
     Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
-    g <- ggplot(fields.long, aes(E_km, N_km, col=normalized)) +
+    g <- ggplot(fields.long, aes(E_km, N_km, col=value)) +
       geom_point(size=1) +
       facet_grid(component+type~strata) +
       scale_colour_gradientn(colours = Col(15)) + theme_bw()
@@ -110,8 +134,14 @@ plot.vastfit <- function(results){
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() #+ ylim(0, max(Index$est+2*Index$se))
+    geom_line() + geom_point()+ theme_bw() + scale_y_log10() +
+    ylab('log abundance')
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
+  ## Also create an index of the individual strata
+  g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
+    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+    geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
+  ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
                               Extrapolation_List=Extrapolation_List)
   ## This was causing problems and not sure why. Will fix later.
