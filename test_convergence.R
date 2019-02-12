@@ -10,6 +10,50 @@ source("startup.R")
 
 
 ## Test combined spatial model
+n_x <- 200
+model <- 'combined'; space <- 'ST'
+model <- 'ats'; space <- 'ST'
+savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=1, control=list(trace=10))
+### TMBhelper::Check_Identifiable(Obj)
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results)
+
+
+
+## Look at data by knot
+tmp <- ddply(Data_Geostat, .(knot_i, Gear, Year), summarize,
+            den=median(Catch_KG), count=length(Catch_KG))
+xx <- subset(merge(tmp, Inputs$loc_x, by.x='knot_i', by.y='knot_x'),
+             Gear !='Acoustic_16-surface' & ! Year %in% c(2011, 2013, 2015,
+            2017))
+Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
+ggplot(xx, aes(E_km, N_km, col=log(den), size=sqrt(count), shape=den==0)) + geom_point() + facet_grid(Gear~Year)+
+  scale_colour_gradientn(colours = Col(15)) + theme_bw()
+x2 <- dcast(xx, knot_i+Year+E_km+N_km~Gear, value.var='den')
+x3 <- dcast(xx, knot_i+Year+E_km+N_km~Gear, value.var='count')
+names(x2)[5:6] <- names(x3)[5:6] <- c("BTS", "ATS")
+x2$count.all <- x3$BTS + x3$ATS
+ggplot(x2, aes(E_km, N_km, col=BTS>ATS, size=sqrt(count.all))) + geom_point() + facet_wrap(.~Year)+
+  theme_bw()
+ggplot(x2, aes(log(BTS),log(ATS))) + geom_point() + geom_abline(slope=1) + facet_wrap('Year')
+
+
+## raw standardization
+tmp <- subset(Data_Geostat, Catch_KG>0)
+xx <- ddply(tmp, .(Gear, Year), summarize,
+            catch=median(Catch_KG), std=sd(Catch_KG))
+ggplot(xx, aes(Year, catch, group=Gear, color=Gear)) + geom_line() + geom_point()
+
+
+
+
+
+### Old tests
+## Test combined spatial model
 n_x <- 50
 model <- 'combined'; space <- 'S'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
