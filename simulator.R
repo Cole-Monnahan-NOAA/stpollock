@@ -86,153 +86,34 @@ sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
 #' @param data The output from sample.data
 #' @param replicate Replicate number, used for parallel
 #' @return A list of fitted objects for each model type
-fit.models <- function(data, replicate, plot=TRUE){
-
-  ## Setup the VAST inputs
-  Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
-  grid_size_km <- 50
-  n_x <- 100
-  ## Stratification for results
-  strata.limits <- data.frame(STRATA='All_areas')
-  ## Derived objects
-  Region <- "Eastern_Bering_Sea"
-  ## Save settings
-  Extrapolation_List  <-
-    make_extrapolation_info( Region=Region, strata.limits=strata.limits )
-
-  ## Model settings
-  FieldConfig <- c(Omega1=3, Epsilon1=0, Omega2=0, Epsilon2=0)
-  RhoConfig <- c(Beta1=0, Beta2=0, Epsilon1=0, Epsilon2=0)
-  OverdispersionConfig <- c(Delta1=0, Delta2=0)
-  ObsModel <- c(1,1)
-  Options <-  c(SD_site_density=0, SD_site_logdensity=0, Calculate_Range=1,
-                Calculate_evenness=0, Calculate_effective_area=1, Calculate_Cov_SE=0,
-                Calculate_Synchrony=0, Calculate_Coherence=0)
-  Data_Geostat <-
-    reshape2::melt(data, id.vars=c('Lat', 'Lon', 'Year', 'density', 'depth', 'd1', 'd2', 'd3'),
-                   value.name='Catch_KG', variable.name='Gear')
-  Data_Geostat$Vessel <- factor(1)
-  Data_Geostat$AreaSwept_km2 <- 1
-  ## Derived objects for spatio-temporal estimation
-  DateFile <- paste0(getwd(),'/VAST_output_',replicate, '/')
-  Spatial_List  <-  make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
-                                   Method=Method, Lon=Data_Geostat[,'Lon'],
-                                   Lat=Data_Geostat[,'Lat'],
-                                   Extrapolation_List=Extrapolation_List,
-                                   DirPath=DateFile, Save_Results=FALSE )
-  Data_Geostat$knot_i=Spatial_List$knot_i
-  dir.create(DateFile)
-  Record <- list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
-  save( Record, file=file.path(DateFile,"Record.RData"))
-  capture.output( Record, file=paste0(DateFile,"Record.txt"))
-  TmbDir <- DateFile
-  c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
-                ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  ## Add threshold
-  b_i = Data_Geostat[,'Catch_KG']
-  Random = "generate"
-  TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
-                     OverdispersionConfig=OverdispersionConfig,
-                     RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
-                     b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
-                     ## v_i=rep(factor(1:110-1), times=3),
-                     v_i=Data_Geostat$vessel-1,
-                     s_i=Data_Geostat[,'knot_i']-1,
-                     t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
-                     MeshList=Spatial_List$MeshList,
-                     GridList=Spatial_List$GridList,
-                     Method=Spatial_List$Method, Options=Options,
-                     Aniso=FALSE)
-  TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                           Version=Version,  RhoConfig=RhoConfig,
-                           loc_x=Spatial_List$loc_x, Method=Method,
-                           TmbDir='models', Random="generate")
-  ## Extract default values
-  Map <- TmbList0$Map
-  Params <- TmbList0$Parameters
-  ## Fix SigmaM for all surveys to be equal
-  Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
-  ##  Map$beta1_ct <- factor(rep(1, 30))
-  ## Map$beta2_ct <- factor(rep(1, 30))
-  ## turn off estimation of space
-  ## Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
-  ## ## turn off estimation of factor analysis
-  ## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
-  ## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
-  ## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
-  ## Params$L_omega1_z <- lvec
-  TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                          Version=Version,  RhoConfig=RhoConfig,
-                          loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir=TmbDir, Random='generate', Map=Map)
-
-  ## Fit the full VAST model
-  obj.full <- TmbList$Obj; obj.full$env$beSilent()
-  ## Not sure why passing lower and upper throws an error for this case
-  Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
-                   control=list(trace=10))
-  rep.full <- obj.full$report()
-  ## Manually calculate SE for the total biomass index. Since it's a sum of
-  ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
-  ## of all of the variances and covariances. This feature is not coded
-  ## into VAST yet so have to do it manually. also note that the order of
-  ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
-  ## Index_12,.. etc. This effects the subsetting below
-  est <- data.frame(par=names(Opt.full$SD$value), value=Opt.full$SD$value,
-                    se=Opt.full$SD$sd)
-  tmp <- which(names(Opt.full$SD$value) %in% 'Index_cyl')
-  cov.index <- Opt.full$SD$cov[tmp,tmp]
-  index <- data.frame(year=1:10,
-       value=apply(rep.full$Index_cyl, 2, sum),
-       se=sqrt(sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])})))
-  fit.full <- list(index=index, est=est, Opt=Opt.full, Report=rep.full,
-                   ## ParHat=obj.full$env$parList(Opt.full$par),
-                   TmbData=TmbData)
-
+fit.models <- function(data, replicate, model, space, plot=TRUE){
+  ## Setup the VAST model
+  ## attach these globally so sourcing works
+  DF1 <<- data.frame(Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$BT, Gear='Trawl', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  DF2 <<- data.frame( Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$AT1, Gear='Acoustic_3-16', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  DF3 <<- data.frame( Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$AT2, Gear='Acoustic_16-surface', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  simulated.data <<- TRUE
+  model <<- model; space <<- space; n_x <<- 100
+  savedir <<- paste0(getwd(), '/simulations/fit_', replicate, "_",  model, "_", space, '_',
+                    n_x)
+  source('prepare_inputs.R')
+  ## Fit the VAST model
+  Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=1, control=list(trace=0))
+  ## TMBhelper::Check_Identifiable(Obj)
+  results <- process.results(Opt, Obj, Inputs, model, space, savedir)
   if(plot){
     message("Making plots..")
-    plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
-              Data_Geostat=Data_Geostat, PlotDir=DateFile )
-    Enc_prob  <-
-      plot_encounter_diagnostic(Report=rep.full, Data_Geostat=Data_Geostat,
-                                DirName=DateFile)
-    Q  <-  plot_quantile_diagnostic( TmbData=TmbData, Report=rep.full, FileName_PP="Posterior_Predictive",
-                                    FileName_Phist="Posterior_Predictive-Histogram",
-                                    FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile)
-
-    ## Spatial residuals
-    MapDetails_List  <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
-    ## Decide which years to plot
-    Year_Set  <-  seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-    Years2Include <-  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-    plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-                   TmbData=TmbData, Report=rep.full, Q=Q, savedir=DateFile,
-                   MappingDetails=MapDetails_List[["MappingDetails"]],
-                   PlotDF=MapDetails_List[["PlotDF"]],
-                   MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                   Xlim=MapDetails_List[["Xlim"]], Ylim=MapDetails_List[["Ylim"]],
-                   FileName=DateFile, Year_Set=Year_Set, Years2Include=Years2Include,
-                   Rotate=MapDetails_List[["Rotate"]], Cex=MapDetails_List[["Cex"]],
-                   Legend=MapDetails_List[["Legend"]], zone=MapDetails_List[["Zone"]],
-                   mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8)
-    Index <-
-      plot_biomass_index( DirName=DateFile, TmbData=TmbData,
-                         Sdreport=Opt.full[["SD"]], Year_Set=Year_Set,
-                         Years2Include=Years2Include,
-                         strata_names=strata.limits[,1], use_biascorr=TRUE,
-                         category_names=levels(Data_Geostat[,'Gear']) )
-    Index$Table[,c("Category","Year","Estimate_metric_tons","SD_mt")]
-    Plot_factors( Report=rep.full, ParHat=obj.full$env$parList(), Data=TmbData,
-                 SD=Opt$SD, mapdetails_list=MapDetails_List, Year_Set=Year_Set,
-                 category_names=levels(Data_Geostat[,'Gear']), plotdir=DateFile )
+    plot.vastfit(results)
   }
-
-  ## Now two independent ST indices with VAST
-
-
-  ## And the combined model from Stan's paper
-  ##  dyn.unload(dynlib(paste0(DateFile, 'VAST_v4_0_0')))
-  return(list(vast.full=fit.full))
+  return(results)
 }
 
 
@@ -256,37 +137,31 @@ simulate <- function(replicate, st.list, nyrs, abundance.trend,
                      obins, ...){
   ## load libraries again in case run in parallel
   library(VAST); library(TMB); library(TMBhelper)
-  ## Check inputs TODO
-
   ## Generate 2D density
   set.seed(replicate)
   den2d <- generate.density(st.list=st.list, abundance.trend=atrend,
                             nyrs=nyrs, X.space=NULL, beta.space=NULL)
-
   ## Distribution density vertically
-  vertical.trend <- rep(1,10)#c(4,16,24,16, 18, 18,14, 12,12,12)
   den3d <- distribute.density(den2d, vertical.trend, X.vert, beta.vert,
                               obins)
   ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
   ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
 
   ## Simulate the sampling process for both gear types
-
-  bt.sd <- .2
-  at.sd <- .2
   data <- sample.data(den3d, bt.sd, at.sd, pl.list, obins)
 
-  ## Reorganize data for models
-  out <- fit.models(data, replicate, ...)
-
-
-
-
-  ## Fit the independent VAST models, one for BT and one for AT
-
-  ## and the combined model
-
-  return(out)
-
+  ## Fit combinations of models
+  k <- 1
+  ind.list <- list()
+  for(s in c('NS')){
+    for(m in c('ats', 'bts', 'combined')){
+      out <- fit.models(data, replicate, model=m, space=s, plot=FALSE)
+      ind.list[[k]] <- cbind(rep=replicate, out$Index)
+      k <- k+1
+    }
+  }
+  ## Return them in long format
+  indices <- do.call(rbind, ind.list)
+  return(indices)
 }
 

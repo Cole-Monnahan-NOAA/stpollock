@@ -92,6 +92,8 @@ calculate.index <- function(Opt, Report, model, space, log, strata){
 }
 
 plot.vastfit <- function(results){
+  Opt <- results$Opt
+  Obj <- results$Obj
   df <- data.frame(obs=Data_Geostat$Catch_KG,
                    predicted=results$Report$R2_i, gear=Data_Geostat$Gear,
                    year=Data_Geostat$Year)

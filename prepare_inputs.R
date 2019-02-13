@@ -12,8 +12,9 @@ silent.fn <- function(expr){
   if(silent) suppressMessages(expr) else expr
 }
 
-### Step 1: Load in the real data
-source("load_data.R")
+### Step 1: Load in the real data if not doing simulation
+if(!exists('simulated.data')) simulated.data <- FALSE
+if(!simulated.data) source("load_data.R")
 
 ### Step 2: Configure the spatial factors which depend on inputs
 n_f <- ifelse(model=='combined', 3,1) # number of factors to use
@@ -78,21 +79,19 @@ if(model=='combined'){
  ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  c_iz[,2] <- NA
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
-  Data_Geostat <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                             Catch_KG=ats$strata2+ats$strata3, depth=ats$depth,
-                             depth2=ats$depth2,
-                   Gear='Acoustic_3-surface', AreaSwept_km2=1,
-                   Vessel='none')
+  Data_Geostat <-
+    data.frame( Lat=DF2$Lat, Lon=DF2$Lon, Year=DF2$Year,
+               Catch_KG=DF2$Catch_KG+DF3$Catch_KG, depth=DF2$depth,
+               depth2=DF2$depth2,
+               Gear='Acoustic_3-surface', AreaSwept_km2=1,
+               Vessel='none')
   c_iz <- rep(0, nrow(Data_Geostat))
-  years <- sort(unique(ats$year))
 } else if(model=='bts'){
   Data_Geostat <- DF1
-  years <- sort(unique(bts$year))
   c_iz <- rep(0, nrow(Data_Geostat))
 }
 years <- sort(unique(Data_Geostat$Year))
@@ -202,7 +201,7 @@ loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
 names(loc) <- c('E_km', 'N_km')
 Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
 
-
-silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
-          Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
+if(!simulated.data)
+  silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
+                      Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
 
