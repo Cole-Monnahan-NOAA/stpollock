@@ -14,6 +14,10 @@ library(maps)
 library(mapdata)
 Version <- "VAST_v7_0_0"
 
+dir.create('simulations', showWarnings=FALSE)
+dir.create('plots', showWarnings=FALSE)
+dir.create('simulations/plots', showWarnings=FALSE)
+
 source("simulator.R")
 
 

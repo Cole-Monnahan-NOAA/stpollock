@@ -7,33 +7,34 @@ source("startup.R")
 ## Basic simulation
 set.seed(1)
 atrend <- c(seq(0,1, len=5), seq(1,-1, len=5))
-vtrend <- rep(1,10)
-vtrend <- c(4,16,24,16, 18, 18,14, 12,12,12)
+vtrend <- c(4,16,24,16, 20, 25,14, 12,12,12)
+vtrend <- c(rep(5, 5), rep(50,5)); atrend <- rep(1, 10)
 
 ## currently depth has no impact but should add that and other covariates later
 Nsamples <- 200
-st.list <- list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62), beta0=3,
-                depth = sample(50:100, size=Nsamples, replace=TRUE))
+st.list <-
+  list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62),
+       beta0=5, depth = sample(50:100, size=Nsamples, replace=TRUE),
+       sd.process=.05, nyrs=10,  bt.sd=.1, at.sd=.1, n_x=100 )
 
 ## ## Run a single replicate in serial for testing
-## out <- simulate(replicate=1, st.list=st.list, nyrs=10,
-##                 abundance.trend=atrend, plot=TRUE)
+out <- simulate(replicate=12, st.list=st.list,
+                atrend=atrend, vtrend=vtrend, plot=TRUE)
 ## ggplot(out, aes(year, est, color=strata)) + geom_line() + geom_point() +
 ##   facet_grid(model~space)
 
-chains <- cores <- 6
+cores <- 6
+chains <- cores
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='simulation_progress.txt')
 snowfall::sfExportAll()
-sfLibrary(VAST)
 out.parallel <-
   snowfall::sfLapply(1:chains, function(i)
-    simulate(replicate=i, st.list=st.list, nyrs=10, abundance.trend=atrend,
-             vertical.trend=vtrend, bt.sd=.1, at.sd=.1,
-             plot=FALSE))
+  ##sapply(1:chains, function(i)
+    simulate(replicate=i, st.list=st.list, atrend=atrend,
+             vtrend=vtrend, plot=TRUE))
 sfStop()
 indices <- do.call(rbind, out.parallel)
-indices$group <- with(indices, paste(rep, model, strata, sep='-'))
 ## indices$year <- indices$year+ ((1:10)/10)[indices$x]
-ggplot(indices, aes(year, est, group=group, color=strata)) + geom_line() + geom_jitter() +
-  facet_grid(model~space)
+ggplot(indices, aes(year, est, group=group, color=model)) + geom_line()+
+  facet_grid(strata~space)
