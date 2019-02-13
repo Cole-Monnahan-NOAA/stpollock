@@ -39,15 +39,13 @@ distribute.density <- function(dat, vertical.trend, X, vbins, obins,
     ynorm <- y/sum(y)
     ynorm[ynorm<eps] <- 0
     ynorm <- ynorm/sum(ynorm) # renormalize to be probability
-    ## temp test
-    ynorm <- rep(1, len=dat$depth[i])/dat$depth[i]
     dvert[i,1:length(y)] <- dat$density[i]*ynorm
   }
   ## check we didn't lose density
   if(max(abs(dat$density-apply(dvert, 1, sum)))>.01)
     warning("Lost density when generating vertical distribution")
   ## quick visual check of distributions
-  ##  matplot(t(dvert[1:50,]), type='l')
+  ## matplot(t(dvert[1:50,]), type='l')
   dvert <- as.data.frame(dvert)
   names(dvert) <- paste0('d', x.all)
   out <- data.frame(dat, dvert)
