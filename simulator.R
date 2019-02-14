@@ -175,7 +175,11 @@ simulate <- function(replicate, st.list, atrend,
 
   ## Simulate the sampling process for both gear types
   data <- sample.data(dat=den3d, st.list=st.list, plot=plot)
-
+  data$total <- data$density
+  truth <- ddply(data, .(Year), summarize,
+                 strata1=(sum(d1)),
+                 strata2=(sum(d2)),
+                 strata3=(sum(d3)))
   ## Fit combinations of models
   k <- 1
   ind.list <- list()
@@ -183,9 +187,19 @@ simulate <- function(replicate, st.list, atrend,
     for(m in models){
       out <- fit.models(data, replicate, model=m, space=s, plot=plot)
       if(!is.null(out)){
-        ind.list[[k]] <- cbind(rep=replicate, out$Index)
-      } else {
-        ind.list[[k]] <- NULL
+        ## Grab the truth values and the predicted densities by strata to
+        ## compare more directly
+        if(m=='ats') t0 <-log(truth$strata2+truth$strata3)
+        if(m=='bts') t0 <-log(truth$strata1+truth$strata2)
+        if(m=='combined'){
+          tmp <- melt(truth,
+                      measure.vars=c('strata1', 'strata2', 'strata3', 'total'))
+          t0 <- log(tmp$value)
+        }
+        ind.list[[k]] <-
+          cbind(rep=replicate, out$Index, strata2=out$Index.strata$strata,
+                strata.est=out$Index.strata$est,
+                strata.se=out$Index.strata$se, truth=t0)
       }
       k <- k+1
     }
@@ -193,6 +207,7 @@ simulate <- function(replicate, st.list, atrend,
   ## Return them in long format
   indices <- do.call(rbind, ind.list)
   indices$group <- with(indices, paste(rep, model, strata, sep='-'))
+  indices$group2 <- with(indices, paste(rep, model, strata2, sep='-'))
   return(indices)
 }
 

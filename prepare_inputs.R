@@ -32,7 +32,7 @@ FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
 ### following AR1 process
 ## For now using IID for combined model and temporal on ATS/BTS since
 ## missing years there.
-x <- switch(model, combined=1, ats=4, bts=4)
+x <- switch(model, combined=0, ats=0, bts=0)
 RhoConfig <- c("Beta1"=x, "Beta2"=3, "Epsilon1"=0, "Epsilon2"=0)
 
 
@@ -79,6 +79,7 @@ if(model=='combined'){
  ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
+  c_iz[,2] <- NA
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
