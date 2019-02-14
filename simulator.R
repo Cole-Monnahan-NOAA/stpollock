@@ -1,3 +1,78 @@
+
+## Generate a Poisson-link density that matches VAST structure to test for
+## consistency
+generate.pl.samples <- function(st.list, atrend, nyrs, plot){
+  lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth; beta0 <- st.list$beta0
+
+  ## long format data.frame to hold the true densities
+  D <- data.frame(Lon=lon, Lat=lat, depth=depth)
+  D <- D[rep(seq_len(nrow(D)), nyrs), ]
+  D$Year <- rep(1:nyrs, each=length(lon))
+
+  ## The Poisson-link predictors
+  a1 <- -.15/20; a2 <- .1/20; a3 <- .05/20
+  t <- 1:nyrs-1
+  beta0 <- 0
+  beta1 <- cbind(beta0+t*a1,  beta0+t*a2,  beta0+t*a3)
+  ## matplot(beta1)
+  beta2 <- matrix(5, nyrs, 3)
+  p1 <- p2 <- r1 <- r2 <- den <- matrix(NA, nrow=nrow(D), ncol=3)
+  for(i in 1:nrow(D)){
+    for(ss in 1:3){
+      p1[i,ss] <- beta1[D$Year[i], ss]
+      p2[i,ss] <- beta2[ss] + rnorm(1, mean=0, sd=st.list$sd.process)
+      r1[i,ss] <- 1-exp(-exp(p1[i,ss]))
+      r2[i,ss] <- exp(p1[i,ss]+p2[i,ss])/r1[i,ss]
+      den[i,ss] <- exp(p1[i,ss]+p2[i,ss])#r1[i,ss]*r2[i,ss]
+    }
+  }
+  ## matplot(p1)
+  ## matplot(p2)
+  ## matplot(r1)
+  ## matplot(r2)
+  ## matplot(den)
+  D <- cbind(D, d1=den[,1], d2=den[,2], d3=den[,3])
+  D.long <- melt(D, measure.vars=c('d1', 'd2', 'd3'),
+                 variable.name='strata', value.name='density')
+  if(plot){
+    tmp <- ddply(D.long, .(Year, strata), summarize, mean.den=median(density))
+    g <- ggplot(tmp, aes(Year, mean.den, color=strata)) + geom_line()
+    ggsave(file.path(st.list$plotdir, paste0('pl_annual_density_', st.list$replicate,'.png')), g, width=7, height=5)
+  }
+
+  ## now sample from the truth
+  i=1
+  r1bts <- r1ats1 <- r1ats2 <- dbts <- dats1 <- dats2 <- rep(NA, nrow(D))
+  bts <- ats1 <- ats2 <- rep(NA, nrow(D))
+  rpl <- function(p, mu, sd){
+    ## observed; p is probability of occurence
+    x <- rbinom(n=1, size=1, prob=p)
+    if(x==1){
+      x <- exp(rnorm(1, mean=log(mu), sd=sd)-sd^2/2)
+    }
+    return(x)
+  }
+  ## mean(sapply(1:5000, function(i) rpl(.9999, 100, 1.1)))
+
+  for(i in 1:nrow(D)){
+    r1bts[i] <- 1-exp(-exp(p1[i,1])-exp(p1[i,2]))
+    dbts[i] <- exp(p1[i,1]+p2[i,1])+exp(p1[i,2]+p2[i,2])
+    bts[i] <- rpl(r1bts[i], dbts[i]/r1bts[i], sd=st.list$bt.sd)
+    r1ats1[i] <- r1[i,2]
+    dats1[i] <- exp(p1[i,2]+p2[i,2])
+    ats1[i] <- rpl(r1ats1[i], dats1[i]/r1ats1[i], sd=st.list$at.sd)
+    r1ats2[i] <- r1[i,3]
+    dats2[i] <- exp(p1[i,3]+p2[i,3])
+    ats2[i] <- rpl(r1ats2[i], dats2[i]/r1ats2[i], sd=st.list$at.sd)
+  }
+  D <- cbind(D,  BT=bts, AT1=ats1, AT2=ats2, d1=den[,1], d2=den[,2],
+             d3=den[,3])
+  pars <- list(beta1_tc=beta1, beta2_tc=beta2, sigma_bt=st.list$bt.sd,
+               sigma_at=st.list$at.sd)
+  return(list(D=D, pars=pars))
+}
+
+
 #' Generate spatio-temporal index
 #'
 #' @return A data.frame containing the spatial locations and densities
@@ -165,35 +240,55 @@ simulate <- function(replicate, st.list, atrend,
   st.list$replicate <- replicate
   ## Generate 2D density
   set.seed(replicate)
-  den2d <- generate.density(st.list=st.list, atrend=atrend,
-                            nyrs=st.list$nyrs, plot=plot)
-  ## Distribution density vertically
-  den3d <-
-    distribute.density(dat=den2d, vtrend=vtrend, st.list=st.list, plot=plot)
-  ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
-  ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
+  ## den2d <- generate.density(st.list=st.list, atrend=atrend,
+  ##                           nyrs=st.list$nyrs, plot=plot)
+  ## ## Distribution density vertically
+  ## den3d <-
+  ##   distribute.density(dat=den2d, vtrend=vtrend, st.list=st.list, plot=plot)
+  ## ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
+  ## ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
 
-  ## Simulate the sampling process for both gear types
-  data <- sample.data(dat=den3d, st.list=st.list, plot=plot)
-  data$total <- data$density
+  ## ## Simulate the sampling process for both gear types
+  ## data <- sample.data(dat=den3d, st.list=st.list, plot=plot)
+  tmp <- generate.pl.samples(st.list=st.list, atrend=atrend, nyrs=st.list$nyrs, plot=plot)
+  data <- tmp$D
   truth <- ddply(data, .(Year), summarize,
                  strata1=(sum(d1)),
                  strata2=(sum(d2)),
                  strata3=(sum(d3)))
+  ## only makes sense to compare the combiend model I think
+  x1 <- data.frame(year=1:st.list$nyrs, par.name='beta1', tmp$pars$beta1_tc)
+  x2 <- data.frame(year=1:st.list$nyrs, par.name='beta2',
+                   tmp$pars$beta2_tc)
+  beta.names <- c('year', 'par.name', 'strata1', 'strata2', 'strata3')
+  names(x1) <- names(x2)  <- beta.names
+  betas <- melt(rbind(x1,x2), id.vars=c('year', 'par.name'),
+                variable.name='strata', value.name='truth')
+
   ## Fit combinations of models
   k <- 1
-  ind.list <- list()
+  betas.list <- ind.list <- list()
   for(s in spaces){
     for(m in models){
       out <- fit.models(data, replicate, model=m, space=s, plot=plot)
       if(!is.null(out)){
         ## Grab the truth values and the predicted densities by strata to
-        ## compare more directly
+        ## compare more directly. Have to manually massage the output to
+        ## compare to truth
         if(m=='ats') t0 <-log(truth$strata2+truth$strata3)
         if(m=='bts') t0 <-log(truth$strata1+truth$strata2)
         if(m=='combined'){
+          b1 <- out$Report$beta1_tc
+          b2 <- out$Report$beta2_tc
+          x1 <- data.frame(year=1:st.list$nyrs, par.name='beta1', out$Report$beta1_tc)
+          x2 <- data.frame(year=1:st.list$nyrs, par.name='beta2', out$Report$beta2_tc)
+          names(x1) <- names(x2)  <- beta.names
+          betas2 <- melt(rbind(x1,x2), id.vars=c('year', 'par.name'),
+                         variable.name='strata', value.name='est')
+          stopifnot(identical(betas[,1:3], betas2[,1:3]))
+          betas.list[[k]] <- cbind(rep=replicate, model=m, space=s, betas, est=betas2$est)
           tmp <- melt(truth,
-                      measure.vars=c('strata1', 'strata2', 'strata3', 'total'))
+                      measure.vars=c('strata1', 'strata2', 'strata3'))
           t0 <- log(tmp$value)
         }
         ind.list[[k]] <-
@@ -208,6 +303,8 @@ simulate <- function(replicate, st.list, atrend,
   indices <- do.call(rbind, ind.list)
   indices$group <- with(indices, paste(rep, model, strata, sep='-'))
   indices$group2 <- with(indices, paste(rep, model, strata2, sep='-'))
-  return(indices)
+  betas <- do.call(rbind, betas.list)
+  betas$group <- with(betas, paste(rep, model, strata, sep='-'))
+  return(list(indices=indices, betas=betas))
 }
 

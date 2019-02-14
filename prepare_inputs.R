@@ -79,7 +79,7 @@ if(model=='combined'){
  ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  c_iz[,2] <- NA
+ ## c_iz[,2] <- NA
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
