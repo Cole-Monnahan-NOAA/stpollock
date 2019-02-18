@@ -23,6 +23,35 @@ plot.vastfit(results)
 }
 }
 
+
+## Test bias adjustment for index
+model <- 'combined'
+space <- 'ST'
+n_x <- 300
+savedir <- paste0(getwd(), '/bias_', model, "_", space, '_', n_x)
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=1, control=list(trace=10))
+## TMBhelper::Check_Identifiable(Obj)
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results)
+## Repeat with bias adjust turned on for index
+savedir <- paste0(getwd(), '/bias_cor_', model, "_", space, '_', n_x)
+source("prepare_inputs.R")
+Obj$par <- Opt$par
+Opt2 <- Optimize(obj=Obj, lower=TmbList$Lower,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(trace=10),
+                bias.correct=TRUE,
+                bias.correct.control=list(vars_to_correct='Index_cyl'))
+## TMBhelper::Check_Identifiable(Obj)
+results <- process.results(Opt2, Obj, Inputs, model, space, savedir)
+plot.vastfit(results)
+cbind(Opt$time_for_run, Opt$time_for_sdreport )
+cbind(Opt2$time_for_run, Opt2$time_for_sdreport )
+
+
 ## Test increasing resolution
 for(n_x in 2^(11:12)){
   space <- "S"; model <- 'combined'
