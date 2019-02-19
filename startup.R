@@ -39,10 +39,58 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
 }
 
 calculate.index <- function(Opt, Report, model, space, log, strata){
+  ## If available use the bias corrected versions
+  if(!is.null(Opt$SD$unbiased)){
+    rr <- as.list(Opt$SD, "Est. (bias.correct)", report=TRUE)
+  } else {
+    ## Not available so used uncorrected version
+    rr <- as.list(Opt$SD, what='Estimate', report=TRUE)
+  }
+  ## Assuming for now that the SDs aren't bias corrected
+  ss <- as.list(Opt$SD, what='Std. Error', report=TRUE)
+  if(strata){
+    ## the strata versions
+    if(log){
+      ## calculate in log space?
+      ses <- t(ss$ln_Index_cyl[,,1])
+      ests <- t(rr$ln_Index_cyl[,,1])
+    } else {
+      ses <- t(ss$Index_cyl[,,1])
+      ests <- t(rr$Index_cyl[,,1])
+    }
+  } else {
+    ## the versions the gear sees
+    if(log){
+      ## calculate in log space?
+      ses <- t(ss$ln_ColeIndex_cy)
+      ests <- t(rr$ln_ColeIndex_cy)
+    } else {
+      ses <- t(ss$ColeIndex_cy)
+      ests <- t(rr$ColeIndex_cy)
+    }
+  }
+  ## Chop of years of missing ATS if necessary
+  yrs <- years[which(min(years):max(years) %in% years)]
+  if(model=='combined'){
+    index <- data.frame(model=model, space=space,  year=yrs,
+                        strata=rep(c('total', 'bts', 'ats'), each=length(years)),
+                        est=as.vector(ests), se=as.vector(ses))
+  } else {
+    ## ATS or BTS is just a single column
+    index <- data.frame(model=model, space=space,  year=yrs,
+                        strata=model,
+                        est=as.vector(ests), se=as.vector(ses))
+  }
+  index <- within(index, {lwr <- est-1.96*se; upr <- est+1.96*se})
+  return(index)
+}
+
+calculate.index.old <- function(Opt, Report, model, space, log, strata){
   if(log){
     ## calculate in log space?
     if(!strata)
       stop("Doesnt make sense to have combined model in log space")
+
     tmp <- which(names(Opt$SD$value) %in% 'ln_Index_cyl')
     ii <- log(Report$Index_cyl[,,1])
   } else {

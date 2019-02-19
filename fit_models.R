@@ -1,9 +1,8 @@
-## File to run the fits to the real data
+ ## File to run the fits to the real data
 rm(list=ls())
 source('startup.R')
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
-
-
+indices.to.correct <- c('ColeIndex_cy', 'ln_ColeIndex_cy', 'Index_cyl', 'ln_Index_cyl')
 
 
 ## Fit all versions of model
@@ -26,14 +25,13 @@ plot.vastfit(results)
 
 ## Test bias adjustment for index
 model <- 'combined'
-space <- 'ST'
-n_x <- 300
+space <- 'S'
+n_x <- 50
 savedir <- paste0(getwd(), '/bias_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5,
-                upper=TmbList$Upper,  savedir=savedir,
+                upper=TmbList$Upper,   savedir=savedir,
                 newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 ## Repeat with bias adjust turned on for index
@@ -42,9 +40,9 @@ source("prepare_inputs.R")
 Obj$par <- Opt$par
 Opt2 <- Optimize(obj=Obj, lower=TmbList$Lower,
                 upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=10),
+                newtonsteps=1, control=list(trace=10),
                 bias.correct=TRUE,
-                bias.correct.control=list(vars_to_correct='Index_cyl'))
+                bias.correct.control=list(vars_to_correct=indices.to.correct))
 ## TMBhelper::Check_Identifiable(Obj)
 results <- process.results(Opt2, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
