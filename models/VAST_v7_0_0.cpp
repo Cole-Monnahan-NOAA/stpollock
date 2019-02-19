@@ -1779,11 +1779,37 @@ Type objective_function<Type>::operator() ()
   ADREPORT( Range_raw2 );
   ADREPORT( Index_cyl );
   ADREPORT( ln_Index_cyl );
+  
+  // Cole added manual construction of Index. Necessary for now b/c bias
+  // correction doesn't allow manual construction of SEs of index b/c
+  // there's no covariance terms and those are needed when summing across
+  // strata. This represents what the gear types "see"
+  array<Type> ColeIndex_cy(n_c, n_y);
+  ColeIndex_cy.setZero();
+  for(int y=0; y<n_y; y++){
+    if(n_c==3){
+      // total = 0- surface
+      ColeIndex_cy(0,y)=Index_cyl(0,y,0)+Index_cyl(1,y,0)+Index_cyl(2,y,0);
+      // BTS = 0-3m + 3m-16m
+      ColeIndex_cy(1,y)=Index_cyl(0,y,0)+Index_cyl(1,y,0);
+      // ATS= 3m-surface
+      ColeIndex_cy(2,y)=Index_cyl(1,y,0)+Index_cyl(2,y,0);
+    } else {
+      // if n_c=1 it's just a straight copy
+      ColeIndex_cy(0,y)=Index_cyl(0,y,0);
+    }
+  }
+  array<Type> ln_ColeIndex_cy(n_c, n_y);
+  ln_ColeIndex_cy=log(ColeIndex_cy);
+  ADREPORT(ColeIndex_cy);
+  REPORT(ColeIndex_cy);
+  ADREPORT(ln_ColeIndex_cy);
+  REPORT(ln_ColeIndex_cy);
 
   SIMULATE{
     REPORT( b_i );
   }
-
+    
   // Additional miscellaneous outputs
   if( Options(0)==1 ){
     ADREPORT( Index_xcyl );
