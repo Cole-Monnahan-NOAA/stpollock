@@ -58,6 +58,7 @@ calculate.index <- function(Opt, Report, model, space, log, strata){
       ses <- t(ss$Index_cyl[,,1])
       ests <- t(rr$Index_cyl[,,1])
     }
+    snames <- c('stratum1', 'stratum2', 'stratum3')
   } else {
     ## the versions the gear sees
     if(log){
@@ -68,12 +69,13 @@ calculate.index <- function(Opt, Report, model, space, log, strata){
       ses <- t(ss$ColeIndex_cy)
       ests <- t(rr$ColeIndex_cy)
     }
+    snames <- c('total', 'bts', 'ats')
   }
   ## Chop of years of missing ATS if necessary
   yrs <- years[which(min(years):max(years) %in% years)]
   if(model=='combined'){
     index <- data.frame(model=model, space=space,  year=yrs,
-                        strata=rep(c('total', 'bts', 'ats'), each=length(years)),
+                        strata=rep(snames, each=length(years)),
                         est=as.vector(ests), se=as.vector(ses))
   } else {
     ## ATS or BTS is just a single column
@@ -182,7 +184,7 @@ plot.vastfit <- function(results){
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + scale_y_log10() +
+    geom_line() + geom_point()+ theme_bw() +
     ylab('log abundance')
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   ## Also create an index of the individual strata
