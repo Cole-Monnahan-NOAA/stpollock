@@ -148,8 +148,10 @@ if(model=='combined'){
   Params$L_beta2_z <- .4
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
-
-
+if(space=='ST'){
+  if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
+  Map$Beta_rho1_f <- factor(c(2,2,2))
+}
 
 ## Params$beta2_ft <- Params$beta2_ft+5
 ## if(model=='combined'){
