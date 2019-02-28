@@ -17,10 +17,11 @@ source("load_data.R")
 
 ### Step 2: Configure the spatial factors which depend on inputs
 n_f <- ifelse(model=='combined', 3,1) # number of factors to use
+n_eps <- 2
 ## This puts a FA on beta1 and beta2, which means I need to set Rho
 ## accordingly below
 FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
-                        "Epsilon1"=ifelse(space=='ST', n_f,0),
+                        "Epsilon1"=ifelse(space=='ST',n_eps,0),
                         "Beta1"="IID",
                         "Omega2"=ifelse(space=='NS', 0, n_f),
                         "Epsilon2"=ifelse(space=='ST', 0,0),
@@ -141,14 +142,16 @@ if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
   Params$logSigmaM[1:3] <- c(.6,.7,.8)
-  Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  ## Map$lambda1_k <- Map$lambda2_k <- factor(NA)
 } else {
   Params$L_beta1_z <- .4
   Params$L_beta2_z <- .4
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
-
-
+if(space=='ST'){
+  if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
+  Map$Beta_rho1_f <- factor(c(2,2,2))
+}
 
 ## Params$beta2_ft <- Params$beta2_ft+5
 ## if(model=='combined'){
