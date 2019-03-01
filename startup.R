@@ -226,7 +226,9 @@ plot.vastfit <- function(results){
 
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
-  Dens_xt = plot_maps(plot_set=c(3),
+  tmp <- c(1,2,3, 10, 12)
+  if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
+  Dens_xt = plot_maps(plot_set=tmp,
                   MappingDetails=MapDetails_List[["MappingDetails"]],
                   Report=Report, Sdreport=Opt$SD,
                   PlotDF=MapDetails_List[["PlotDF"]],
@@ -248,3 +250,46 @@ plot.vastfit <- function(results){
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
 }
+
+
+Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+Years2Include <- 1
+
+
+devtools::load_all('C:/Users/cole.monnahan/FishStatsUtils/')
+Dens_xt = plot_maps(plot_set=3,
+                    MappingDetails=MapDetails_List[["MappingDetails"]],
+                    Report=Report, Sdreport=Opt$SD,
+                    PlotDF=MapDetails_List[["PlotDF"]],
+                    MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
+                    Xlim=MapDetails_List[["Xlim"]],
+                    Ylim=MapDetails_List[["Ylim"]], FileName=paste0(savedir,'/'),
+                    Year_Set=Year_Set, Years2Include=Years2Include,
+                    Rotate=MapDetails_List[["Rotate"]],
+                    Cex=MapDetails_List[["Cex"]],
+                    Legend=MapDetails_List[["Legend"]],
+                    zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+                    oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+
+
+
+## Plot average catch in grid
+mdl <- MapDetails_List
+Mat_xt <- log(Report$D_xcy[,1,, drop=TRUE])
+Mat_test <- Mat_xt[,1, drop=FALSE]
+
+Mat_xt <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                FUN=mean, na.rm=TRUE))
+
+PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+           ## Mat=Mat_xt[,1,Years2Include,drop=FALSE],
+           Mat=Mat_test,
+           PlotDF=mdl$PlotDF,
+           MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+           FileName=paste0(savedir, '/data_test'),
+           Year_Set=Year_Set[Years2Include],
+           mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+           textmargin='textmargin', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+           oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+

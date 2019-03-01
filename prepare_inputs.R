@@ -42,7 +42,7 @@ grid_size_km <- 50
 ## Model settings
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 ObsModel <- c(1,1)
-Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
+Options <-  c("SD_site_density"=0, "SD_site_logdensity"=1,
               "Calculate_Range"=1, "Calculate_evenness"=0,
               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
