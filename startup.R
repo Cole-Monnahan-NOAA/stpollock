@@ -207,7 +207,7 @@ plot.vastfit <- function(results){
                                FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
 
   MapDetails_List = make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
-  ## ## Decide which years to plot
+  ## Decide which years to plot
   Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
   Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
   plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
@@ -223,22 +223,24 @@ plot.vastfit <- function(results){
                  Legend=MapDetails_List[["Legend"]],
                  zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
                  oma=c(3.5,3.5,0,0), cex=1.8)
-
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
-  Dens_xt = plot_maps(plot_set=c(3),
-                  MappingDetails=MapDetails_List[["MappingDetails"]],
-                  Report=Report, Sdreport=Opt$SD,
-                  PlotDF=MapDetails_List[["PlotDF"]],
-                  MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                  Xlim=MapDetails_List[["Xlim"]],
-                  Ylim=MapDetails_List[["Ylim"]], FileName=paste0(savedir,'/'),
-                  Year_Set=Year_Set, Years2Include=Years2Include,
-                  Rotate=MapDetails_List[["Rotate"]],
-                  Cex=MapDetails_List[["Cex"]],
-                  Legend=MapDetails_List[["Legend"]],
-                  zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  ## Some built-in maps
+  tmp <- c(1,2,3, 12)
+  if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
+  Dens_xt = plot_maps(plot_set=tmp,
+                      MappingDetails=MapDetails_List[["MappingDetails"]],
+                      Report=Report, Sdreport=Opt$SD,
+                      PlotDF=MapDetails_List[["PlotDF"]],
+                      MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
+                      Xlim=MapDetails_List[["Xlim"]],
+                      Ylim=MapDetails_List[["Ylim"]], FileName=paste0(savedir,'/'),
+                      Year_Set=Year_Set, Years2Include=Years2Include,
+                      Rotate=MapDetails_List[["Rotate"]],
+                      Cex=MapDetails_List[["Cex"]],
+                      Legend=MapDetails_List[["Legend"]],
+                      zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+                      oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   Dens_DF = cbind( "Density"=as.vector(Dens_xt),
                   "Year"=Year_Set[col(Dens_xt)],
                   "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
@@ -247,4 +249,34 @@ plot.vastfit <- function(results){
   Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
+
+  if(results$Index$model[1]=='combined'){
+    ## Plot ratio of observed/predicted by grid cell for the three gear types
+    MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                      FUN=mean, na.rm=TRUE))
+    MatExp <- Report$D_xcy
+    MatRatio <- array(NA, dim=dim(MatDat))
+    ## BTS is sum over first two strata
+    MatRatio[,1,] <- MatDat[,1,]/apply(MatExp[,-3,], 2, sum)
+    MatRatio[,2,] <- MatDat[,2,]/MatExp[,2,]
+    MatRatio[,3,] <- MatDat[,3,]/MatExp[,3,]
+    MatRatio <- log(MatRatio)
+    MatRatio[is.infinite(MatRatio)] <- NA
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatRatio[,ii,Years2Include,drop=TRUE],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/map_data_ratio_', ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=(ii==1), pch=16)
+    }
+  }
+
 }
+
+
+

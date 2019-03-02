@@ -42,7 +42,7 @@ grid_size_km <- 50
 ## Model settings
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 ObsModel <- c(1,1)
-Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
+Options <-  c("SD_site_density"=0, "SD_site_logdensity"=1,
               "Calculate_Range"=1, "Calculate_evenness"=0,
               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
@@ -58,11 +58,11 @@ silent.fn(Extrapolation_List <-
 dir.create(savedir, showWarnings=FALSE)
 ## ## Copy over the DLL so I don't have to compile each time.
 trash <- file.copy(file.path('models', paste0(Version, '.cpp')),
-          to=file.path(savedir, paste0(Version, '.cpp')))
+                   to=file.path(savedir, paste0(Version, '.cpp')))
 trash <- file.copy(file.path('models', paste0(Version, '.dll')),
-          to=file.path(savedir, paste0(Version, '.dll')))
+                   to=file.path(savedir, paste0(Version, '.dll')))
 trash <- file.copy(file.path('models', paste0(Version, '.o')),
-          to=file.path(savedir, paste0(Version, '.o')))
+                   to=file.path(savedir, paste0(Version, '.o')))
 Record <- list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
 save( Record, file=file.path(savedir,"Record.RData"))
 capture.output( Record, file=paste0(savedir,"/Record.txt"))
@@ -71,15 +71,15 @@ capture.output( Record, file=paste0(savedir,"/Record.txt"))
 Q_ik <- NULL ## catchability covariates, updated below for combined model?
 if(model=='combined'){
   Data_Geostat <- rbind( DF1, DF2, DF3 )
- ## Data_Geostat <- subset(Data_Geostat, Year < 2011)
- ##  tmp <- Data_Geostat
- ##  tmp$Year <- tmp$Year-4
- ##  Data_Geostat <- rbind(Data_Geostat, tmp)
- ##  tmp$Year <- tmp$Year-4
- ##  Data_Geostat <- rbind(Data_Geostat, tmp)
+  ## Data_Geostat <- subset(Data_Geostat, Year < 2011)
+  ##  tmp <- Data_Geostat
+  ##  tmp$Year <- tmp$Year-4
+  ##  Data_Geostat <- rbind(Data_Geostat, tmp)
+  ##  tmp$Year <- tmp$Year-4
+  ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
- ## c_iz[,2] <- NA
+  ## c_iz[,2] <- NA
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
@@ -87,8 +87,8 @@ if(model=='combined'){
   Data_Geostat <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                              Catch_KG=ats$strata2+ats$strata3, depth=ats$depth,
                              depth2=ats$depth2,
-                   Gear='Acoustic_3-surface', AreaSwept_km2=1,
-                   Vessel='none')
+                             Gear='Acoustic_3-surface', AreaSwept_km2=1,
+                             Vessel='none')
   c_iz <- rep(0, nrow(Data_Geostat))
   years <- sort(unique(ats$year))
 } else if(model=='bts'){
@@ -100,36 +100,36 @@ years <- sort(unique(Data_Geostat$Year))
 nyr <- length(years)
 ## Derived objects for spatio-temporal estimation
 silent.fn(Spatial_List <-
-     make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
-                       Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
-                       Extrapolation_List=Extrapolation_List, DirPath=savedir,
-                       Save_Results=FALSE ))
+            make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
+                              Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
+                              Extrapolation_List=Extrapolation_List, DirPath=savedir,
+                              Save_Results=FALSE ))
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
 silent.fn(XX <- (FishStatsUtils::format_covariates(
-    Lat_e = Data_Geostat$Lat,
-    Lon_e = Data_Geostat$Lon,
-    t_e = Data_Geostat$Year,
-    Cov_ep = Data_Geostat[,c('depth', 'depth2')],
-    Extrapolation_List = Extrapolation_List,
-    Spatial_List = Spatial_List, FUN = mean,
-    na.omit = "time-average")))
+                                   Lat_e = Data_Geostat$Lat,
+                                   Lon_e = Data_Geostat$Lon,
+                                   t_e = Data_Geostat$Year,
+                                   Cov_ep = Data_Geostat[,c('depth', 'depth2')],
+                                   Extrapolation_List = Extrapolation_List,
+                                   Spatial_List = Spatial_List, FUN = mean,
+                                   na.omit = "time-average")))
 
 ## Build data and object for first time
 TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
-                  OverdispersionConfig=OverdispersionConfig,
-                  RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
-                  b_i=Data_Geostat[,'Catch_KG'],
-                  a_i=Data_Geostat[,'AreaSwept_km2'],
-                  ## v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
-                  v_i=1:nrow(Data_Geostat),
-                  s_i=Data_Geostat[,'knot_i']-1,
-                  t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
-                  MeshList=Spatial_List$MeshList,
-                  GridList=Spatial_List$GridList,
-                  Q_ik=Q_ik,
-                  X_xtp=NULL,#XX$Cov_xtp,
-                  Method=Spatial_List$Method, Options=Options,
-                  Aniso=FALSE)
+                   OverdispersionConfig=OverdispersionConfig,
+                   RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
+                   b_i=Data_Geostat[,'Catch_KG'],
+                   a_i=Data_Geostat[,'AreaSwept_km2'],
+                   ## v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
+                   v_i=1:nrow(Data_Geostat),
+                   s_i=Data_Geostat[,'knot_i']-1,
+                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                   MeshList=Spatial_List$MeshList,
+                   GridList=Spatial_List$GridList,
+                   Q_ik=Q_ik,
+                   X_xtp=NULL,#XX$Cov_xtp,
+                   Method=Spatial_List$Method, Options=Options,
+                   Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                          Version=Version,  RhoConfig=RhoConfig,
                          loc_x=Spatial_List$loc_x, Method=Method,
@@ -193,9 +193,9 @@ TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
                         Param=Params, TmbDir='models',
-                         Random='generate',
+                        Random='generate',
                         ##Random=c('beta1_ft'),
-                         Map=Map)
+                        Map=Map)
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
 
@@ -207,5 +207,66 @@ Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
 
 
 silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
-          Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
+                    Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
+
+
+## Some custom maps of the data properties
+## Plot log average catch in grid
+mdl <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+Year_Set <- sort(unique(Data_Geostat$Year))
+Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                     FUN=mean, na.rm=TRUE))
+## Some grids have only zero observations
+MatDat[is.infinite(MatDat)]  <-  NA
+if(model=='combined'){
+  message('Making data maps by gear type...')
+  for(ii in 1:3){
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+               Mat=MatDat[,ii,Years2Include,drop=TRUE],
+               PlotDF=mdl$PlotDF,
+               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_data_avg_', ii),
+               Year_Set=Year_Set[Years2Include],
+               Legend=mdl$Legend,
+               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               textmargin='Log avg catches', zone=mdl$Zone, mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+  }
+
+
+  ## Plot percentage 0's
+  MatDat <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                   FUN=function(x) mean(x==0, na.rm=TRUE))
+  for(ii in 1:3){
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+               Mat=MatDat[,ii,Years2Include,drop=TRUE],
+               PlotDF=mdl$PlotDF,
+               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_data_pres_', ii),
+               Year_Set=Year_Set[Years2Include],
+               Legend=mdl$Legend, zlim=c(0,1),
+               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+  }
+
+
+  ## Plot log average catch in BTS divided by ATS 3-16.
+  MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                    FUN=mean, na.rm=TRUE))
+  MatDat <- log(MatDat[,2,]/MatDat[,1,])
+  ## Some grids have only zero observations
+  MatDat[is.infinite(MatDat) | MatDat==0]  <-  NA
+  PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+             Mat=MatDat[,Years2Include],
+             PlotDF=mdl$PlotDF,
+             MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+             FileName=paste0(savedir, '/map_data_ratio'),
+             Year_Set=Year_Set[Years2Include],
+             Legend=mdl$Legend,
+             mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+             textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+             oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+}
 
