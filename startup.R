@@ -226,7 +226,7 @@ plot.vastfit <- function(results){
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
-  tmp <- c(1,2,3, 10, 12)
+  tmp <- c(1,2,3, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
   Dens_xt = plot_maps(plot_set=tmp,
                       MappingDetails=MapDetails_List[["MappingDetails"]],
@@ -249,4 +249,34 @@ plot.vastfit <- function(results){
   Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
+
+  if(results$Index$model[1]=='combined'){
+    ## Plot ratio of observed/predicted by grid cell for the three gear types
+    MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                      FUN=mean, na.rm=TRUE))
+    MatExp <- Report$D_xcy
+    MatRatio <- array(NA, dim=dim(MatDat))
+    ## BTS is sum over first two strata
+    MatRatio[,1,] <- MatDat[,1,]/apply(MatExp[,-3,], 2, sum)
+    MatRatio[,2,] <- MatDat[,2,]/MatExp[,2,]
+    MatRatio[,3,] <- MatDat[,3,]/MatExp[,3,]
+    MatRatio <- log(MatRatio)
+    MatRatio[is.infinite(MatRatio)] <- NA
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatRatio[,ii,Years2Include,drop=TRUE],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/map_data_ratio_', ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=(ii==1), pch=16)
+    }
+  }
+
 }
+
+
+
