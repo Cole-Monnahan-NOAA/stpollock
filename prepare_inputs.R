@@ -98,12 +98,25 @@ if(model=='combined'){
 }
 years <- sort(unique(Data_Geostat$Year))
 nyr <- length(years)
-## Derived objects for spatio-temporal estimation
-silent.fn(Spatial_List <-
-            make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
-                              Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
-                              Extrapolation_List=Extrapolation_List, DirPath=savedir,
-                              Save_Results=FALSE ))
+
+### Derived objects for spatio-temporal estimation
+silent.fn(Spatial_List  <-
+  make_spatial_info(grid_size_km=grid_size_km, n_x=n_x,
+                    Method=Method, Lon=Data_Geostat[,'Lon'],
+                    Lat=Data_Geostat[,'Lat'],
+                    ## According to Jim this will make the grid uniform with respect to the
+                    ## extrapolation region. This helps avoid the grid being driven by the ATS
+                    ## which as more points than the BTS. But it breaks
+                    ## plotting code so turned off for now.
+                    ## LON_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lon'],
+                    ## LAT_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lat'],
+                    Extrapolation_List=Extrapolation_List,
+                    DirPath=savedir, Save_Results=FALSE ))
+## silent.fn(Spatial_List <-
+##             make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
+##                               Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
+##                               Extrapolation_List=Extrapolation_List, DirPath=savedir,
+##                               Save_Results=FALSE ))
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
 silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Lat_e = Data_Geostat$Lat,
@@ -212,7 +225,9 @@ silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_
 
 ## Some custom maps of the data properties
 ## Plot log average catch in grid
-mdl <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+mdl <- make_map_info( "Region"=Region,
+                     "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+                     "Extrapolation_List"=Extrapolation_List )
 mdl$Legend$x <- mdl$Legend$x-70
 mdl$Legend$y <- mdl$Legend$y-45
 Year_Set <- sort(unique(Data_Geostat$Year))
