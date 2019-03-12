@@ -29,6 +29,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
+  write.csv(est, file=paste0(savedir, "estimates.csv"))
   Index <- calculate.index(Opt, Report, model, space, log=FALSE, strata=FALSE)
   Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
