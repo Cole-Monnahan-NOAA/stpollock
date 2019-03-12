@@ -281,13 +281,142 @@ plot.vastfit <- function(results){
                  Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
                  mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
                  textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=(ii==1), pch=16)
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
   }
 
 }
 
 
+## This is a modified version of plot_residuals meant to work with my
+## combined strata model
+
+observed.catches.by.geartype <- function(gear){
+  obs_rate_xy <- total_num_xy <- obs_num_xy <-
+    matrix(NA, nrow=TmbData$n_x, ncol=nrow(TmbData$t_yz) )
+  ## Loop through each year and calculate obs for each cell. Be careful to
+  ## only select the appropriate gear type and then sum across the correct strata
+  for(yr in  1:nrow(TmbData$t_yz)){
+    tmp <- subset(Data_Geostat, Year== years[yr] & Gear == gear)
+    if(nrow(tmp)>0){
+      index.tmp <- factor(tmp$knot_i, levels=1:TmbData$n_x-1)
+      obs_rate_xy[,yr] <- tapply(tmp$Catch_KG>0, INDEX=index.tmp, FUN=mean )
+      total_num_xy[,yr] <- tapply(tmp$Catch_KG, INDEX=index.tmp, FUN=length)
+    } else {
+      total_num_xy[,yr] <- NA
+    }
+  }
+  return(list(obs_rate_xy=obs_rate_xy, total_num_xy=total_num_xy))
+}
+
+Q1_xy <- list()
+#### First get the Pearon resids for Trawl
+## Sum across P1 for the first two strata then calculate R1 manually. I
+## don't think there's another way to do this.
+exp_rate_xy <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
+temp <- observed.catches.by.geartype('Trawl')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q1_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+#### Now ATS1
+exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+temp <- observed.catches.by.geartype('Acoustic_3-16')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q1_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+#### Now ATS2
+exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+temp <- observed.catches.by.geartype('Acoustic_16-surface')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q1_xy[[3]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+
+textmargin = "Pearson residual"
+Col = colorRampPalette(colors=c("blue","white","red"))
+for( zI in 1:3 ){
+  ## Sometimes expected is 1 to machine precision which causes infinite
+  ## residual. For now truncating to 3
+  ## for(ii in 1:3) Q1_xy[[ii]][which(is.infinite(Q1_xy[[ii]]), arr.ind=TRUE)] <- NA
+  ## for(ii in 1:3) Q1_xy[[ii]][which(abs(Q1_xy[[ii]])>50, arr.ind=TRUE)] <- NA
+  Q1_xy[[zI]]  <-  ifelse( abs(Q1_xy[[zI]])>3, 3*sign(Q1_xy[[zI]]), Q1_xy[[zI]] )
+  zlim  <-  c(-1,1) *3#ceiling(max(abs(unlist(Q1_xy)),na.rm=TRUE))
+  PlotMap_Fn( MappingDetails=mdl$MappingDetails, Mat=Q1_xy[[zI]],
+             PlotDF=mdl$PlotDF, Col=Col, zlim=zlim, ignore.na=TRUE,
+             MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+             FileName=paste0(savedir, '/Pearson_resid_presence_', zI),
+             Year_Set=paste0("Residuals--",1:ncol(Q1_xy[[zI]])),
+             zone=mdl$Zone, Legend=mdl$Legend,
+             mfrow=c(ceiling(sqrt(length(Years2Include))),
+                     ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+             mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+}
+
+
+Q2_xy <- list()
+#### First get the Pearon resids for Trawl
+## Sum across P1 for the first two strata then calculate R1 manually. I
+## don't think there's another way to do this.
+exp_rate_xy <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
+temp <- observed.catches.by.geartype('Trawl')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q2_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+#### Now ATS1
+exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+temp <- observed.catches.by.geartype('Acoustic_3-16')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q2_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+#### Now ATS2
+exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+temp <- observed.catches.by.geartype('Acoustic_16-surface')
+exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## Now calculate Pearson residuals using binomial form:
+Q2_xy[[3]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+
+textmargin = "Pearson residual"
+Col = colorRampPalette(colors=c("blue","white","red"))
+for( zI in 1:3 ){
+  ## Sometimes expected is 1 to machine precision which causes infinite
+  ## residual. For now truncating to 3
+  ## for(ii in 1:3) Q2_xy[[ii]][which(is.infinite(Q2_xy[[ii]]), arr.ind=TRUE)] <- NA
+  ## for(ii in 1:3) Q2_xy[[ii]][which(abs(Q2_xy[[ii]])>50, arr.ind=TRUE)] <- NA
+  Q2_xy[[zI]]  <-  ifelse( abs(Q2_xy[[zI]])>3, 3*sign(Q2_xy[[zI]]), Q2_xy[[zI]] )
+  zlim  <-  c(-1,1) *3#ceiling(max(abs(unlist(Q2_xy)),na.rm=TRUE))
+  PlotMap_Fn( MappingDetails=mdl$MappingDetails, Mat=Q2_xy[[zI]],
+             PlotDF=mdl$PlotDF, Col=Col, zlim=zlim, ignore.na=TRUE,
+             MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+             FileName=paste0(savedir, '/Pearson_resid_presence_', zI),
+             Year_Set=paste0("Residuals--",1:ncol(Q2_xy[[zI]])),
+             zone=mdl$Zone, Legend=mdl$Legend,
+             mfrow=c(ceiling(sqrt(length(Years2Include))),
+                     ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+             mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+}
+
+
+
+### Method #3 -- Pearson residuals
+  sum_obs_xy = sum_exp_xy = var_exp_xy = matrix(NA, nrow=TmbData$n_x, ncol=nrow(TmbData$t_yz) )
+  for( yI in 1:nrow(TmbData$t_yz) ){
+    which_i_in_y = ( TmbData$t_iz == outer(rep(1,TmbData$n_i),TmbData$t_yz[yI,]) )
+    which_i_in_y = which( apply(which_i_in_y,MARGIN=1,FUN=all) )
+    which_i_in_y_and_pos = intersect( which_i_in_y, which_pos )
+    which_ipos_in_y = ( TmbData$t_iz[which_pos,] == outer(rep(1,length(which_pos)),TmbData$t_yz[yI,]) )
+    which_ipos_in_y = which( apply(which_ipos_in_y,MARGIN=1,FUN=all) )
+    if( length(which_i_in_y_and_pos)>0 ){
+      sum_obs_xy[,yI] = tapply( TmbData$b_i[which_i_in_y_and_pos], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+      sum_exp_xy[,yI] = tapply( bpred_ipos[which_ipos_in_y], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+      var_exp_xy[,yI] = tapply( bvar_ipos[which_ipos_in_y], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+    }
+  }
+  Q2_xy = (sum_obs_xy - sum_exp_xy) / sqrt(var_exp_xy)
 
 
 
