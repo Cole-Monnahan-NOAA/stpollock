@@ -12,6 +12,7 @@ library(TMBhelper)
 library(snowfall)
 library(maps)
 library(mapdata)
+library(abind)
 Version <- "VAST_v7_0_0"
 
 source("simulator.R")
@@ -29,7 +30,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
-  write.csv(est, file=paste0(savedir, "estimates.csv"))
+  write.csv(est, file=paste0(savedir, "/estimates.csv"))
   Index <- calculate.index(Opt, Report, model, space, log=FALSE, strata=FALSE)
   Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
@@ -195,6 +196,9 @@ plot.vastfit <- function(results){
   ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
                               Extrapolation_List=Extrapolation_List)
+  Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+  Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
     Plot_factors(Report, results$ParHatList, Data=TmbData, SD=Opt$SD,
@@ -207,7 +211,10 @@ plot.vastfit <- function(results){
                                FileName_Phist="Posterior_Predictive-Histogram",
                                FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
 
-  MapDetails_List = make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+  MapDetails_List = make_map_info( "Region"=Region,
+                                  "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+                                  "Extrapolation_List"=Extrapolation_List )
+  MapDetails_List  <- Mapdetails
   ## Decide which years to plot
   Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
   Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
@@ -223,15 +230,16 @@ plot.vastfit <- function(results){
                  Cex=MapDetails_List[["Cex"]],
                  Legend=MapDetails_List[["Legend"]],
                  zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8)
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
-  tmp <- c(1,2,3, 12)
+  tmp <- c(1,2,3, 11, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
   Dens_xt = plot_maps(plot_set=tmp,
                       MappingDetails=MapDetails_List[["MappingDetails"]],
                       Report=Report, Sdreport=Opt$SD,
+                      TmbData=TmbData,
                       PlotDF=MapDetails_List[["PlotDF"]],
                       MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
                       Xlim=MapDetails_List[["Xlim"]],
@@ -278,6 +286,10 @@ plot.vastfit <- function(results){
   }
 
 }
+
+
+
+
 
 
 

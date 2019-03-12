@@ -122,10 +122,14 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Lat_e = Data_Geostat$Lat,
                                    Lon_e = Data_Geostat$Lon,
                                    t_e = Data_Geostat$Year,
-                                   Cov_ep = Data_Geostat[,c('depth', 'depth2')],
+                                   Cov_ep = Data_Geostat[,c('depth', 'depth2')[1]],
                                    Extrapolation_List = Extrapolation_List,
                                    Spatial_List = Spatial_List, FUN = mean,
                                    na.omit = "time-average")))
+## Normalize depth and then add depth^2
+XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
+new  <- XX$Cov_xtp[,,1]^2
+XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
 TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
@@ -140,7 +144,7 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                    MeshList=Spatial_List$MeshList,
                    GridList=Spatial_List$GridList,
                    Q_ik=Q_ik,
-                   X_xtp=NULL,#XX$Cov_xtp,
+                   X_xtp=XX$Cov_xtp,
                    Method=Spatial_List$Method, Options=Options,
                    Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
