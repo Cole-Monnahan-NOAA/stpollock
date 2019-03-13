@@ -6,12 +6,14 @@ indices.to.correct <- c('ColeIndex_cy', 'ln_ColeIndex_cy', 'Index_cyl', 'ln_Inde
 
 
 ## Fit all versions of model
-n_x <- 100 # number of knots
+n_x <- 200 # number of knots
 for(m in 3){
-for(s in 1:3){
+for(s in 2){
 model <- c('ats', 'bts', 'combined')[m]
 space <- c('NS', 'S', 'ST')[s]
 savedir <- paste0(getwd(), '/fit_', model, "_", space, '_', n_x)
+options(warn=2)
+options(warn=1)
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper,  savedir=savedir,
