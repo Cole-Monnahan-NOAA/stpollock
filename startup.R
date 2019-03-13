@@ -284,37 +284,38 @@ plot.vastfit <- function(results){
     }
   }
 
+  ## Pearson resids for detection and catch rate
+  D_i <- Report$R1_i*Report$R2_i
+  PR1_i <- PR2_i <- rep(NA, length(D_i))
+  for(i in 1:length(D_i)){
+    ## bernoulli for presence
+    mui <- Report$R1_i[i]
+    obs <- as.numeric(Data_Geostat$Catch_KG[i]>0)
+    PR1_i[i] <- (obs-mui)/sqrt(mui*(1-mui)/1)
+    ## log-normal for catch rate; NA for 0 observations
+    obs <- Data_Geostat$Catch_KG[i]
+    if(obs>0){
+      PR2_i[i] <- (log(obs)-log(D_i[i]))/Report$SigmaM[gr]
+    }
+  }
+  df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
+  xlim <- range(df$Lon); ylim <- range(df$Lat)
+  for(gr in 1:3){
+    gt <- levels(Data_Geostat$Gear)[gr]
+    g <- ggplot(subset(df, Gear==gt & positive==1), aes(Lon, Lat, size=abs(PR2), color=PR2>0))+
+      geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
+      scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
+    ggsave(filename=paste0(savedir, '/Pearson_resid_catchrate_', gr, '.png'), plot=g,
+           width=7, height=5)
+    g <- ggplot(subset(df, Gear==gt & positive==0), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
+      geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
+      scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
+    ggsave(filename=paste0(savedir, '/Pearson_resid_presence_', gr, '.png'), plot=g,
+           width=7, height=5)
+  }
+
 }
 
-## Pearson resids for detection and catch rate
-D_i <- Report$R1_i*Report$R2_i
-PR1_i <- PR2_i <- rep(NA, length(D_i))
-for(i in 1:length(D_i)){
-  ## bernoulli for presence
-  mui <- Report$R1_i[i]
-  obs <- as.numeric(Data_Geostat$Catch_KG[i]>0)
-  PR1_i[i] <- (obs-mui)/sqrt(mui*(1-mui)/1)
-  ## log-normal for catch rate; NA for 0 observations
-  obs <- Data_Geostat$Catch_KG[i]
-  if(obs>0){
-  PR2_i[i] <- (log(obs)-log(D_i[i]))/Report$SigmaM[gr]
-  }
-}
-df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
-xlim <- range(df$Lon); ylim <- range(df$Lat)
-for(gr in 1:3){
-  gt <- levels(Data_Geostat$Gear)[gr]
-  g <- ggplot(subset(df, Gear==gt & positive==1), aes(Lon, Lat, size=abs(PR2), color=PR2>0))+
-    geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
-    scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
-  ggsave(filename=paste0(savedir, '/Pearson_resid_catchrate_', gr, '.png'), plot=g,
-         width=7, height=5)
-  g <- ggplot(subset(df, Gear==gt & positive==0), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
-    geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
-    scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
-  ggsave(filename=paste0(savedir, '/Pearson_resid_presence_', gr, '.png'), plot=g,
-         width=7, height=5)
-}
 ##   ## This is a modified version of plot_residuals meant to work with my
 ## ## combined strata model
 
