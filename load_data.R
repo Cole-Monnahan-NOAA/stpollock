@@ -2,23 +2,18 @@
 
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
-set.seed(1)
-ats$surface <- rnorm(nrow(ats))
-bts$depth <- rnorm(nrow(bts))
 
 ## The ats data is really high resolution so truncating this for now to
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
 
-## Normalize the covariates
+## Normalize the covariates. Does it make sense to do that here with depths
+## in different strata??
 norm <- function(x) (x-mean(x, na.rm=TRUE))/sd(x, na.rm=TRUE)
-bts$depth <- norm(bts$depth)
+## bts$depth <- norm(bts$depth)
 bts$depth2 <- bts$depth^2
-## bts$mlength <- norm(bts$mean_length)
-## bts$temp.bottom <- norm(bts$temp.bottom)
-## bts$temp.surface <- norm(bts$temp.surface)
-ats$depth <- norm(ats$surface)
+ats$depth <- ats$surface# norm(ats$surface)
 ats$depth2 <- ats$depth^2
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 

@@ -12,6 +12,7 @@ library(TMBhelper)
 library(snowfall)
 library(maps)
 library(mapdata)
+library(abind)
 Version <- "VAST_v7_0_0"
 
 source("simulator.R")
@@ -29,6 +30,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
+  write.csv(est, file=paste0(savedir, "/estimates.csv"))
   Index <- calculate.index(Opt, Report, model, space, log=FALSE, strata=FALSE)
   Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
@@ -92,7 +94,6 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
     ## calculate in log space?
     if(!strata)
       stop("Doesnt make sense to have combined model in log space")
-
     tmp <- which(names(Opt$SD$value) %in% 'ln_Index_cyl')
     ii <- log(Report$Index_cyl[,,1])
   } else {
@@ -194,6 +195,9 @@ plot.vastfit <- function(results){
   ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
                               Extrapolation_List=Extrapolation_List)
+  Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+  Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
     Plot_factors(Report, results$ParHatList, Data=TmbData, SD=Opt$SD,
@@ -206,7 +210,10 @@ plot.vastfit <- function(results){
                                FileName_Phist="Posterior_Predictive-Histogram",
                                FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
 
-  MapDetails_List = make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+  MapDetails_List = make_map_info( "Region"=Region,
+                                  "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+                                  "Extrapolation_List"=Extrapolation_List )
+  MapDetails_List  <- Mapdetails
   ## Decide which years to plot
   Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
   Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
@@ -222,15 +229,16 @@ plot.vastfit <- function(results){
                  Cex=MapDetails_List[["Cex"]],
                  Legend=MapDetails_List[["Legend"]],
                  zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8)
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
-  tmp <- c(1,2,3, 12)
+  tmp <- c(1,2,3, 11, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
   Dens_xt = plot_maps(plot_set=tmp,
                       MappingDetails=MapDetails_List[["MappingDetails"]],
                       Report=Report, Sdreport=Opt$SD,
+                      TmbData=TmbData,
                       PlotDF=MapDetails_List[["PlotDF"]],
                       MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
                       Xlim=MapDetails_List[["Xlim"]],
@@ -272,11 +280,174 @@ plot.vastfit <- function(results){
                  Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
                  mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
                  textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=(ii==1), pch=16)
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
   }
 
+  ## Pearson resids for detection and catch rate
+  D_i <- Report$R1_i*Report$R2_i
+  PR1_i <- PR2_i <- rep(NA, length(D_i))
+  for(i in 1:length(D_i)){
+    ## bernoulli for presence
+    mui <- Report$R1_i[i]
+    obs <- as.numeric(Data_Geostat$Catch_KG[i]>0)
+    PR1_i[i] <- (obs-mui)/sqrt(mui*(1-mui)/1)
+    ## log-normal for catch rate; NA for 0 observations
+    obs <- Data_Geostat$Catch_KG[i]
+    if(obs>0){
+      PR2_i[i] <- (log(obs)-log(D_i[i]))/Report$SigmaM[gr]
+    }
+  }
+  df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
+  xlim <- range(df$Lon); ylim <- range(df$Lat)
+  for(gr in 1:3){
+    gt <- levels(Data_Geostat$Gear)[gr]
+    g <- ggplot(subset(df, Gear==gt & positive==1), aes(Lon, Lat, size=abs(PR2), color=PR2>0))+
+      geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
+      scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
+    ggsave(filename=paste0(savedir, '/Pearson_resid_catchrate_', gr, '.png'), plot=g,
+           width=7, height=5)
+    g <- ggplot(subset(df, Gear==gt & positive==0), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
+      geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
+      scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
+    ggsave(filename=paste0(savedir, '/Pearson_resid_presence_', gr, '.png'), plot=g,
+           width=7, height=5)
+  }
+
 }
+
+##   ## This is a modified version of plot_residuals meant to work with my
+## ## combined strata model
+
+## observed.catches.by.geartype <- function(gear){
+##   obs_rate_xy <- total_num_xy <- obs_num_xy <-
+##     matrix(NA, nrow=TmbData$n_x, ncol=nrow(TmbData$t_yz) )
+##   ## Loop through each year and calculate obs for each cell. Be careful to
+##   ## only select the appropriate gear type and then sum across the correct strata
+##   for(yr in  1:nrow(TmbData$t_yz)){
+##     tmp <- subset(Data_Geostat, Year== years[yr] & Gear == gear)
+##     if(nrow(tmp)>0){
+##       index.tmp <- factor(tmp$knot_i, levels=1:TmbData$n_x-1)
+##       obs_rate_xy[,yr] <- tapply(tmp$Catch_KG>0, INDEX=index.tmp, FUN=mean )
+##       total_num_xy[,yr] <- tapply(tmp$Catch_KG, INDEX=index.tmp, FUN=length)
+##     } else {
+##       total_num_xy[,yr] <- NA
+##     }
+##   }
+##   return(list(obs_rate_xy=obs_rate_xy, total_num_xy=total_num_xy))
+## }
+
+## Q1_xy <- list()
+## #### First get the Pearon resids for Trawl
+## ## Sum across P1 for the first two strata then calculate R1 manually. I
+## ## don't think there's another way to do this.
+## exp_rate_xy <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
+## temp <- observed.catches.by.geartype('Trawl')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q1_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+## #### Now ATS1
+## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+## temp <- observed.catches.by.geartype('Acoustic_3-16')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q1_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+## #### Now ATS2
+## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+## temp <- observed.catches.by.geartype('Acoustic_16-surface')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q1_xy[[3]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+
+## textmargin = "Pearson residual"
+## Col = colorRampPalette(colors=c("blue","white","red"))
+## for( zI in 1:3 ){
+##   ## Sometimes expected is 1 to machine precision which causes infinite
+##   ## residual. For now truncating to 3
+##   ## for(ii in 1:3) Q1_xy[[ii]][which(is.infinite(Q1_xy[[ii]]), arr.ind=TRUE)] <- NA
+##   ## for(ii in 1:3) Q1_xy[[ii]][which(abs(Q1_xy[[ii]])>50, arr.ind=TRUE)] <- NA
+##   Q1_xy[[zI]]  <-  ifelse( abs(Q1_xy[[zI]])>3, 3*sign(Q1_xy[[zI]]), Q1_xy[[zI]] )
+##   zlim  <-  c(-1,1) *3#ceiling(max(abs(unlist(Q1_xy)),na.rm=TRUE))
+##   PlotMap_Fn( MappingDetails=mdl$MappingDetails, Mat=Q1_xy[[zI]],
+##              PlotDF=mdl$PlotDF, Col=Col, zlim=zlim, ignore.na=TRUE,
+##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+##              FileName=paste0(savedir, '/Pearson_resid_presence_', zI),
+##              Year_Set=paste0("Residuals--",1:ncol(Q1_xy[[zI]])),
+##              zone=mdl$Zone, Legend=mdl$Legend,
+##              mfrow=c(ceiling(sqrt(length(Years2Include))),
+##                      ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+##              mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+## }
+
+
+## Q2_xy <- list()
+## #### First get the Pearon resids for Trawl
+## ## Sum across P1 for the first two strata then calculate R1 manually. I
+## ## don't think there's another way to do this.
+## r1temp <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
+## ## For R2=exp(p1+p2)/r1
+## exp_rate_xy <-
+##   exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)+apply(Report$P2_xcy[,-3,], c(1,3), sum))/r1temp
+## temp <- observed.catches.by.geartype('Trawl')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q2_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+## #### Now ATS1
+## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+## temp <- observed.catches.by.geartype('Acoustic_3-16')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q2_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+## #### Now ATS2
+## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
+## temp <- observed.catches.by.geartype('Acoustic_16-surface')
+## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
+## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
+## ## Now calculate Pearson residuals using binomial form:
+## Q2_xy[[3]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
+
+## for( zI in 1:3 ){
+##   ## Sometimes expected is 1 to machine precision which causes infinite
+##   ## residual. For now truncating to 3
+##   ## for(ii in 1:3) Q2_xy[[ii]][which(is.infinite(Q2_xy[[ii]]), arr.ind=TRUE)] <- NA
+##   ## for(ii in 1:3) Q2_xy[[ii]][which(abs(Q2_xy[[ii]])>50, arr.ind=TRUE)] <- NA
+##   Q2_xy[[zI]]  <-  ifelse( abs(Q2_xy[[zI]])>3, 3*sign(Q2_xy[[zI]]), Q2_xy[[zI]] )
+##   zlim  <-  c(-1,1) *3#ceiling(max(abs(unlist(Q2_xy)),na.rm=TRUE))
+##   PlotMap_Fn( MappingDetails=mdl$MappingDetails, Mat=Q2_xy[[zI]],
+##              PlotDF=mdl$PlotDF, Col=Col, zlim=zlim, ignore.na=TRUE,
+##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+##              FileName=paste0(savedir, '/Pearson_resid_presence_', zI),
+##              Year_Set=paste0("Residuals--",1:ncol(Q2_xy[[zI]])),
+##              zone=mdl$Zone, Legend=mdl$Legend,
+##              mfrow=c(ceiling(sqrt(length(Years2Include))),
+##                      ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+##              mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+## }
+
+
+
+## ### Method #3 -- Pearson residuals
+##   sum_obs_xy = sum_exp_xy = var_exp_xy = matrix(NA, nrow=TmbData$n_x, ncol=nrow(TmbData$t_yz) )
+##   for( yI in 1:nrow(TmbData$t_yz) ){
+##     which_i_in_y = ( TmbData$t_iz == outer(rep(1,TmbData$n_i),TmbData$t_yz[yI,]) )
+##     which_i_in_y = which( apply(which_i_in_y,MARGIN=1,FUN=all) )
+##     which_i_in_y_and_pos = intersect( which_i_in_y, which_pos )
+##     which_ipos_in_y = ( TmbData$t_iz[which_pos,] == outer(rep(1,length(which_pos)),TmbData$t_yz[yI,]) )
+##     which_ipos_in_y = which( apply(which_ipos_in_y,MARGIN=1,FUN=all) )
+##     if( length(which_i_in_y_and_pos)>0 ){
+##       sum_obs_xy[,yI] = tapply( TmbData$b_i[which_i_in_y_and_pos], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+##       sum_exp_xy[,yI] = tapply( bpred_ipos[which_ipos_in_y], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+##       var_exp_xy[,yI] = tapply( bvar_ipos[which_ipos_in_y], INDEX=factor(TmbData$s_i[which_i_in_y_and_pos],levels=1:TmbData$n_x-1), FUN=sum )
+##     }
+##   }
+##   Q2_xy = (sum_obs_xy - sum_exp_xy) / sqrt(var_exp_xy)
+
+
 
 
 

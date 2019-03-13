@@ -98,21 +98,38 @@ if(model=='combined'){
 }
 years <- sort(unique(Data_Geostat$Year))
 nyr <- length(years)
-## Derived objects for spatio-temporal estimation
-silent.fn(Spatial_List <-
-            make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
-                              Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
-                              Extrapolation_List=Extrapolation_List, DirPath=savedir,
-                              Save_Results=FALSE ))
+
+### Derived objects for spatio-temporal estimation
+silent.fn(Spatial_List  <-
+  make_spatial_info(grid_size_km=grid_size_km, n_x=n_x,
+                    Method=Method, Lon=Data_Geostat[,'Lon'],
+                    Lat=Data_Geostat[,'Lat'],
+                    ## According to Jim this will make the grid uniform with respect to the
+                    ## extrapolation region. This helps avoid the grid being driven by the ATS
+                    ## which as more points than the BTS. But it breaks
+                    ## plotting code so turned off for now.
+                    ## LON_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lon'],
+                    ## LAT_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lat'],
+                    Extrapolation_List=Extrapolation_List,
+                    DirPath=savedir, Save_Results=FALSE ))
+## silent.fn(Spatial_List <-
+##             make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
+##                               Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
+##                               Extrapolation_List=Extrapolation_List, DirPath=savedir,
+##                               Save_Results=FALSE ))
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
 silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Lat_e = Data_Geostat$Lat,
                                    Lon_e = Data_Geostat$Lon,
                                    t_e = Data_Geostat$Year,
-                                   Cov_ep = Data_Geostat[,c('depth', 'depth2')],
+                                   Cov_ep = Data_Geostat[,c('depth', 'depth2')[1]],
                                    Extrapolation_List = Extrapolation_List,
                                    Spatial_List = Spatial_List, FUN = mean,
                                    na.omit = "time-average")))
+## Normalize depth and then add depth^2
+XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
+new  <- XX$Cov_xtp[,,1]^2
+XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
 TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
@@ -127,7 +144,7 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                    MeshList=Spatial_List$MeshList,
                    GridList=Spatial_List$GridList,
                    Q_ik=Q_ik,
-                   X_xtp=NULL,#XX$Cov_xtp,
+                   X_xtp=XX$Cov_xtp,
                    Method=Spatial_List$Method, Options=Options,
                    Aniso=FALSE)
 TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
@@ -212,13 +229,19 @@ silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_
 
 ## Some custom maps of the data properties
 ## Plot log average catch in grid
-mdl <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
+mdl <- make_map_info( "Region"=Region,
+                     "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+                     "Extrapolation_List"=Extrapolation_List )
+mdl$Legend$x <- mdl$Legend$x-70
+mdl$Legend$y <- mdl$Legend$y-45
 Year_Set <- sort(unique(Data_Geostat$Year))
 Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
 MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                      FUN=mean, na.rm=TRUE))
 ## Some grids have only zero observations
 MatDat[is.infinite(MatDat)]  <-  NA
+## Use consistent zlim for all three data types
+zlim <- range(MatDat, na.rm=TRUE)
 if(model=='combined'){
   message('Making data maps by gear type...')
   for(ii in 1:3){
@@ -228,16 +251,16 @@ if(model=='combined'){
                MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
                FileName=paste0(savedir, '/map_data_avg_', ii),
                Year_Set=Year_Set[Years2Include],
-               Legend=mdl$Legend,
-               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               Legend=mdl$Legend, zlim=zlim,
+               mfrow = c(ceiling(sqrt(length(Years2Include))),
+                         ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
                textmargin='Log avg catches', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
-
 
   ## Plot percentage 0's
   MatDat <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
-                   FUN=function(x) mean(x==0, na.rm=TRUE))
+                   FUN=function(x) mean(x>0, na.rm=TRUE))
   for(ii in 1:3){
     PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                Mat=MatDat[,ii,Years2Include,drop=TRUE],
@@ -248,25 +271,27 @@ if(model=='combined'){
                Legend=mdl$Legend, zlim=c(0,1),
                mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
                textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
 
 
-  ## Plot log average catch in BTS divided by ATS 3-16.
+  ## Plot log average catch in BTS divided by ATS 3-16. This shouldn't be
+  ## possible b/c the BTS also includes the ATS data. Although this ignores
+  ## catchability.
   MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                     FUN=mean, na.rm=TRUE))
-  MatDat <- log(MatDat[,2,]/MatDat[,1,])
+  MatDat <- (MatDat[,2,]/MatDat[,1,])>1
   ## Some grids have only zero observations
   MatDat[is.infinite(MatDat) | MatDat==0]  <-  NA
   PlotMap_Fn(MappingDetails=mdl$MappingDetails,
              Mat=MatDat[,Years2Include],
-             PlotDF=mdl$PlotDF,
+             PlotDF=mdl$PlotDF, zlim=c(0,1),
              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
              FileName=paste0(savedir, '/map_data_ratio'),
              Year_Set=Year_Set[Years2Include],
              Legend=mdl$Legend,
              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
              textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-             oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=TRUE, pch=16)
+             oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
 }
 
