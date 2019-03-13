@@ -295,7 +295,9 @@ plot.vastfit <- function(results){
     ## log-normal for catch rate; NA for 0 observations
     obs <- Data_Geostat$Catch_KG[i]
     if(obs>0){
-      PR2_i[i] <- (log(obs)-log(D_i[i]))/Report$SigmaM[gr]
+      ## make sure to use the right variance as this depends on gear type
+      gr <- as.numeric(Data_Geostat$Gear[i])
+      PR2_i[i] <- (log(obs)-log(D_i[i])+Report$SigmaM[gr]^2/2)/Report$SigmaM[gr]
     }
   }
   df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
@@ -314,6 +316,47 @@ plot.vastfit <- function(results){
            width=7, height=5)
   }
 
+  ## QQplots
+  get.qq <- function(gr, presence){
+    gears <- levels(Data_Geostat$Gear)
+    qq <- ldply(years, function(i){
+      tmp <- subset(df, Year==i & positive==1 & Gear==gears[gr])
+      if(nrow(tmp)>0) {
+        qq <- data.frame(qqnorm(tmp$PR2, plot.it=FALSE))
+        x <- data.frame(year=i, gear=gears[gr], qq)
+        return(x)
+      }
+    })
+  }
+  qq <- rbind(get.qq(1,1), get.qq(2,1), get.qq(3,1))
+  g <- ggplot(qq, aes(x,y, group=gear, color=gear)) +
+    geom_abline(slope=1,intercept=0) + facet_wrap('year') +
+    geom_point(alpha=.5) + theme_bw()
+  ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
+         width=7, height=5)
+  ## Melt it down
+  qq.long <- melt(qq, id.vars=c('par', 'stan'), variable.name='platform')
+  ## Since can be too many parameters, break them up into pages. Stolen
+  ## from
+  ## http://stackoverflow.com/questions/22996911/segment-facet-wrap-into-multi-page-pdf
+  noVars <- length(par.names)
+  noPlots <- 25
+  plotSequence <- c(seq(0, noVars-1, by = noPlots), noVars)
+  ## pdf('plots/model_comparison_qqplots.pdf', onefile=TRUE,
+  ## width=ggwidth,height=ggheight)
+  png('plots/model_comparison_qqplots%02d.png', units='in', res=500,
+      width=ggwidth,height=ggheight)
+  for(ii in 2:length(plotSequence)){
+    start <- plotSequence[ii-1] + 1;   end <- plotSequence[ii]
+    tmp <- subset(qq.long, par %in% par.names[start:end])
+    g <- ggplot(tmp, aes(stan, value, color=platform))+ geom_point(alpha=.5) +
+      geom_abline(slope=1, col='red') +
+      facet_wrap('par', scales='free', nrow=5) + xlab('stan')+ ylab('y')
+    ## theme(axis.text.x=element_blank(), axis.text.y=element_blank())
+    g <- g+ theme(text=element_text(size=7))
+    print(g)
+  }
+  dev.off()
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my
