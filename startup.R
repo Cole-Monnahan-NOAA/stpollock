@@ -143,11 +143,15 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 }
 
 plot.vastfit <- function(results){
-  df <- data.frame(obs=Data_Geostat$Catch_KG,
-                   predicted=results$Report$R2_i, gear=Data_Geostat$Gear,
+  ## Need to reconstruct the Density including the log-normal bias
+  ## adjustment
+  sigtmp <- Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
+  df <- data.frame(obs=log(Data_Geostat$Catch_KG),
+                   predicted= log(results$Report$R2_i)-sigtmp,
+                   gear=Data_Geostat$Gear,
                    year=Data_Geostat$Year)
   df <- subset(df, obs>0) ## drop zeroes
-  g <- ggplot(df, aes(log(obs), log(predicted))) + facet_grid(gear~year) + geom_point(alpha=.5) +
+  g <- ggplot(df, aes(obs, predicted)) + facet_grid(gear~year) + geom_point(alpha=.5) +
     geom_abline(slope=1, intercept=0)
   ggsave(file.path(savedir, 'obs_vs_pred.png'), g, width=10, height=5)
   if(results$Index$space[1]!="NS"){
@@ -236,28 +240,26 @@ plot.vastfit <- function(results){
   tmp <- c(1,2,3, 11, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
   Dens_xt = plot_maps(plot_set=tmp,
-                      MappingDetails=MapDetails_List[["MappingDetails"]],
+                      MappingDetails=Mapdetails[["MappingDetails"]],
                       Report=Report, Sdreport=Opt$SD,
                       TmbData=TmbData,
-                      PlotDF=MapDetails_List[["PlotDF"]],
-                      MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                      Xlim=MapDetails_List[["Xlim"]],
-                      Ylim=MapDetails_List[["Ylim"]], FileName=paste0(savedir,'/'),
+                      PlotDF=Mapdetails[["PlotDF"]],
+                      MapSizeRatio=Mapdetails[["MapSizeRatio"]],
+                      Xlim=Mapdetails[["Xlim"]],
+                      Ylim=Mapdetails[["Ylim"]], FileName=paste0(savedir,'/'),
                       Year_Set=Year_Set, Years2Include=Years2Include,
-                      Rotate=MapDetails_List[["Rotate"]],
-                      Cex=MapDetails_List[["Cex"]],
-                      Legend=MapDetails_List[["Legend"]],
-                      zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+                      Rotate=Mapdetails[["Rotate"]],
+                      Cex=Mapdetails[["Cex"]],
+                      Legend=Mapdetails[["Legend"]],
+                      zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
                       oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   Dens_DF = cbind( "Density"=as.vector(Dens_xt),
                   "Year"=Year_Set[col(Dens_xt)],
                   "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
                   "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
-
   Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
-
   if(results$Index$model[1]=='combined'){
     ## Plot ratio of observed/predicted by grid cell for the three gear types
     MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
@@ -283,7 +285,6 @@ plot.vastfit <- function(results){
                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
   }
-
   ## Pearson resids for detection and catch rate
   D_i <- Report$R1_i*Report$R2_i
   PR1_i <- PR2_i <- rep(NA, length(D_i))
@@ -297,7 +298,7 @@ plot.vastfit <- function(results){
     if(obs>0){
       ## make sure to use the right variance as this depends on gear type
       gr <- as.numeric(Data_Geostat$Gear[i])
-      PR2_i[i] <- (log(obs)-log(D_i[i])+Report$SigmaM[gr]^2/2)/Report$SigmaM[gr]
+      PR2_i[i] <- (log(obs)-log(Report$R2_i[i])+Report$SigmaM[gr]^2/2)/Report$SigmaM[gr]
     }
   }
   df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
@@ -309,10 +310,10 @@ plot.vastfit <- function(results){
       scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
     ggsave(filename=paste0(savedir, '/Pearson_resid_catchrate_', gr, '.png'), plot=g,
            width=7, height=5)
-    g <- ggplot(subset(df, Gear==gt & positive==0), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
+    g <- ggplot(subset(df, Gear==gt), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
       geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
       scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
-    ggsave(filename=paste0(savedir, '/Pearson_resid_presence_', gr, '.png'), plot=g,
+    ggsave(filename=paste0(savedir, '/Pearson_resid_encounter_', gr, '.png'), plot=g,
            width=7, height=5)
   }
 
