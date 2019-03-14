@@ -334,29 +334,6 @@ plot.vastfit <- function(results){
     geom_point(alpha=.5) + theme_bw()
   ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
          width=7, height=5)
-  ## Melt it down
-  qq.long <- melt(qq, id.vars=c('par', 'stan'), variable.name='platform')
-  ## Since can be too many parameters, break them up into pages. Stolen
-  ## from
-  ## http://stackoverflow.com/questions/22996911/segment-facet-wrap-into-multi-page-pdf
-  noVars <- length(par.names)
-  noPlots <- 25
-  plotSequence <- c(seq(0, noVars-1, by = noPlots), noVars)
-  ## pdf('plots/model_comparison_qqplots.pdf', onefile=TRUE,
-  ## width=ggwidth,height=ggheight)
-  png('plots/model_comparison_qqplots%02d.png', units='in', res=500,
-      width=ggwidth,height=ggheight)
-  for(ii in 2:length(plotSequence)){
-    start <- plotSequence[ii-1] + 1;   end <- plotSequence[ii]
-    tmp <- subset(qq.long, par %in% par.names[start:end])
-    g <- ggplot(tmp, aes(stan, value, color=platform))+ geom_point(alpha=.5) +
-      geom_abline(slope=1, col='red') +
-      facet_wrap('par', scales='free', nrow=5) + xlab('stan')+ ylab('y')
-    ## theme(axis.text.x=element_blank(), axis.text.y=element_blank())
-    g <- g+ theme(text=element_text(size=7))
-    print(g)
-  }
-  dev.off()
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my
