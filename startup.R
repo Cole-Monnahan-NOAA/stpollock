@@ -206,30 +206,30 @@ plot.vastfit <- function(results){
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
-  Q = plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
-                               FileName_Phist="Posterior_Predictive-Histogram",
-                               FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
+  ## Q = plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
+  ##                              FileName_Phist="Posterior_Predictive-Histogram",
+  ##                              FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
 
-  MapDetails_List = make_map_info( "Region"=Region,
-                                  "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
-                                  "Extrapolation_List"=Extrapolation_List )
-  MapDetails_List  <- Mapdetails
-  ## Decide which years to plot
-  Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-  plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-                 TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
-                 MappingDetails=MapDetails_List[["MappingDetails"]],
-                 PlotDF=MapDetails_List[["PlotDF"]],
-                 MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                 Xlim=MapDetails_List[["Xlim"]],
-                 Ylim=MapDetails_List[["Ylim"]], FileName=savedir,
-                 Year_Set=Year_Set, Years2Include=Years2Include,
-                 Rotate=MapDetails_List[["Rotate"]],
-                 Cex=MapDetails_List[["Cex"]],
-                 Legend=MapDetails_List[["Legend"]],
-                 zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  ## MapDetails_List = make_map_info( "Region"=Region,
+  ##                                 "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+  ##                                 "Extrapolation_List"=Extrapolation_List )
+  ## MapDetails_List  <- Mapdetails
+  ## ## Decide which years to plot
+  ## Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+  ## Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+  ## plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
+  ##                TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
+  ##                MappingDetails=MapDetails_List[["MappingDetails"]],
+  ##                PlotDF=MapDetails_List[["PlotDF"]],
+  ##                MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
+  ##                Xlim=MapDetails_List[["Xlim"]],
+  ##                Ylim=MapDetails_List[["Ylim"]], FileName=savedir,
+  ##                Year_Set=Year_Set, Years2Include=Years2Include,
+  ##                Rotate=MapDetails_List[["Rotate"]],
+  ##                Cex=MapDetails_List[["Cex"]],
+  ##                Legend=MapDetails_List[["Legend"]],
+  ##                zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+  ##                oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
