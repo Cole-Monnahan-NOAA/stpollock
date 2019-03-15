@@ -132,7 +132,7 @@ new  <- XX$Cov_xtp[,,1]^2
 XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
-TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
+TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                    OverdispersionConfig=OverdispersionConfig,
                    RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                    b_i=Data_Geostat[,'Catch_KG'],
@@ -140,17 +140,21 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                    ## v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
                    v_i=1:nrow(Data_Geostat),
                    s_i=Data_Geostat[,'knot_i']-1,
-                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                   t_i=Data_Geostat[,'Year'],
                    MeshList=Spatial_List$MeshList,
                    GridList=Spatial_List$GridList,
                    Q_ik=Q_ik,
-                   X_xtp=XX$Cov_xtp,
+                   X_gtp=XX$Cov_xtp,
+                   spatial_list=Spatial_List,
                    Method=Spatial_List$Method, Options=Options,
                    Aniso=FALSE)
-TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
+
+TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
                          Version=Version,  RhoConfig=RhoConfig,
                          loc_x=Spatial_List$loc_x, Method=Method,
-                         TmbDir='models', Random="generate")
+                       TmbDir='models', Random="generate")
+TmbList0$Parameters$gamma1_ctp
+TmbList0$Map$gamma1_ctp
 ## Tweak the Map based on inputs
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
@@ -169,6 +173,8 @@ if(space=='ST'){
   if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
   Map$Beta_rho1_f <- factor(c(2,2,2))
 }
+
+Params$gamma1_ctp
 
 ## Params$beta2_ft <- Params$beta2_ft+5
 ## if(model=='combined'){
@@ -206,7 +212,7 @@ if(space=='ST'){
 ## }
 
 ## Rebuild with the new mapping stuff
-TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
                         Param=Params, TmbDir='models',
@@ -229,9 +235,8 @@ silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_
 
 ## Some custom maps of the data properties
 ## Plot log average catch in grid
-mdl <- make_map_info( "Region"=Region,
-                     "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
-                     "Extrapolation_List"=Extrapolation_List )
+mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
+                     Extrapolation_List=Extrapolation_List )
 mdl$Legend$x <- mdl$Legend$x-70
 mdl$Legend$y <- mdl$Legend$y-45
 Year_Set <- sort(unique(Data_Geostat$Year))

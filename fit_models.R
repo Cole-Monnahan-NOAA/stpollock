@@ -6,7 +6,7 @@ indices.to.correct <- c('ColeIndex_cy', 'ln_ColeIndex_cy', 'Index_cyl', 'ln_Inde
 
 
 ## Fit all versions of model
-n_x <- 200 # number of knots
+n_x <- 300 # number of knots
 for(m in 3){
 for(s in 2){
 model <- c('ats', 'bts', 'combined')[m]

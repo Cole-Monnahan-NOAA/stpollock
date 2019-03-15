@@ -13,7 +13,7 @@ library(snowfall)
 library(maps)
 library(mapdata)
 library(abind)
-Version <- "VAST_v7_0_0"
+Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
@@ -145,7 +145,7 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 plot.vastfit <- function(results){
   ## Need to reconstruct the Density including the log-normal bias
   ## adjustment
-  sigtmp <- Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
+  sigtmp <- results$Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
   df <- data.frame(obs=log(Data_Geostat$Catch_KG),
                    predicted= log(results$Report$R2_i)-sigtmp,
                    gear=Data_Geostat$Gear,
@@ -199,7 +199,7 @@ plot.vastfit <- function(results){
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
-  Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
+  Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                               Extrapolation_List=Extrapolation_List)
   Mapdetails$Legend$x <- Mapdetails$Legend$x-70
   Mapdetails$Legend$y <- Mapdetails$Legend$y-45
@@ -241,6 +241,12 @@ plot.vastfit <- function(results){
   ## Some built-in maps
   tmp <- c(1,2,3, 11, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
+  ## Temporary hack to get v8.0.0 to work with this function
+  Report$D_xcy <- Report$D_gcy
+  Report$R1_xcy <- Report$R1_gcy
+  Report$R2_xcy <- Report$R2_gcy
+  Report$D_gcy <- Report$R1_gcy <- Report$R2_gcy <- NULL
+  TmbData$X_xtp <- TmbData$X_gtp
   Dens_xt = plot_maps(plot_set=tmp,
                       MappingDetails=Mapdetails[["MappingDetails"]],
                       Report=Report, Sdreport=Opt$SD,
