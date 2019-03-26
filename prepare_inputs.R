@@ -130,6 +130,7 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
 XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
 new  <- XX$Cov_xtp[,,1]^2
 XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
+XX <- NULL
 
 ## Build data and object for first time
 TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,

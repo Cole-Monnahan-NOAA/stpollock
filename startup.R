@@ -145,6 +145,7 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 plot.vastfit <- function(results){
   ## Need to reconstruct the Density including the log-normal bias
   ## adjustment
+  Report <- results$Report
   sigtmp <- Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
   df <- data.frame(obs=log(Data_Geostat$Catch_KG),
                    predicted= log(results$Report$R2_i)-sigtmp,
