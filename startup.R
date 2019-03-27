@@ -13,7 +13,7 @@ library(snowfall)
 library(maps)
 library(mapdata)
 library(abind)
-Version <- "VAST_v7_0_0"
+Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
@@ -142,45 +142,51 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
   return(index)
 }
 
-plot.vastfit <- function(results){
-  df <- data.frame(obs=Data_Geostat$Catch_KG,
-                   predicted=results$Report$R2_i, gear=Data_Geostat$Gear,
+plot.vastfit <- function(results, plotQQ=FALSE){
+  ## Need to reconstruct the Density including the log-normal bias
+  ## adjustment
+  sigtmp <- results$Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
+  df <- data.frame(obs=log(Data_Geostat$Catch_KG),
+                   predicted= log(results$Report$R2_i)-sigtmp,
+                   gear=Data_Geostat$Gear,
                    year=Data_Geostat$Year)
   df <- subset(df, obs>0) ## drop zeroes
-  g <- ggplot(df, aes(log(obs), log(predicted))) + facet_grid(gear~year) + geom_point(alpha=.5) +
+  g <- ggplot(df, aes(obs, predicted)) + facet_grid(gear~year) + geom_point(alpha=.5) +
     geom_abline(slope=1, intercept=0)
   ggsave(file.path(savedir, 'obs_vs_pred.png'), g, width=10, height=5)
-  if(results$Index$space[1]!="NS"){
-    fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
-                         omegainput1=results$Report$Omegainput1_sf,
-                         omega1=results$Report$Omega1_sc,
-                         omegainput2=results$Report$Omegainput2_sf,
-                         omega2=results$Report$Omega2_sc,
-                         E_km=results$Inputs$loc$E_km,
-                         N_km=results$Inputs$loc$N_km)
-    fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
-                        factorsAsStrings=FALSE)
-    if(results$Index$model[1]=='combined'){
-      fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
-                                                           function(x) x[2])))
-    } else {
-      fields.long$strata <- results$Index$model[1]
-    }
-    fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
-                                      function(x) x[1]))
-    fields.long$component <- 'Component=1'
-    fields.long$component[grep(fields.long$type, pattern='2')] <- 'Component=2'
-    fields.long$type <- gsub("1|2", "", x=fields.long$type)
-    fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
-    fields.long <- ddply(fields.long, .(type, space, component), mutate,
-                         normalized=value/sd(value))
-    Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
-    g <- ggplot(fields.long, aes(E_km, N_km, col=value)) +
-      geom_point(size=1) +
-      facet_grid(component+type~strata) +
-      scale_colour_gradientn(colours = Col(15)) + theme_bw()
-    ggsave(file.path(savedir, 'map_omegas.png'), g, width=9, height=6, units='in')
-  }
+  ## ## This was old code to look at the input fields but are not really
+  ## ## helpful anymore
+  ## if(results$Index$space[1]!="NS"){
+  ##   fields <- data.frame(model=results$Index$model[1], space=results$Index$space[1],
+  ##                        omegainput1=results$Report$Omegainput1_sf,
+  ##                        omega1=results$Report$Omega1_sc,
+  ##                        omegainput2=results$Report$Omegainput2_sf,
+  ##                        omega2=results$Report$Omega2_sc,
+  ##                        E_km=results$Inputs$loc$E_km,
+  ##                        N_km=results$Inputs$loc$N_km)
+  ##   fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
+  ##                       factorsAsStrings=FALSE)
+  ##   if(results$Index$model[1]=='combined'){
+  ##     fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+  ##                                                          function(x) x[2])))
+  ##   } else {
+  ##     fields.long$strata <- results$Index$model[1]
+  ##   }
+  ##   fields.long$type <- unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
+  ##                                     function(x) x[1]))
+  ##   fields.long$component <- 'Component=1'
+  ##   fields.long$component[grep(fields.long$type, pattern='2')] <- 'Component=2'
+  ##   fields.long$type <- gsub("1|2", "", x=fields.long$type)
+  ##   fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
+  ##   fields.long <- ddply(fields.long, .(type, space, component), mutate,
+  ##                        normalized=value/sd(value))
+  ##   Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
+  ##   g <- ggplot(fields.long, aes(E_km, N_km, col=value)) +
+  ##     geom_point(size=1) +
+  ##     facet_grid(component+type~strata) +
+  ##     scale_colour_gradientn(colours = Col(15)) + theme_bw()
+  ##   ggsave(file.path(savedir, 'map_omegas.png'), g, width=9, height=6, units='in')
+  ## }
   Report <- results$Report
   Index <- results$Index
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
@@ -193,71 +199,78 @@ plot.vastfit <- function(results){
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
-  Mapdetails <- make_map_info(Region, NN_Extrap=Spatial_List$NN_Extrap,
+  Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                               Extrapolation_List=Extrapolation_List)
   Mapdetails$Legend$x <- Mapdetails$Legend$x-70
   Mapdetails$Legend$y <- Mapdetails$Legend$y-45
 
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
+    Report$D_xcy <- Report$D_gcy
     Plot_factors(Report, results$ParHatList, Data=TmbData, SD=Opt$SD,
                  mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
   }
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
-  Q = plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
-                               FileName_Phist="Posterior_Predictive-Histogram",
-                               FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
-
-  MapDetails_List = make_map_info( "Region"=Region,
-                                  "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
-                                  "Extrapolation_List"=Extrapolation_List )
-  MapDetails_List  <- Mapdetails
-  ## Decide which years to plot
-  Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-  plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-                 TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
-                 MappingDetails=MapDetails_List[["MappingDetails"]],
-                 PlotDF=MapDetails_List[["PlotDF"]],
-                 MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                 Xlim=MapDetails_List[["Xlim"]],
-                 Ylim=MapDetails_List[["Ylim"]], FileName=savedir,
-                 Year_Set=Year_Set, Years2Include=Years2Include,
-                 Rotate=MapDetails_List[["Rotate"]],
-                 Cex=MapDetails_List[["Cex"]],
-                 Legend=MapDetails_List[["Legend"]],
-                 zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  if(plotQQ){
+    Q <- plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
+                                  FileName_Phist="Posterior_Predictive-Histogram",
+                                  FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
+    ## MapDetails_List = make_map_info( "Region"=Region,
+    ##                                 "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+    ##                                 "Extrapolation_List"=Extrapolation_List )
+    ## Decide which years to plot
+    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include = which( Year_Set %in%
+                           sort(unique(Data_Geostat[,'Year'])))
+    TmbData$n_x <- TmbData$n_g
+    plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
+                   TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
+                   MappingDetails=Mapdetails[["MappingDetails"]],
+                   PlotDF=Mapdetails[["PlotDF"]],
+                   MapSizeRatio=Mapdetails[["MapSizeRatio"]],
+                   Xlim=Mapdetails[["Xlim"]],
+                   Ylim=Mapdetails[["Ylim"]], FileName=savedir,
+                   Year_Set=Year_Set, Years2Include=Years2Include,
+                   Rotate=Mapdetails[["Rotate"]],
+                   Cex=Mapdetails[["Cex"]],
+                   Legend=Mapdetails[["Legend"]],
+                   zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
+                   oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  }
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
   tmp <- c(1,2,3, 11, 12)
   if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
+  ## Temporary hack to get v8.0.0 to work with this function
+  Report$D_xcy <- Report$D_gcy
+  Report$R1_xcy <- Report$R1_gcy
+  Report$R2_xcy <- Report$R2_gcy
+  Report$D_gcy <- Report$R1_gcy <- Report$R2_gcy <- NULL
+  TmbData$X_xtp <- TmbData$X_gtp
   Dens_xt = plot_maps(plot_set=tmp,
-                      MappingDetails=MapDetails_List[["MappingDetails"]],
+                      MappingDetails=Mapdetails[["MappingDetails"]],
                       Report=Report, Sdreport=Opt$SD,
                       TmbData=TmbData,
-                      PlotDF=MapDetails_List[["PlotDF"]],
-                      MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                      Xlim=MapDetails_List[["Xlim"]],
-                      Ylim=MapDetails_List[["Ylim"]], FileName=paste0(savedir,'/'),
+                      PlotDF=Mapdetails[["PlotDF"]],
+                      MapSizeRatio=Mapdetails[["MapSizeRatio"]],
+                      Xlim=Mapdetails[["Xlim"]],
+                      Ylim=Mapdetails[["Ylim"]], FileName=paste0(savedir,'/'),
                       Year_Set=Year_Set, Years2Include=Years2Include,
-                      Rotate=MapDetails_List[["Rotate"]],
-                      Cex=MapDetails_List[["Cex"]],
-                      Legend=MapDetails_List[["Legend"]],
-                      zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+                      Rotate=Mapdetails[["Rotate"]],
+                      Cex=Mapdetails[["Cex"]],
+                      Legend=Mapdetails[["Legend"]],
+                      zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
                       oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
-  Dens_DF = cbind( "Density"=as.vector(Dens_xt),
-                  "Year"=Year_Set[col(Dens_xt)],
-                  "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
-                  "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
-
+  ## Dens_DF = cbind( "Density"=as.vector(Dens_xt),
+  ##                 "Year"=Year_Set[col(Dens_xt)],
+  ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
+  ##                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
   Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
-
   if(results$Index$model[1]=='combined'){
     ## Plot ratio of observed/predicted by grid cell for the three gear types
     MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
@@ -283,7 +296,6 @@ plot.vastfit <- function(results){
                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
   }
-
   ## Pearson resids for detection and catch rate
   D_i <- Report$R1_i*Report$R2_i
   PR1_i <- PR2_i <- rep(NA, length(D_i))
@@ -295,7 +307,9 @@ plot.vastfit <- function(results){
     ## log-normal for catch rate; NA for 0 observations
     obs <- Data_Geostat$Catch_KG[i]
     if(obs>0){
-      PR2_i[i] <- (log(obs)-log(D_i[i]))/Report$SigmaM[gr]
+      ## make sure to use the right variance as this depends on gear type
+      gr <- as.numeric(Data_Geostat$Gear[i])
+      PR2_i[i] <- (log(obs)-log(Report$R2_i[i])+Report$SigmaM[gr]^2/2)/Report$SigmaM[gr]
     }
   }
   df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
@@ -307,13 +321,31 @@ plot.vastfit <- function(results){
       scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
     ggsave(filename=paste0(savedir, '/Pearson_resid_catchrate_', gr, '.png'), plot=g,
            width=7, height=5)
-    g <- ggplot(subset(df, Gear==gt & positive==0), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
+    g <- ggplot(subset(df, Gear==gt), aes(Lon, Lat, size=abs(PR1), color=PR1>0))+
       geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
       scale_size('Pearson Resid', range=c(0,3))  + theme_bw()
-    ggsave(filename=paste0(savedir, '/Pearson_resid_presence_', gr, '.png'), plot=g,
+    ggsave(filename=paste0(savedir, '/Pearson_resid_encounter_', gr, '.png'), plot=g,
            width=7, height=5)
   }
 
+  ## QQplots
+  get.qq <- function(gr, presence){
+    gears <- levels(Data_Geostat$Gear)
+    qq <- ldply(years, function(i){
+      tmp <- subset(df, Year==i & positive==1 & Gear==gears[gr])
+      if(nrow(tmp)>0) {
+        qq <- data.frame(qqnorm(tmp$PR2, plot.it=FALSE))
+        x <- data.frame(year=i, gear=gears[gr], qq)
+        return(x)
+      }
+    })
+  }
+  qq <- rbind(get.qq(1,1), get.qq(2,1), get.qq(3,1))
+  g <- ggplot(qq, aes(x,y, group=gear, color=gear)) +
+    geom_abline(slope=1,intercept=0) + facet_wrap('year') +
+    geom_point(alpha=.5) + theme_bw()
+  ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
+         width=7, height=5)
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my

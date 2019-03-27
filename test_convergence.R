@@ -9,18 +9,226 @@ source("startup.R")
 ##      1.02         0.97         1.02
 
 
+## Set seed and find a bad model without the ocmbination of strata and send
+## it to Jim
+
+## Try random seeds with combined model to test stability
+
+## Test MCMC use bounds on L's given "close to MLE" crash point and run
+## everything.
+
 ## Test combined spatial model
-n_x <- 200
+n_x <- 50
 model <- 'combined'; space <- 'ST'
-model <- 'ats'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
+set.seed(111)
+options(warn=0)
 source("prepare_inputs.R")
+options(warn=2) # stop on a warning
+## options(warn=1)
+Obj$env$silent <- FALSE
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
                 upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=1, control=list(trace=10))
-### TMBhelper::Check_Identifiable(Obj)
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
+                newtonsteps=0, control=list(iter.max=300, trace=1))
+
+
+all <- Obj$env$last.par
+fixed <- all[-Obj$env$random]
+## Grab the last one run
+Obj$fn(fixed)
+Obj$gr(fixed)
+Report <- Obj$report(all)
+Report$jnll
+
+plot(Report$LogProb1_i)
+plot(Report$LogProb2_i)
+plot(log(Report$R2_i))
+plot(log(Report$D_gcy))
+plot(Report$Epsilon1_gct)
+matplot(Report$Omegainput1_sf)
+matplot(Report$Omegainput2_sf)
+matplot(Report$beta1_tc)
+matplot(Report$beta2_tc)
+
+
+
+## Try to find a standard model that doesn't work to show Jim.
+
+run.iteration <- function(seed){
+  set.seed(seed)
+  n_x <<- 50
+  model <<- 'combined'; space <<- 'NS'
+  savedir <<- paste0(getwd(), '/test_std_', seed)
+  source('startup.R')
+  source("prepare_inputs.R")
+  print(str(Obj))
+  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE,
+                                  loopnum=5,
+                                  upper=TmbList$Upper,  savedir=savedir,
+                                  newtonsteps=0, control=list(iter.max=300, trace=1)),
+                  error=function(e) NULL)
+  if(is.null(err)){
+    return('failed')
+  } else {
+    return(Opt)
+  }
+}
+
+library(snowfall)
+chains <- cores <- 2
+sfStop()
+snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
+snowfall::sfExportAll()
+sfLibrary(VAST)
+sfLibrary(TMB)
+out.parallel <-
+  sfLapply(1:chains, function(i)
+  ##lapply(1:chains, function(i)
+  run.iteration(i))
+sfStop()
+
+which(out.parallel=='failed')
+sapply(out.parallel, function(x) x$objective)
+
+
+## Took the console trace output and processed it into Excel to read back
+## in
+## pars <- read.table('testing/trace.csv', sep=',')
+pars <- read.table('testing/trace_nocombined.csv', sep=',')
+grads <- data.frame(t(apply(pars, 1, Obj$gr)))
+nlls <- apply(pars, 1, Obj$fn)
+names(grads) <- names(pars) <- paste0(1:length(Obj$par),"_", names(Obj$par))
+maxgrads <- apply(grads, 1, function(x) max(abs(x)))
+png('testing/convergence_ST_nocombined.png', width=7, height=5, units='in', res=500)
+par(mfrow=c(1,2))
+plot(nlls-min(nlls)); plot(log10(maxgrads))
+dev.off()
+
+grads$iter <- pars$iter <- 1:nrow(grads)
+pars.long <- melt(pars[-1,], id.vars='iter', value.name='fn')
+grads.long <- melt(grads[-1,], id.vars='iter', value.name='gr')
+## Make some quick plots of these
+g <- ggplot(pars.long, aes(iter, fn, group=variable, color=variable)) + geom_line()
+ggsave('testing/pars_ST_nocombined.png', g, width=7, height=5)
+g <- ggplot(pars.long, aes(iter, fn, group=variable)) +
+  geom_line() + facet_wrap('variable', scales='free_y')
+ggsave('testing/pars_faceted_ST_nocombined.png', g, width=10, height=5)
+g <- ggplot(grads.long, aes(iter, gr, group=variable, color=variable)) +
+  geom_line()
+ggsave('testing/grads_ST_nocombined.png', g, width=7, height=5)
+g <- ggplot(grads.long, aes(iter, sign(gr)*log10(abs(gr)), group=variable)) +
+  geom_line() + facet_wrap('variable') + geom_abline(intercept=0, slope=0, color='red')
+ggsave('testing/log_grads_ST_nocombined.png', g, width=7, height=5)
+
+
+## Try rebuilding it with random effects turned off and variances at the
+## MLE
+Map$L_beta1_z <- factor(c(NA, NA, NA))
+Map$L_epsilon1_z <- factor(rep(NA,5))
+Params$L_epsilon1_z  <- c(-0.8258647,-0.4384401,-0.2161642, 0.9626192, 0.5119802)
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
+                      Version=Version,  RhoConfig=RhoConfig,
+                      loc_x=Spatial_List$loc_x, Method=Method,
+                      Param=Params, TmbDir='models',
+                      Random=c('beta1_ft', 'Omegainput1_sf',
+                               'Omegainput2_sf'),
+                      Map=Map)
+Obj  <-  TmbList[["Obj"]]
+Obj$env$beSilent()
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(trace=10))
+
+
+
+## ## Loop through optimization one step at a time and save gradients and
+## ## parameter vectors.
+## pars <- grads <- nlls <- list()
+## pars[[1]] <- Obj$par
+## grads[[1]] <-  Obj$gr(Obj$par)
+## nlls[[1]] <- Obj$fn(Obj$par)
+## for(i in 2:100){
+##   tmp <- optim(par=pars[[i-1]], fn=Obj$fn,
+##                 gr=Obj$gr, lower=TmbList$Lower,
+##                 upper=TmbList$Upper, method='L-BFGS-B',
+##                 control=list(maxit=0, trace=1))
+##   ## tmp <- nlminb(start=pars[[i-1]], objective=Obj$fn,
+##   ##               gradient=Obj$gr, lower=TmbList$Lower,
+##   ##               upper=TmbList$Upper,  savedir=savedir,
+##   ##               control=list(iter.max=1, trace=0))
+##   pars[[i]] <- tmp$par
+##   grads[[i]] <- Obj$gr(tmp$par)
+##   nlls[[i]] <- Obj$fn(tmp$par)
+##   if(tmp$convergence==0) break
+##   print(paste(i, round(max(grads[[i]]),4)))
+## }
+## pars <- as.data.frame(do.call(rbind,pars))
+## grads <- as.data.frame(do.call(rbind,grads))
+## nlls <- do.call(c, nlls)
+## maxgrads <- apply(grads, 1, function(x) max(abs(x)))
+## names(Obj$par)[apply(grads, 1, which.max)]
+## names(pars) <- names(grads) <-
+##   paste0(1:length(Obj$par),"_", names(Obj$par))
+## grads$iter <- pars$iter <- 1:nrow(grads)
+## pars.long <- melt(pars[-1,], id.vars='iter')
+## grads.long <- melt(grads[-1,], id.vars='iter')
+## ## Make some quick plots of these
+## g <- ggplot(pars.long, aes(iter, value, group=variable, color=variable)) + geom_line()
+## ggsave('testing/pars_NS_BTS.png', g, width=7, height=5)
+## g <- ggplot(pars.long, aes(iter, value, group=variable)) +
+##   geom_line() + facet_wrap('variable', scales='free_y')
+## ggsave('testing/pars_faceted_NS_BTS.png', g, width=10, height=5)
+## g <- ggplot(grads.long, aes(iter, value, group=variable, color=variable)) + geom_line()
+## ggsave('testing/grads_NS_BTS.png', g, width=7, height=5)
+## g <- ggplot(grads.long, aes(iter, sign(value)*log10(abs(value)), group=variable)) +
+##   geom_line() + facet_wrap('variable')
+## ggsave('testing/log_grads_NS_BTS.png', g, width=7, height=5)
+## plot(nlls)
+## plot(log10(maxgrads))
+## prof <- tmbprofile(Obj, name=12)
+## plot(prof)
+## Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
+##                 upper=TmbList$Upper,  savedir=savedir,
+##                 newtonsteps=0, control=list(trace=1))
+## Opt <- nlminb(start=Obj$par, objective=Obj$fn,
+##               gradient=Obj$gr, lower=TmbList$Lower,
+##               upper=TmbList$Upper,
+##               control=list(iter.max=150, trace=0))
+
+## library(tracer)
+## library(nloptr)
+## eval_f <- function(x) {
+##   return( 100 * (x[2] - x[1] * x[1])^2 + (1 - x[1])^2 )
+## }
+## ## Gradient of Rosenbrock Banana function
+## eval_grad_f <- function(x) {
+##   return( c( -400 * x[1] * (x[2] - x[1] * x[1]) - 2 * (1 - x[1]),
+##             200 * (x[2] - x[1] * x[1]) ) )
+## }
+## x0 <- c( -1.2, 1 )
+## res <- nloptr( x0=x0,
+##               eval_f=eval_f,
+##               eval_grad_f=eval_grad_f,
+##               opts=opts)
+## res <- nloptr_tr( x0=x0,
+##               eval_f=eval_f,
+##               eval_grad_f=eval_grad_f,
+##               opts=opts)
+## print(res)
+## ## tracer(res)
+## opts <- list("algorithm"="NLOPT_LD_LBFGS", "xtol_rel"=1.0e-8, print_level=2,"check_derivatives" = TRUE,
+##              "check_derivatives_print" = "all")
+## fn <- function(x) Obj$fn(x)
+## gr <- function(x) Obj$gr(x)
+## res <- nloptr(x0=Obj$par, eval_f=fn, eval_grad_f=gr, opts=opts,
+##               lb=TmbList$Lower, ub=TmbList$Upper)
+## print(res)
+
+
+
+
+
+
 
 
 

@@ -79,7 +79,10 @@ if(model=='combined'){
   ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  ## c_iz[,2] <- NA
+  if(!exists('combinedoff')) combinedoff <- FALSE
+  ## This is a switch to turn off the combined part and revert back to
+  ## standard multivariate model. For testing only.
+  if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
@@ -128,11 +131,11 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    na.omit = "time-average")))
 ## Normalize depth and then add depth^2
 XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
-new  <- XX$Cov_xtp[,,1]^2
-XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
+## new  <- XX$Cov_xtp[,,1]^2
+## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
-TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
+TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                    OverdispersionConfig=OverdispersionConfig,
                    RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                    b_i=Data_Geostat[,'Catch_KG'],
@@ -140,17 +143,21 @@ TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
                    ## v_i=as.numeric(Data_Geostat[,'Vessel'])-1,
                    v_i=1:nrow(Data_Geostat),
                    s_i=Data_Geostat[,'knot_i']-1,
-                   t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
+                   t_i=Data_Geostat[,'Year'],
                    MeshList=Spatial_List$MeshList,
                    GridList=Spatial_List$GridList,
                    Q_ik=Q_ik,
-                   X_xtp=XX$Cov_xtp,
+                   X_gtp=XX$Cov_xtp,
+                   spatial_list=Spatial_List,
                    Method=Spatial_List$Method, Options=Options,
                    Aniso=FALSE)
-TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
-                         Version=Version,  RhoConfig=RhoConfig,
-                         loc_x=Spatial_List$loc_x, Method=Method,
-                         TmbDir='models', Random="generate")
+
+TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
+                       TmbDir='models', Random="generate")
+TmbList0$Parameters$gamma1_ctp
+TmbList0$Map$gamma1_ctp
 ## Tweak the Map based on inputs
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
@@ -158,8 +165,10 @@ Params$Beta_mean2_c <- Params$Beta_mean2_c+5
 if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
-  Params$logSigmaM[1:3] <- c(.6,.7,.8)
+  Params$logSigmaM[1:3] <- c(1,1,1)
   ## Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  ## Assume that the two ATS strata have the same observation error
+  Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 } else {
   Params$L_beta1_z <- .4
   Params$L_beta2_z <- .4
@@ -170,10 +179,10 @@ if(space=='ST'){
   Map$Beta_rho1_f <- factor(c(2,2,2))
 }
 
+Params$gamma1_ctp
+
 ## Params$beta2_ft <- Params$beta2_ft+5
 ## if(model=='combined'){
-##   ## Assume that the two ATS strata have the same observation error
-##  ## Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 ##   ##  Map$beta1_ct <- factor(rep(1, 30))
 ##   ## Carefully build the catchability
 ##   ## Params$lambda1_k <- c(0,0)
@@ -206,7 +215,7 @@ if(space=='ST'){
 ## }
 
 ## Rebuild with the new mapping stuff
-TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=savedir,
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
                         Version=Version,  RhoConfig=RhoConfig,
                         loc_x=Spatial_List$loc_x, Method=Method,
                         Param=Params, TmbDir='models',
@@ -229,9 +238,8 @@ silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_
 
 ## Some custom maps of the data properties
 ## Plot log average catch in grid
-mdl <- make_map_info( "Region"=Region,
-                     "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
-                     "Extrapolation_List"=Extrapolation_List )
+mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
+                     Extrapolation_List=Extrapolation_List )
 mdl$Legend$x <- mdl$Legend$x-70
 mdl$Legend$y <- mdl$Legend$y-45
 Year_Set <- sort(unique(Data_Geostat$Year))
@@ -242,7 +250,7 @@ MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','
 MatDat[is.infinite(MatDat)]  <-  NA
 ## Use consistent zlim for all three data types
 zlim <- range(MatDat, na.rm=TRUE)
-if(model=='combined'){
+if(model=='combined333'){
   message('Making data maps by gear type...')
   for(ii in 1:3){
     PlotMap_Fn(MappingDetails=mdl$MappingDetails,

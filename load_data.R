@@ -17,6 +17,12 @@ ats$depth <- ats$surface# norm(ats$surface)
 ats$depth2 <- ats$depth^2
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 
+## Filter data off the shelf
+## hist(bts$depth)
+## hist(ats$depth)
+bts <- subset(bts, depth<200)
+ats <- subset(ats, depth<400)
+
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
                    Vessel='none', depth=bts$depth, depth2=bts$depth2)
