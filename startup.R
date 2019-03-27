@@ -142,7 +142,7 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
   return(index)
 }
 
-plot.vastfit <- function(results){
+plot.vastfit <- function(results, plotQQ=FALSE){
   ## Need to reconstruct the Density including the log-normal bias
   ## adjustment
   sigtmp <- results$Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
@@ -206,36 +206,39 @@ plot.vastfit <- function(results){
 
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
+    Report$D_xcy <- Report$D_gcy
     Plot_factors(Report, results$ParHatList, Data=TmbData, SD=Opt$SD,
                  mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
   }
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
-  ## Q = plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
-  ##                              FileName_Phist="Posterior_Predictive-Histogram",
-  ##                              FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
-
-  ## MapDetails_List = make_map_info( "Region"=Region,
-  ##                                 "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
-  ##                                 "Extrapolation_List"=Extrapolation_List )
-  ## MapDetails_List  <- Mapdetails
-  ## ## Decide which years to plot
-  ## Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-  ## Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-  ## plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-  ##                TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
-  ##                MappingDetails=MapDetails_List[["MappingDetails"]],
-  ##                PlotDF=MapDetails_List[["PlotDF"]],
-  ##                MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-  ##                Xlim=MapDetails_List[["Xlim"]],
-  ##                Ylim=MapDetails_List[["Ylim"]], FileName=savedir,
-  ##                Year_Set=Year_Set, Years2Include=Years2Include,
-  ##                Rotate=MapDetails_List[["Rotate"]],
-  ##                Cex=MapDetails_List[["Cex"]],
-  ##                Legend=MapDetails_List[["Legend"]],
-  ##                zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-  ##                oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  if(plotQQ){
+    Q <- plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
+                                  FileName_Phist="Posterior_Predictive-Histogram",
+                                  FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=savedir )
+    ## MapDetails_List = make_map_info( "Region"=Region,
+    ##                                 "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
+    ##                                 "Extrapolation_List"=Extrapolation_List )
+    ## Decide which years to plot
+    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include = which( Year_Set %in%
+                           sort(unique(Data_Geostat[,'Year'])))
+    TmbData$n_x <- TmbData$n_g
+    plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
+                   TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
+                   MappingDetails=Mapdetails[["MappingDetails"]],
+                   PlotDF=Mapdetails[["PlotDF"]],
+                   MapSizeRatio=Mapdetails[["MapSizeRatio"]],
+                   Xlim=Mapdetails[["Xlim"]],
+                   Ylim=Mapdetails[["Ylim"]], FileName=savedir,
+                   Year_Set=Year_Set, Years2Include=Years2Include,
+                   Rotate=Mapdetails[["Rotate"]],
+                   Cex=Mapdetails[["Cex"]],
+                   Legend=Mapdetails[["Legend"]],
+                   zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
+                   oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+  }
   plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
                   TmbData=TmbData )
   ## Some built-in maps
@@ -261,10 +264,10 @@ plot.vastfit <- function(results){
                       Legend=Mapdetails[["Legend"]],
                       zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
                       oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
-  Dens_DF = cbind( "Density"=as.vector(Dens_xt),
-                  "Year"=Year_Set[col(Dens_xt)],
-                  "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
-                  "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
+  ## Dens_DF = cbind( "Density"=as.vector(Dens_xt),
+  ##                 "Year"=Year_Set[col(Dens_xt)],
+  ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
+  ##                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
   Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
   ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
   plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
