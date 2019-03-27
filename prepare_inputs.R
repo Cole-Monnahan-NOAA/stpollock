@@ -79,7 +79,10 @@ if(model=='combined'){
   ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-   c_iz[,2] <- NA
+  if(!exists('combinedoff')) combinedoff <- FALSE
+  ## This is a switch to turn off the combined part and revert back to
+  ## standard multivariate model. For testing only.
+  if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
@@ -150,8 +153,8 @@ TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                    Aniso=FALSE)
 
 TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
-                         Version=Version,  RhoConfig=RhoConfig,
-                         loc_x=Spatial_List$loc_x, Method=Method,
+                       Version=Version,  RhoConfig=RhoConfig,
+                       loc_x=Spatial_List$loc_x, Method=Method,
                        TmbDir='models', Random="generate")
 TmbList0$Parameters$gamma1_ctp
 TmbList0$Map$gamma1_ctp
@@ -162,10 +165,10 @@ Params$Beta_mean2_c <- Params$Beta_mean2_c+5
 if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
-  Params$logSigmaM[1:3] <- c(.6,.7,.8)
-  Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  Params$logSigmaM[1:3] <- c(1,1,1)
+  ## Map$lambda1_k <- Map$lambda2_k <- factor(NA)
   ## Assume that the two ATS strata have the same observation error
-  Map$logSigmaM <- factor( cbind( c(NA,NA,NA), NA, NA) )
+  Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 } else {
   Params$L_beta1_z <- .4
   Params$L_beta2_z <- .4
