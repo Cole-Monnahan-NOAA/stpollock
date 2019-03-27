@@ -10,17 +10,84 @@ source("startup.R")
 
 
 ## Test combined spatial model
-n_x <- 200
-model <- 'combined'; space <- 'ST'
-model <- 'ats'; space <- 'ST'
+n_x <- 50
+model <- 'combined'; space <- 'NS'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
+options(warn=2) # stop on a warning
+##options(warn=1)
+
+## Loop through optimization one step at a time and save gradients and
+## parameter vectors.
+pars <- grads <- nlls <- list()
+pars[[1]] <- Obj$par
+grads[[1]] <-  Obj$gr(Obj$par)
+nlls[[1]] <- Obj$fn(Obj$par)
+for(i in 2:1000){
+  tmp <- nlminb(start=pars[[i-1]], objective=Obj$fn,
+                gradient=Obj$gr, lower=TmbList$Lower,
                 upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=1, control=list(trace=10))
-### TMBhelper::Check_Identifiable(Obj)
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
+                control=list(iter.max=1, trace=0))
+  pars[[i]] <- tmp$par
+  grads[[i]] <- Obj$gr(tmp$par)
+  nlls[[i]] <- Obj$fn(tmp$par)
+  if(tmp$convergence==0) break
+  print(paste(i, round(max(grads[[i]]),4)))
+}
+
+pars <- as.data.frame(do.call(rbind,pars))
+grads <- as.data.frame(do.call(rbind,grads))
+nlls <- do.call(c, nlls)
+maxgrads <- apply(grads, 1, function(x) max(abs(x)))
+names(Obj$par)[apply(grads, 1, which.max)]
+names(pars) <- names(grads) <-
+  paste0(1:length(Obj$par),"_", names(Obj$par))
+grads$iter <- pars$iter <- 1:nrow(grads)
+pars.long <- melt(pars[-1,], id.vars='iter')
+grads.long <- melt(grads[-1,], id.vars='iter')
+
+## Make some quick plots of these
+g <- ggplot(pars.long, aes(iter, value, group=variable, color=variable)) + geom_line()
+ggsave('testing/pars_S.png', g, width=7, height=5)
+g <- ggplot(pars.long, aes(iter, value, group=variable)) +
+  geom_line() + facet_wrap('variable', scales='free_y')
+ggsave('testing/pars_faceted_S.png', g, width=10, height=5)
+g <- ggplot(grads.long, aes(iter, value, group=variable, color=variable)) + geom_line()
+ggsave('testing/grads_S.png', g, width=7, height=5)
+g <- ggplot(grads.long, aes(iter, sign(value)*log10(abs(value)), group=variable)) +
+  geom_line() + facet_wrap('variable')
+ggsave('testing/log_grads_S.png', g, width=7, height=5)
+
+
+plot(nlls)
+plot(log10(maxgrads))
+
+prof <- tmbprofile(Obj, name=12)
+plot(prof)
+
+## Try rebuilding it with random effects turned off and variances at the
+## MLE
+Map$L_beta1_z <- factor(c(NA, NA, NA))
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
+                        Version=Version,  RhoConfig=RhoConfig,
+                        loc_x=Spatial_List$loc_x, Method=Method,
+                        Param=Params, TmbDir='models',
+                        Random=NULL, Map=Map)
+Obj  <-  TmbList[["Obj"]]
+Obj$env$beSilent()
+
+
+
+## Grab the last one run
+Obj$fn(Obj$env$last.par)
+Obj$gr(Obj$env$last.par)
+Report <- Obj$report(Obj$env$last.par)
+
+plot(Report$LogProb1_i)
+plot(Report$LogProb2_i)
+plot(log(Report$R2_i))
+plot(Report$log_R2
+plot(log(Report$D_gcy))
 
 
 

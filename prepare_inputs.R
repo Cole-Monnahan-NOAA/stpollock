@@ -79,7 +79,7 @@ if(model=='combined'){
   ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  ## c_iz[,2] <- NA
+   c_iz[,2] <- NA
   Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
@@ -128,9 +128,8 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    na.omit = "time-average")))
 ## Normalize depth and then add depth^2
 XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
-new  <- XX$Cov_xtp[,,1]^2
-XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
-XX <- NULL
+## new  <- XX$Cov_xtp[,,1]^2
+## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
 TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
@@ -164,7 +163,9 @@ if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
   Params$logSigmaM[1:3] <- c(.6,.7,.8)
-  ## Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  ## Assume that the two ATS strata have the same observation error
+  Map$logSigmaM <- factor( cbind( c(NA,NA,NA), NA, NA) )
 } else {
   Params$L_beta1_z <- .4
   Params$L_beta2_z <- .4
@@ -179,8 +180,6 @@ Params$gamma1_ctp
 
 ## Params$beta2_ft <- Params$beta2_ft+5
 ## if(model=='combined'){
-##   ## Assume that the two ATS strata have the same observation error
-##  ## Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 ##   ##  Map$beta1_ct <- factor(rep(1, 30))
 ##   ## Carefully build the catchability
 ##   ## Params$lambda1_k <- c(0,0)
@@ -248,7 +247,7 @@ MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','
 MatDat[is.infinite(MatDat)]  <-  NA
 ## Use consistent zlim for all three data types
 zlim <- range(MatDat, na.rm=TRUE)
-if(model=='combined'){
+if(model=='combined333'){
   message('Making data maps by gear type...')
   for(ii in 1:3){
     PlotMap_Fn(MappingDetails=mdl$MappingDetails,
