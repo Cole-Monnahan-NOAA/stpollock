@@ -17,28 +17,25 @@ source("startup.R")
 ## Test MCMC use bounds on L's given "close to MLE" crash point and run
 ## everything.
 
+
 ## Test combined spatial model
 n_x <- 50
 model <- 'combined'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
-set.seed(111)
+set.seed(112) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
 options(warn=2) # stop on a warning
 ## options(warn=1)
-Obj$env$silent <- FALSE
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
-
-
+## Check where problem occurred
 all <- Obj$env$last.par
 fixed <- all[-Obj$env$random]
-## Grab the last one run
 Obj$fn(fixed)
 Obj$gr(fixed)
-Report <- Obj$report(all)
-Report$jnll
+Obj$report(all)$jnll
 
 plot(Report$LogProb1_i)
 plot(Report$LogProb2_i)
@@ -50,7 +47,25 @@ matplot(Report$Omegainput2_sf)
 matplot(Report$beta1_tc)
 matplot(Report$beta2_tc)
 
+## Try using MCMC to see if it helps identify the issue
+options(warn=0)
+library(tmbstan)
+library(shinystan)
+## The only tricky part is getting the L's to be identifiable b/c of label
+## switching
+names(fixed) <- paste0(1:length(fixed),"_", names(fixed))
+sort(round(fixed[grep('L_', x=names(fixed))],1))
+lwr <- TmbList$Lower; upr <- TmbList$Upper
+upr[7] <- 0
+lwr[c(26,6,28)] <- 0
+inits <- function() all
+chains <- 6
+options(mc.cores = chains)
+fit <- tmbstan(Obj, lower=lwr, upper=upr, chains=chains,
+               iter=1000, open_progress=FALSE,
+               init=inits, control=list(max_treedepth=10))
 
+launch_shinystan(fit)
 
 ## Try to find a standard model that doesn't work to show Jim.
 
