@@ -19,10 +19,12 @@ results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 
 
-## Test bias adjustment for index
+## Test bias adjustment for index. Run this once then again with a slightly different n_x and change 
+## prepare_inputs to have epsilon rho = 0. Thus there's w & w/o bias correction on a model with and without a 
+## smoother on ST effects
 model <- 'combined'
-space <- 'S'
-n_x <- 50
+space <- 'ST'
+n_x <- 200
 savedir <- paste0(getwd(), '/bias_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5,

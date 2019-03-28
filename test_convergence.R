@@ -56,14 +56,13 @@ library(shinystan)
 names(fixed) <- paste0(1:length(fixed),"_", names(fixed))
 sort(round(fixed[grep('L_', x=names(fixed))],1))
 lwr <- TmbList$Lower; upr <- TmbList$Upper
-upr[7] <- 0
 lwr[c(26,6,28)] <- 0
 inits <- function() all
 chains <- 6
 options(mc.cores = chains)
 fit <- tmbstan(Obj, lower=lwr, upper=upr, chains=chains,
                iter=1000, open_progress=FALSE,
-               init=inits, control=list(max_treedepth=10))
+               init=inits, control=list(max_treedepth=12))
 
 launch_shinystan(fit)
 
@@ -72,12 +71,12 @@ launch_shinystan(fit)
 run.iteration <- function(seed){
   set.seed(seed)
   n_x <<- 50
-  model <<- 'combined'; space <<- 'NS'
+  model <<- 'combined'; space <<- 'ST'
+  combinedoff <<- FALSE
   savedir <<- paste0(getwd(), '/test_std_', seed)
   source('startup.R')
   source("prepare_inputs.R")
-  print(str(Obj))
-  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE,
+  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE,
                                   loopnum=5,
                                   upper=TmbList$Upper,  savedir=savedir,
                                   newtonsteps=0, control=list(iter.max=300, trace=1)),
@@ -86,11 +85,12 @@ run.iteration <- function(seed){
     return('failed')
   } else {
     return(Opt)
-  }
+    }
 }
 
 library(snowfall)
-chains <- cores <- 2
+cores <- 10
+chains <- cores*3
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 snowfall::sfExportAll()
@@ -103,7 +103,7 @@ out.parallel <-
 sfStop()
 
 which(out.parallel=='failed')
-sapply(out.parallel, function(x) x$objective)
+plot(sapply(out.parallel, function(x) x$max_gradient))
 
 
 ## Took the console trace output and processed it into Excel to read back
