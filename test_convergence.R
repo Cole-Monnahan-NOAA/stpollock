@@ -57,11 +57,11 @@ matplot(Report$beta2_tc)
 run.iteration <- function(seed){
   set.seed(seed)
   n_x <<- 50
-  model <<- 'combined'; space <<- 'NS'
+  model <<- 'combined'; space <<- 'ST'
+  combinedoff <<- TRUE
   savedir <<- paste0(getwd(), '/test_std_', seed)
   source('startup.R')
   source("prepare_inputs.R")
-  print(str(Obj))
   err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE,
                                   loopnum=5,
                                   upper=TmbList$Upper,  savedir=savedir,
@@ -75,7 +75,8 @@ run.iteration <- function(seed){
 }
 
 library(snowfall)
-chains <- cores <- 2
+cores <- 15
+chains <- cores*25
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 snowfall::sfExportAll()
@@ -88,7 +89,7 @@ out.parallel <-
 sfStop()
 
 which(out.parallel=='failed')
-sapply(out.parallel, function(x) x$objective)
+plot(sapply(out.parallel, function(x) x$max_gradient))
 
 
 ## Took the console trace output and processed it into Excel to read back
