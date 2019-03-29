@@ -22,20 +22,23 @@ source("startup.R")
 n_x <- 50
 model <- 'combined'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
-set.seed(112) ## seed 111 works for ST; 112 crashes out
+set.seed(111) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
 options(warn=2) # stop on a warning
-## options(warn=1)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
+options(warn=0)
 ## Check where problem occurred
 all <- Obj$env$last.par
 fixed <- all[-Obj$env$random]
 Obj$fn(fixed)
 Obj$gr(fixed)
 Obj$report(all)$jnll
+hes <- Obj$env$spHess(par=all, random=TRUE)
+evs <- eigen(hes)
+plot(log10(evs$values+1e-4))
 
 plot(Report$LogProb1_i)
 plot(Report$LogProb2_i)
@@ -107,33 +110,65 @@ plot(sapply(out.parallel, function(x) x$max_gradient))
 
 
 ## Took the console trace output and processed it into Excel to read back
-## in
-## pars <- read.table('testing/trace.csv', sep=',')
-pars <- read.table('testing/trace_nocombined.csv', sep=',')
-grads <- data.frame(t(apply(pars, 1, Obj$gr)))
-nlls <- apply(pars, 1, Obj$fn)
-names(grads) <- names(pars) <- paste0(1:length(Obj$par),"_", names(Obj$par))
-maxgrads <- apply(grads, 1, function(x) max(abs(x)))
-png('testing/convergence_ST_nocombined.png', width=7, height=5, units='in', res=500)
-par(mfrow=c(1,2))
-plot(nlls-min(nlls)); plot(log10(maxgrads))
-dev.off()
+## in. Did this for a failed and successful run to compare. This takes like
+## half an hour to run (maybe more?)
+pars0 <- read.table('testing/trace_crash.csv', sep=',')
+grads0 <- jnll0 <- mnll0 <- list()
+for(i in 1:nrow(pars0)){
+  p  <- as.numeric(pars0[i,])
+  mnll0[[i]] <-  as.numeric(Obj$fn(p))
+  grads0[[i]] <- Obj$gr(p)
+  jnll0[[i]] <- Obj$report(Obj$env$last.par)$jnll
+  print(i)
+}
+mnll0 <- do.call(c, mnll0)
+grads0 <- as.data.frame(do.call(rbind, grads0))
+jnll0 <- do.call(c, jnll0)
+names(grads0) <- names(pars0) <- paste0(1:length(Obj$par),"_", names(Obj$par))
+maxgrads0 <- apply(grads0, 1, function(x) max(abs(x)))
+grads0$iter <- pars0$iter <- 1:nrow(grads0)
+pars0.long <- melt(pars0, id.vars='iter', value.name='value')
+grads0.long <- melt(grads0, id.vars='iter', value.name='gradient')
 
-grads$iter <- pars$iter <- 1:nrow(grads)
-pars.long <- melt(pars[-1,], id.vars='iter', value.name='fn')
-grads.long <- melt(grads[-1,], id.vars='iter', value.name='gr')
-## Make some quick plots of these
-g <- ggplot(pars.long, aes(iter, fn, group=variable, color=variable)) + geom_line()
-ggsave('testing/pars_ST_nocombined.png', g, width=7, height=5)
-g <- ggplot(pars.long, aes(iter, fn, group=variable)) +
-  geom_line() + facet_wrap('variable', scales='free_y')
-ggsave('testing/pars_faceted_ST_nocombined.png', g, width=10, height=5)
-g <- ggplot(grads.long, aes(iter, gr, group=variable, color=variable)) +
-  geom_line()
-ggsave('testing/grads_ST_nocombined.png', g, width=7, height=5)
-g <- ggplot(grads.long, aes(iter, sign(gr)*log10(abs(gr)), group=variable)) +
-  geom_line() + facet_wrap('variable') + geom_abline(intercept=0, slope=0, color='red')
-ggsave('testing/log_grads_ST_nocombined.png', g, width=7, height=5)
+pars1 <- read.table('testing/trace_nocrash.csv', sep=',')
+grads1 <- jnll1 <- mnll1 <- list()
+for(i in 1:nrow(pars1)){
+  p  <- as.numeric(pars1[i,])
+  mnll1[[i]] <-  as.numeric(Obj$fn(p))
+  grads1[[i]] <- Obj$gr(p)
+  jnll1[[i]] <- Obj$report(Obj$env$last.par)$jnll
+  print(i)
+}
+
+mnll1 <- do.call(c, mnll1)
+grads1 <- as.data.frame(do.call(rbind, grads1))
+jnll1 <- do.call(c, jnll1)
+names(grads1) <- names(pars1) <- paste0(1:length(Obj$par),"_", names(Obj$par))
+maxgrads1 <- apply(grads1, 1, function(x) max(abs(x)))
+grads1$iter <- pars1$iter <- 1:nrow(grads1)
+pars1.long <- melt(pars1, id.vars='iter', value.name='value')
+grads1.long <- melt(grads1, id.vars='iter', value.name='gradient')
+
+## Now combine them together and make plots
+pars.long <- rbind(cbind(converged=FALSE, pars0.long),
+                   cbind(converged=TRUE, pars1.long))
+g <- ggplot(pars.long, aes(iter, value, color=converged)) + geom_line(lwd=2,alpha=.5) +
+                   facet_wrap('variable', scales='free_y') + theme_bw()
+ggsave('testing/pars_crash_nocrash.png', g, width=12, height=7)
+grads.long <- rbind(cbind(converged=FALSE, grads0.long),
+                   cbind(converged=TRUE, grads1.long))
+g <- ggplot(grads.long, aes(iter, gradient, color=converged)) + geom_line(lwd=2,alpha=.5) +
+                   facet_wrap('variable', scales='free_y') + theme_bw() +
+  geom_abline(slope=0, intercept=0)
+ggsave('testing/grads_crash_nocrash.png', g, width=12, height=7)
+
+likes <- as.data.frame(rbind(data.frame(iter=1:length(jnll0), converged=FALSE, joint=jnll0, marginal=mnll0),
+               data.frame(iter=1:length(jnll1), converged=TRUE, joint=jnll1, marginal=mnll1)))
+likes.long <- melt(likes, id.vars=c('iter', 'converged'),
+               value.name='negloglike', variable.name='type')
+g <- ggplot(likes.long, aes(iter, negloglike, color=converged))+ geom_line(lwd=2) +
+  facet_wrap('type', scales='free_y', ncol=1)
+ggsave('testing/nlls_crash_nocrash.png', g, width=7, height=5)
 
 
 ## Try rebuilding it with random effects turned off and variances at the
