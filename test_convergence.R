@@ -22,7 +22,7 @@ source("startup.R")
 n_x <- 50
 model <- 'combined'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
-set.seed(111) ## seed 111 works for ST; 112 crashes out
+set.seed(112) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
 options(warn=2) # stop on a warning
@@ -49,6 +49,75 @@ matplot(Report$Omegainput1_sf)
 matplot(Report$Omegainput2_sf)
 matplot(Report$beta1_tc)
 matplot(Report$beta2_tc)
+
+## Try rebuilding it with LA turned off and fixed effects at the MLE
+Map$L_beta1_z <- factor(c(NA, NA, NA))
+Map$L_epsilon1_z <- factor(rep(NA,5))
+Map$lambda1_k <- factor(Params$lambda1_k*NA)
+Params$lambda1_k <- fixed['lambda1_k']
+Map$L_omega1_z <- factor(Params$L_omega1_z*NA)
+Params$L_omega1_z <- fixed[grep('L_omega1_z', x=names(fixed))]
+Map$L_epsilon1_z <- factor(Params$L_epsilon1_z*NA)
+Params$L_epsilon1_z <- fixed[grep('L_epsilon1_z', x=names(fixed))]
+Map$L_beta1_z <- factor(Params$L_beta1_z*NA)
+Params$L_beta1_z <- fixed[grep('L_beta1_z', x=names(fixed))]
+Map$logkappa1 <- factor(Params$logkappa1*NA)
+Params$logkappa1 <- fixed[grep('logkappa1', x=names(fixed))]
+Map$Beta_mean1_c <- factor(Params$Beta_mean1_c*NA)
+Params$Beta_mean1_c <- fixed[grep('Beta_mean1_c', x=names(fixed))]
+Map$Beta_rho1_f <- factor(Params$Beta_rho1_f*NA)
+Params$Beta_rho1_f <- fixed[grep('Beta_rho1_f', x=names(fixed))]
+Map$lambda2_k <- factor(Params$lambda2_k*NA)
+Params$lambda2_k <- fixed[grep('lambda2_k', x=names(fixed))]
+Map$L_omega2_z <- factor(Params$L_omega2_z*NA)
+Params$L_omega2_z <- fixed[grep('L_omega2_z', x=names(fixed))]
+Map$logkappa2 <- factor(Params$logkappa2*NA)
+Params$logkappa2 <- fixed[grep('logkappa2', x=names(fixed))]
+## This one is different
+Map$beta2_ft <- factor(as.numeric(TmbList0$Map$beta2_ft) * NA)
+Params$beta2_ft <- matrix(fixed[grep('beta2_ft', x=names(fixed))][TmbList0$Map$beta2_ft],nrow=3)
+Map$logSigmaM <- factor(Params$logSigmaM*NA)
+TmbList0$Parameters$logSigmaM
+Params$logSigmaM <- TmbList0$Parameters$logSigmaM
+Params$logSigmaM[1,1] <- fixed[grep('logSigmaM', x=names(fixed))][1]
+Params$logSigmaM[2:3,1] <- fixed[grep('logSigmaM', x=names(fixed))][2]
+Map$Epsilon_rho1_f <- factor(c(NA, NA))
+Params$Epsilon_rho1_f <- rep(fixed[grep('Epsilon_rho1_f', x=names(fixed))],2)
+Map$Beta_rho1_f <- factor(c(NA, NA,NA))
+Params$Beta_rho1_f <- rep(fixed[grep('Beta_rho1_f', x=names(fixed))],3)
+Params$Epsiloninput1_sft <-
+  array(all[grep('Epsiloninput1_sft', names(all))], dim=c(66,2,12))
+Params$Omegainput1_sf <-  matrix(all[grep('Omegainput1_sf', names(all))],
+                                 nrow=66, ncol=3)
+Params$Omegainput2_sf <-  matrix(all[grep('Omegainput2_sf', names(all))],
+                                 nrow=66, ncol=3)
+
+for(i in 1:length(Map)){
+  print(names(Map)[i])
+  print(length(Params[[names(Map)[i]]]))
+  print(length(Map[[i]]))
+#  print(length(TmbList0$Map[[i]]))
+}
+
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
+                      Version=Version,  RhoConfig=RhoConfig,
+                      loc_x=Spatial_List$loc_x, Method=Method,
+                      Param=Params, TmbDir='models',
+                      Random=NULL, Map=Map)
+Obj2  <-  TmbList[["Obj"]]
+Obj2$env$beSilent()
+Obj2$fn()
+grs <- as.numeric(Obj2$gr())
+plot(grs[1:50])
+abline(v=36)
+
+## Try optimizing just out of curiosity
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(trace=20))
+
+
+
 
 ## Try using MCMC to see if it helps identify the issue
 options(warn=0)
@@ -171,23 +240,6 @@ g <- ggplot(likes.long, aes(iter, negloglike, color=converged))+ geom_line(lwd=2
 ggsave('testing/nlls_crash_nocrash.png', g, width=7, height=5)
 
 
-## Try rebuilding it with random effects turned off and variances at the
-## MLE
-Map$L_beta1_z <- factor(c(NA, NA, NA))
-Map$L_epsilon1_z <- factor(rep(NA,5))
-Params$L_epsilon1_z  <- c(-0.8258647,-0.4384401,-0.2161642, 0.9626192, 0.5119802)
-TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
-                      Version=Version,  RhoConfig=RhoConfig,
-                      loc_x=Spatial_List$loc_x, Method=Method,
-                      Param=Params, TmbDir='models',
-                      Random=c('beta1_ft', 'Omegainput1_sf',
-                               'Omegainput2_sf'),
-                      Map=Map)
-Obj  <-  TmbList[["Obj"]]
-Obj$env$beSilent()
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=10))
 
 
 
