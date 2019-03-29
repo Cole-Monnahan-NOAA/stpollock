@@ -124,20 +124,28 @@ options(warn=0)
 library(tmbstan)
 library(shinystan)
 ## The only tricky part is getting the L's to be identifiable b/c of label
-## switching
-names(fixed) <- paste0(1:length(fixed),"_", names(fixed))
-sort(round(fixed[grep('L_', x=names(fixed))],1))
+## switching. I think if I set the diagonals to be positive everything else
+## will fall into place
+names(all) <- paste0(1:length(all),"_", names(all))
+names(all)[grep('L_', x=names(all))]
 lwr <- TmbList$Lower; upr <- TmbList$Upper
-lwr[c(26,6,28)] <- 0
+lwr[c(38,40,43)] <- 0 # digonal for L_omega1_z n_f=3
+lwr[c(44,46)] <- 0 # digonal for L_epsilon_z which is n_f=2
+lwr[c(1844,1846,1849)] <- 0 # diagonal for L_omega2_z n_f=3
+lwr[c(49,50,51)] <- 0 # sd for the temporal rw on beta1s
+## make sure inits are positive
+all[c(38,40,43,44,46,1844,1846,1849,49,50,51)] <-
+  abs(all[c(38,40,43,44,46,1844,1846,1849,49,50,51)])
+
 inits <- function() all
-chains <- 6
+chains <- 7
 options(mc.cores = chains)
 fit <- tmbstan(Obj, lower=lwr, upper=upr, chains=chains,
-               iter=1000, open_progress=FALSE,
-               init=inits, control=list(max_treedepth=12))
-
+               iter=2000, open_progress=FALSE,
+               init=inits, control=list(max_treedepth=10))
+saveRDS(object = fit, file='fit.RDS')
+fit <- readRDS('fit.RDS')
 launch_shinystan(fit)
-
 ## Try to find a standard model that doesn't work to show Jim.
 
 run.iteration <- function(seed){
@@ -148,21 +156,22 @@ run.iteration <- function(seed){
   savedir <<- paste0(getwd(), '/test_std_', seed)
   source('startup.R')
   source("prepare_inputs.R")
-  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE,
-                                  loopnum=5,
+  options(warn=2) # stop immediately on NaN warning to save time
+  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE,
+                                  loopnum=3,
                                   upper=TmbList$Upper,  savedir=savedir,
-                                  newtonsteps=0, control=list(iter.max=300, trace=1)),
+                                  newtonsteps=0, control=list(iter.max=120, trace=1)),
                   error=function(e) NULL)
   if(is.null(err)){
     return('failed')
   } else {
-    return(Opt)
+    return(Opt[c( 'max_gradient', 'objective', 'par')])
     }
 }
 
 library(snowfall)
 cores <- 10
-chains <- cores*3
+chains <- cores*30
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 snowfall::sfExportAll()
@@ -175,7 +184,8 @@ out.parallel <-
 sfStop()
 
 which(out.parallel=='failed')
-plot(sapply(out.parallel, function(x) x$max_gradient))
+mean(out.parallel=='failed')
+(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
 
 
 ## Took the console trace output and processed it into Excel to read back
