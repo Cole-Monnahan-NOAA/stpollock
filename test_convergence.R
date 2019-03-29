@@ -84,21 +84,22 @@ run.iteration <- function(seed){
   savedir <<- paste0(getwd(), '/test_std_', seed)
   source('startup.R')
   source("prepare_inputs.R")
-  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE,
-                                  loopnum=5,
+  options(warn=2) # stop immediately on NaN warning to save time
+  err <- tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE,
+                                  loopnum=3,
                                   upper=TmbList$Upper,  savedir=savedir,
-                                  newtonsteps=0, control=list(iter.max=300, trace=1)),
+                                  newtonsteps=0, control=list(iter.max=120, trace=1)),
                   error=function(e) NULL)
   if(is.null(err)){
     return('failed')
   } else {
-    return(Opt)
+    return(Opt[c( 'max_gradient', 'objective', 'par')])
     }
 }
 
 library(snowfall)
 cores <- 10
-chains <- cores*3
+chains <- cores*30
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 snowfall::sfExportAll()
@@ -111,7 +112,8 @@ out.parallel <-
 sfStop()
 
 which(out.parallel=='failed')
-plot(sapply(out.parallel, function(x) x$max_gradient))
+mean(out.parallel=='failed')
+(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
 
 
 ## Took the console trace output and processed it into Excel to read back
