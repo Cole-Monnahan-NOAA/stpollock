@@ -26,16 +26,19 @@ set.seed(112) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
 options(warn=2) # stop on a warning
-## options(warn=1)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
+options(warn=0)
 ## Check where problem occurred
 all <- Obj$env$last.par
 fixed <- all[-Obj$env$random]
 Obj$fn(fixed)
 Obj$gr(fixed)
 Obj$report(all)$jnll
+hes <- Obj$env$spHess(par=all, random=TRUE)
+evs <- eigen(hes)
+plot(log10(evs$values+1e-4))
 
 plot(Report$LogProb1_i)
 plot(Report$LogProb2_i)
@@ -46,6 +49,75 @@ matplot(Report$Omegainput1_sf)
 matplot(Report$Omegainput2_sf)
 matplot(Report$beta1_tc)
 matplot(Report$beta2_tc)
+
+## Try rebuilding it with LA turned off and fixed effects at the MLE
+Map$L_beta1_z <- factor(c(NA, NA, NA))
+Map$L_epsilon1_z <- factor(rep(NA,5))
+Map$lambda1_k <- factor(Params$lambda1_k*NA)
+Params$lambda1_k <- fixed['lambda1_k']
+Map$L_omega1_z <- factor(Params$L_omega1_z*NA)
+Params$L_omega1_z <- fixed[grep('L_omega1_z', x=names(fixed))]
+Map$L_epsilon1_z <- factor(Params$L_epsilon1_z*NA)
+Params$L_epsilon1_z <- fixed[grep('L_epsilon1_z', x=names(fixed))]
+Map$L_beta1_z <- factor(Params$L_beta1_z*NA)
+Params$L_beta1_z <- fixed[grep('L_beta1_z', x=names(fixed))]
+Map$logkappa1 <- factor(Params$logkappa1*NA)
+Params$logkappa1 <- fixed[grep('logkappa1', x=names(fixed))]
+Map$Beta_mean1_c <- factor(Params$Beta_mean1_c*NA)
+Params$Beta_mean1_c <- fixed[grep('Beta_mean1_c', x=names(fixed))]
+Map$Beta_rho1_f <- factor(Params$Beta_rho1_f*NA)
+Params$Beta_rho1_f <- fixed[grep('Beta_rho1_f', x=names(fixed))]
+Map$lambda2_k <- factor(Params$lambda2_k*NA)
+Params$lambda2_k <- fixed[grep('lambda2_k', x=names(fixed))]
+Map$L_omega2_z <- factor(Params$L_omega2_z*NA)
+Params$L_omega2_z <- fixed[grep('L_omega2_z', x=names(fixed))]
+Map$logkappa2 <- factor(Params$logkappa2*NA)
+Params$logkappa2 <- fixed[grep('logkappa2', x=names(fixed))]
+## This one is different
+Map$beta2_ft <- factor(as.numeric(TmbList0$Map$beta2_ft) * NA)
+Params$beta2_ft <- matrix(fixed[grep('beta2_ft', x=names(fixed))][TmbList0$Map$beta2_ft],nrow=3)
+Map$logSigmaM <- factor(Params$logSigmaM*NA)
+TmbList0$Parameters$logSigmaM
+Params$logSigmaM <- TmbList0$Parameters$logSigmaM
+Params$logSigmaM[1,1] <- fixed[grep('logSigmaM', x=names(fixed))][1]
+Params$logSigmaM[2:3,1] <- fixed[grep('logSigmaM', x=names(fixed))][2]
+Map$Epsilon_rho1_f <- factor(c(NA, NA))
+Params$Epsilon_rho1_f <- rep(fixed[grep('Epsilon_rho1_f', x=names(fixed))],2)
+Map$Beta_rho1_f <- factor(c(NA, NA,NA))
+Params$Beta_rho1_f <- rep(fixed[grep('Beta_rho1_f', x=names(fixed))],3)
+Params$Epsiloninput1_sft <-
+  array(all[grep('Epsiloninput1_sft', names(all))], dim=c(66,2,12))
+Params$Omegainput1_sf <-  matrix(all[grep('Omegainput1_sf', names(all))],
+                                 nrow=66, ncol=3)
+Params$Omegainput2_sf <-  matrix(all[grep('Omegainput2_sf', names(all))],
+                                 nrow=66, ncol=3)
+
+for(i in 1:length(Map)){
+  print(names(Map)[i])
+  print(length(Params[[names(Map)[i]]]))
+  print(length(Map[[i]]))
+#  print(length(TmbList0$Map[[i]]))
+}
+
+TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
+                      Version=Version,  RhoConfig=RhoConfig,
+                      loc_x=Spatial_List$loc_x, Method=Method,
+                      Param=Params, TmbDir='models',
+                      Random=NULL, Map=Map)
+Obj2  <-  TmbList[["Obj"]]
+Obj2$env$beSilent()
+Obj2$fn()
+grs <- as.numeric(Obj2$gr())
+plot(grs[1:50])
+abline(v=36)
+
+## Try optimizing just out of curiosity
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(trace=20))
+
+
+
 
 ## Try using MCMC to see if it helps identify the issue
 options(warn=0)
@@ -127,52 +199,67 @@ write.csv(file='convergence.csv', x=t(sapply(out.parallel[out.parallel!='failed'
 
 
 ## Took the console trace output and processed it into Excel to read back
-## in
-## pars <- read.table('testing/trace.csv', sep=',')
-pars <- read.table('testing/trace_nocombined.csv', sep=',')
-grads <- data.frame(t(apply(pars, 1, Obj$gr)))
-nlls <- apply(pars, 1, Obj$fn)
-names(grads) <- names(pars) <- paste0(1:length(Obj$par),"_", names(Obj$par))
-maxgrads <- apply(grads, 1, function(x) max(abs(x)))
-png('testing/convergence_ST_nocombined.png', width=7, height=5, units='in', res=500)
-par(mfrow=c(1,2))
-plot(nlls-min(nlls)); plot(log10(maxgrads))
-dev.off()
+## in. Did this for a failed and successful run to compare. This takes like
+## half an hour to run (maybe more?)
+pars0 <- read.table('testing/trace_crash.csv', sep=',')
+grads0 <- jnll0 <- mnll0 <- list()
+for(i in 1:nrow(pars0)){
+  p  <- as.numeric(pars0[i,])
+  mnll0[[i]] <-  as.numeric(Obj$fn(p))
+  grads0[[i]] <- Obj$gr(p)
+  jnll0[[i]] <- Obj$report(Obj$env$last.par)$jnll
+  print(i)
+}
+mnll0 <- do.call(c, mnll0)
+grads0 <- as.data.frame(do.call(rbind, grads0))
+jnll0 <- do.call(c, jnll0)
+names(grads0) <- names(pars0) <- paste0(1:length(Obj$par),"_", names(Obj$par))
+maxgrads0 <- apply(grads0, 1, function(x) max(abs(x)))
+grads0$iter <- pars0$iter <- 1:nrow(grads0)
+pars0.long <- melt(pars0, id.vars='iter', value.name='value')
+grads0.long <- melt(grads0, id.vars='iter', value.name='gradient')
 
-grads$iter <- pars$iter <- 1:nrow(grads)
-pars.long <- melt(pars[-1,], id.vars='iter', value.name='fn')
-grads.long <- melt(grads[-1,], id.vars='iter', value.name='gr')
-## Make some quick plots of these
-g <- ggplot(pars.long, aes(iter, fn, group=variable, color=variable)) + geom_line()
-ggsave('testing/pars_ST_nocombined.png', g, width=7, height=5)
-g <- ggplot(pars.long, aes(iter, fn, group=variable)) +
-  geom_line() + facet_wrap('variable', scales='free_y')
-ggsave('testing/pars_faceted_ST_nocombined.png', g, width=10, height=5)
-g <- ggplot(grads.long, aes(iter, gr, group=variable, color=variable)) +
-  geom_line()
-ggsave('testing/grads_ST_nocombined.png', g, width=7, height=5)
-g <- ggplot(grads.long, aes(iter, sign(gr)*log10(abs(gr)), group=variable)) +
-  geom_line() + facet_wrap('variable') + geom_abline(intercept=0, slope=0, color='red')
-ggsave('testing/log_grads_ST_nocombined.png', g, width=7, height=5)
+pars1 <- read.table('testing/trace_nocrash.csv', sep=',')
+grads1 <- jnll1 <- mnll1 <- list()
+for(i in 1:nrow(pars1)){
+  p  <- as.numeric(pars1[i,])
+  mnll1[[i]] <-  as.numeric(Obj$fn(p))
+  grads1[[i]] <- Obj$gr(p)
+  jnll1[[i]] <- Obj$report(Obj$env$last.par)$jnll
+  print(i)
+}
+
+mnll1 <- do.call(c, mnll1)
+grads1 <- as.data.frame(do.call(rbind, grads1))
+jnll1 <- do.call(c, jnll1)
+names(grads1) <- names(pars1) <- paste0(1:length(Obj$par),"_", names(Obj$par))
+maxgrads1 <- apply(grads1, 1, function(x) max(abs(x)))
+grads1$iter <- pars1$iter <- 1:nrow(grads1)
+pars1.long <- melt(pars1, id.vars='iter', value.name='value')
+grads1.long <- melt(grads1, id.vars='iter', value.name='gradient')
+
+## Now combine them together and make plots
+pars.long <- rbind(cbind(converged=FALSE, pars0.long),
+                   cbind(converged=TRUE, pars1.long))
+g <- ggplot(pars.long, aes(iter, value, color=converged)) + geom_line(lwd=2,alpha=.5) +
+                   facet_wrap('variable', scales='free_y') + theme_bw()
+ggsave('testing/pars_crash_nocrash.png', g, width=12, height=7)
+grads.long <- rbind(cbind(converged=FALSE, grads0.long),
+                   cbind(converged=TRUE, grads1.long))
+g <- ggplot(grads.long, aes(iter, gradient, color=converged)) + geom_line(lwd=2,alpha=.5) +
+                   facet_wrap('variable', scales='free_y') + theme_bw() +
+  geom_abline(slope=0, intercept=0)
+ggsave('testing/grads_crash_nocrash.png', g, width=12, height=7)
+
+likes <- as.data.frame(rbind(data.frame(iter=1:length(jnll0), converged=FALSE, joint=jnll0, marginal=mnll0),
+               data.frame(iter=1:length(jnll1), converged=TRUE, joint=jnll1, marginal=mnll1)))
+likes.long <- melt(likes, id.vars=c('iter', 'converged'),
+               value.name='negloglike', variable.name='type')
+g <- ggplot(likes.long, aes(iter, negloglike, color=converged))+ geom_line(lwd=2) +
+  facet_wrap('type', scales='free_y', ncol=1)
+ggsave('testing/nlls_crash_nocrash.png', g, width=7, height=5)
 
 
-## Try rebuilding it with random effects turned off and variances at the
-## MLE
-Map$L_beta1_z <- factor(c(NA, NA, NA))
-Map$L_epsilon1_z <- factor(rep(NA,5))
-Params$L_epsilon1_z  <- c(-0.8258647,-0.4384401,-0.2161642, 0.9626192, 0.5119802)
-TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
-                      Version=Version,  RhoConfig=RhoConfig,
-                      loc_x=Spatial_List$loc_x, Method=Method,
-                      Param=Params, TmbDir='models',
-                      Random=c('beta1_ft', 'Omegainput1_sf',
-                               'Omegainput2_sf'),
-                      Map=Map)
-Obj  <-  TmbList[["Obj"]]
-Obj$env$beSilent()
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=10))
 
 
 
