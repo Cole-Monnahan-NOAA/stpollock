@@ -54,28 +54,34 @@ library(shinystan)
 ## The only tricky part is getting the L's to be identifiable b/c of label
 ## switching. I think if I set the diagonals to be positive everything else
 ## will fall into place
-names(all) <- paste0(1:length(all),"_", names(all))
-names(all)[grep('L_', x=names(all))]
-lwr <- TmbList$Lower; upr <- TmbList$Upper
+lwr <- rep(-Inf, length(all)); upr <- -1*lwr
+names(lwr) <- names(upr) <- names(all)
+lwr[which(names(all) %in% names(TmbList$Lower))] <- TmbList$Lower
+upr[which(names(all) %in% names(TmbList$Upper))] <- TmbList$Upper
+## Now the variances
+## names(all) <- paste0(1:length(all),"_", names(all))
+## names(all)[grep('L_', x=names(all))]
 lwr[c(38,40,43)] <- 0 # digonal for L_omega1_z n_f=3
 lwr[c(44,46)] <- 0 # digonal for L_epsilon_z which is n_f=2
 lwr[c(1844,1846,1849)] <- 0 # diagonal for L_omega2_z n_f=3
 lwr[c(49,50,51)] <- 0 # sd for the temporal rw on beta1s
-## make sure inits are positive
+## make sure inits are positive for the random effects, the difference in
+## index is b/c the order in all is not the same
 all[c(38,40,43,44,46,1844,1846,1849,49,50,51)] <-
   abs(all[c(38,40,43,44,46,1844,1846,1849,49,50,51)])
-
 inits <- function() all
 chains <- 7
 options(mc.cores = chains)
 fit <- tmbstan(Obj, lower=lwr, upper=upr, chains=chains,
-               iter=2000, open_progress=FALSE,
-               init=inits, control=list(max_treedepth=10))
+               iter=1000, open_progress=FALSE,
+               init=inits, control=list(max_treedepth=7))
 saveRDS(object = fit, file='fit.RDS')
 fit <- readRDS('fit.RDS')
 launch_shinystan(fit)
-## Try to find a standard model that doesn't work to show Jim.
 
+
+
+## Try to find a standard model that doesn't work to show Jim.
 run.iteration <- function(seed){
   set.seed(seed)
   n_x <<- 50
@@ -111,9 +117,13 @@ out.parallel <-
   run.iteration(i))
 sfStop()
 
+
 which(out.parallel=='failed')
 mean(out.parallel=='failed')
-(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
+plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
+plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$objective}))
+write.csv(file='convergence.csv', x=t(sapply(out.parallel[out.parallel!='failed'],
+            function(x) rbind(x$objective, x$max_gradient))))
 
 
 ## Took the console trace output and processed it into Excel to read back
