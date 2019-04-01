@@ -145,13 +145,31 @@ inits <- function() all
 chains <- 7
 options(mc.cores = chains)
 fit <- tmbstan(Obj, lower=lwr, upper=upr, chains=chains,
-               iter=1000, open_progress=FALSE,
-               init=inits, control=list(max_treedepth=7))
+               iter=1200, open_progress=FALSE,
+               init=inits, control=list(max_treedepth=12))
 saveRDS(object = fit, file='fit.RDS')
 fit <- readRDS('fit.RDS')
 launch_shinystan(fit)
 
+mon <- monitor(fit, print=FALSE)
+stanpars <- dimnames(mon)[[1]]
+slow <- sort(mon[,'n_eff'])[1:200]
+barplot(slow)
+png('testing/mcmc_pairs_slow.png', width=12, height=7, units='in', res=500)
+slow <- names(sort(mon[,'n_eff'])[1:10])
+pairs(fit, pars=slow)
+dev.off()
+png('testing/mcmc_pairs.png', width=7, height=5, units='in', res=500)
+pairs(fit, pars=c('logkappa1','logkappa2', 'beta2_ft[1]', 'beta2_ft[2]',
+                  'beta2_ft[3]', 'Epsilon_rho1_f', 'Beta_rho1_f', 'lp__'))
+dev.off()
 
+for(ii in 1:3){
+png(paste0('testing/mcmc_pairs_beta1_ft_',ii,'.png'), width=15, height=10, units='in', res=500)
+pars <- stanpars[grep('beta1_ft', stanpars)][seq(1,34, by=3)+ii-1]
+pairs(fit, pars=pars)
+dev.off()
+}
 
 ## Try to find a standard model that doesn't work to show Jim.
 run.iteration <- function(seed){
@@ -172,10 +190,11 @@ run.iteration <- function(seed){
     all <- Obj$env$last.par
     fixed <- all[-Obj$env$random]
     ## Crashed out so save par values to test where
-    out <- list(crashed=TRUE, all=all, fixed=fixed)
+    out <- list(crashed=TRUE, all=all, fixed=fixed, init=Obj$par)
     return(out)
   } else {
-    return(c(crashed=FALSE, Opt[c( 'max_gradient', 'objective', 'par')]))
+    out <- c(crashed=FALSE, Opt[c( 'max_gradient', 'objective', 'par')], init=Obj$par)
+    return(out)
   }
   dyn.unload(dynlib(paste0(savedir,'/VAST_v8_0_0')))
   unlink(savedir, recursive=TRUE)
@@ -183,27 +202,33 @@ run.iteration <- function(seed){
 
 library(snowfall)
 cores <- 10
-chains <- cores*1
-sfStop()
+chains <- cores*30
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
-snowfall::sfExportAll()
-sfLibrary(VAST)
-sfLibrary(TMB)
-out.parallel <-
-  sfLapply(1:chains, function(i)
-  ##lapply(1:chains, function(i)
-  run.iteration(i))
+sfExport('run.iteration')
+out.parallel <- sfLapply(1:chains, function(i) run.iteration(i))
 sfStop()
 
-
-which(out.parallel=='failed')
-mean(out.parallel=='failed')
-plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
-plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$objective}))
-parsall <- sapply(out.parallel[out.parallel!='failed'], function(x) {x$par})
-write.csv(file='convergence.csv', x=t(sapply(out.parallel[out.parallel!='failed'],
+## First look at converged cases
+conv.ind <- which(sapply(out.parallel, function(x) !x$crashed))
+plot(sapply(out.parallel[conv.ind], function(x) x$max_gradient))
+plot(sapply(out.parallel[conv.ind], function(x) x$objective))
+parsall1 <- t(sapply(out.parallel[conv.ind], function(x) x$par))
+write.csv(file='convergence.csv', x=t(sapply(out.parallel[conv.ind],
             function(x) rbind(x$objective, x$max_gradient))))
+## Now at the crashed cases
+crash.ind <- -conv.ind
+xx <- out.parallel[crash.ind]
+parsall0 <- t(sapply(xx, function(x) x$fixed))
 
+parsall <- rbind(parsall0, parsall1)
+cols <- c(rep('black', nrow(parsall0)), rep('red', nrow(parsall1)))
+
+png('testing/random_inits1.png', width=12, height=10, units='in', res=500)
+pairs(parsall[,1:16], col=cols, pch=16)
+dev.off()
+png('testing/random_inits2.png', width=12, height=10, units='in', res=500)
+pairs(parsall[,-(1:16)], col=cols, pch=16)
+dev.off()
 
 ## Took the console trace output and processed it into Excel to read back
 ## in. Did this for a failed and successful run to compare. This takes like
