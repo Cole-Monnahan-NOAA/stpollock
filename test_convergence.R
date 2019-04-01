@@ -159,7 +159,7 @@ run.iteration <- function(seed){
   n_x <<- 50
   model <<- 'combined'; space <<- 'ST'
   combinedoff <<- FALSE
-  savedir <<- paste0(getwd(), '/test_std_', seed)
+  savedir <<- paste0(getwd(), '/testing/test_std_', seed)
   source('startup.R')
   source("prepare_inputs.R")
   options(warn=2) # stop immediately on NaN warning to save time
@@ -169,15 +169,21 @@ run.iteration <- function(seed){
                                   newtonsteps=0, control=list(iter.max=120, trace=1)),
                   error=function(e) NULL)
   if(is.null(err)){
-    return('failed')
+    all <- Obj$env$last.par
+    fixed <- all[-Obj$env$random]
+    ## Crashed out so save par values to test where
+    out <- list(crashed=TRUE, all=all, fixed=fixed)
+    return(out)
   } else {
-    return(Opt[c( 'max_gradient', 'objective', 'par')])
-    }
+    return(c(crashed=FALSE, Opt[c( 'max_gradient', 'objective', 'par')]))
+  }
+  dyn.unload(dynlib(paste0(savedir,'/VAST_v8_0_0')))
+  unlink(savedir, recursive=TRUE)
 }
 
 library(snowfall)
 cores <- 10
-chains <- cores*30
+chains <- cores*1
 sfStop()
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 snowfall::sfExportAll()
@@ -194,6 +200,7 @@ which(out.parallel=='failed')
 mean(out.parallel=='failed')
 plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$max_gradient}))
 plot(sapply(out.parallel[out.parallel!='failed'], function(x) {x$objective}))
+parsall <- sapply(out.parallel[out.parallel!='failed'], function(x) {x$par})
 write.csv(file='convergence.csv', x=t(sapply(out.parallel[out.parallel!='failed'],
             function(x) rbind(x$objective, x$max_gradient))))
 
