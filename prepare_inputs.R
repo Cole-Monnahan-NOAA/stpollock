@@ -33,7 +33,7 @@ FieldConfig <- matrix(c("Omega1"=ifelse(space=='NS', 0,n_f),
 ## For now using IID for combined model and temporal on ATS/BTS since
 ## missing years there.
 x <- switch(model, combined=4, ats=4, bts=4)
-RhoConfig <- c("Beta1"=x, "Beta2"=3, "Epsilon1"=ifelse(space=='ST', 4,0), "Epsilon2"=0)
+RhoConfig <- c("Beta1"=x, "Beta2"=3, "Epsilon1"=ifelse(space=='ST', x,0), "Epsilon2"=0)
 
 
 ### Step 3: Setup VAST inputs which are constant for the models
@@ -224,6 +224,9 @@ TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
                         Map=Map)
 Obj  <-  TmbList[["Obj"]]
 Obj$env$beSilent()
+
+TmbList$Upper[grep('rho', names(TmbList$Upper))] <- .99
+TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -.99
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
