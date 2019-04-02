@@ -153,22 +153,21 @@ launch_shinystan(fit)
 
 mon <- monitor(fit, print=FALSE)
 stanpars <- dimnames(mon)[[1]]
-slow <- sort(mon[,'n_eff'])[1:200]
+slow <- sort(mon[,'n_eff'])[1:10]
 barplot(slow)
 png('testing/mcmc_pairs_slow.png', width=12, height=7, units='in', res=500)
-slow <- names(sort(mon[,'n_eff'])[1:10])
-pairs(fit, pars=slow)
+slow <- names(sort(mon[,'n_eff'])[1:8])
+pairs(fit, pars=slow, gap=0, upper.panel=NULL)
 dev.off()
 png('testing/mcmc_pairs.png', width=7, height=5, units='in', res=500)
-pairs(fit, pars=c('logkappa1','logkappa2', 'beta2_ft[1]', 'beta2_ft[2]',
+pairs(fit, gap=0, pars=c('logkappa1','logkappa2', 'beta2_ft[1]', 'beta2_ft[2]',
                   'beta2_ft[3]', 'Epsilon_rho1_f', 'Beta_rho1_f', 'lp__'))
 dev.off()
-
 for(ii in 1:3){
-png(paste0('testing/mcmc_pairs_beta1_ft_',ii,'.png'), width=15, height=10, units='in', res=500)
-pars <- stanpars[grep('beta1_ft', stanpars)][seq(1,34, by=3)+ii-1]
-pairs(fit, pars=pars)
-dev.off()
+  png(paste0('testing/mcmc_pairs_beta1_ft_',ii,'.png'), width=15, height=10, units='in', res=500)
+  pars <- stanpars[grep('beta1_ft', stanpars)][seq(1,34, by=3)+ii-1]
+  pairs(fit, gap=0, pars=pars)
+  dev.off()
 }
 
 ## Try to find a standard model that doesn't work to show Jim.
@@ -206,28 +205,34 @@ chains <- cores*30
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 sfExport('run.iteration')
 out.parallel <- sfLapply(1:chains, function(i) run.iteration(i))
+saveRDS('testing/out.parallel.RDS', object=out.parallel)
 sfStop()
+
 
 ## First look at converged cases
 conv.ind <- which(sapply(out.parallel, function(x) !x$crashed))
-plot(sapply(out.parallel[conv.ind], function(x) x$max_gradient))
-plot(sapply(out.parallel[conv.ind], function(x) x$objective))
+
+png('testing/inits_conv.png', width=7, height=5, units='in', res=500)
+par(mfrow=c(1,2))
+mgs <- sapply(out.parallel[conv.ind], function(x) log10(x$max_gradient))
+mnlls <- sapply(out.parallel[conv.ind], function(x) x$objective)
+plot(mgs, ylab='log10 max gradient')
+plot(mnlls, ylab='marginal NLL')
+dev.off()
+
 parsall1 <- t(sapply(out.parallel[conv.ind], function(x) x$par))
-write.csv(file='convergence.csv', x=t(sapply(out.parallel[conv.ind],
-            function(x) rbind(x$objective, x$max_gradient))))
+write.csv(file='convergence.csv', x=cbind(mnlls, mgs))
 ## Now at the crashed cases
 crash.ind <- -conv.ind
 xx <- out.parallel[crash.ind]
 parsall0 <- t(sapply(xx, function(x) x$fixed))
-
 parsall <- rbind(parsall0, parsall1)
-cols <- c(rep('black', nrow(parsall0)), rep('red', nrow(parsall1)))
-
+cols <- c(rep(rgb(0,0,0,.5), nrow(parsall0)), rep(rgb(1,0,0,.5), nrow(parsall1)))
 png('testing/random_inits1.png', width=12, height=10, units='in', res=500)
-pairs(parsall[,1:16], col=cols, pch=16)
+pairs(parsall[,1:16], col=cols, pch=16, upper.panel=NULL, gap=0)
 dev.off()
 png('testing/random_inits2.png', width=12, height=10, units='in', res=500)
-pairs(parsall[,-(1:16)], col=cols, pch=16)
+pairs(parsall[,-(1:16)], col=cols, pch=16, gap=0, upper.panel=NULL)
 dev.off()
 
 ## Took the console trace output and processed it into Excel to read back
