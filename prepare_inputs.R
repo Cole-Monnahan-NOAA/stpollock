@@ -223,7 +223,7 @@ TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
                         ##Random=c('beta1_ft'),
                         Map=Map)
 Obj  <-  TmbList[["Obj"]]
-Obj$env$beSilent()
+## Obj$env$beSilent()
 
 TmbList$Upper[grep('rho', names(TmbList$Upper))] <- .99
 TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -.99
@@ -249,11 +249,14 @@ Year_Set <- sort(unique(Data_Geostat$Year))
 Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
 MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                      FUN=mean, na.rm=TRUE))
+MatDatSD <- tapply(log(Data_Geostat$Catch_KG), Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                     FUN=sd, na.rm=TRUE)
 ## Some grids have only zero observations
 MatDat[is.infinite(MatDat)]  <-  NA
+MatDatSD[is.infinite(MatDatSD) | is.nan(MatDatSD)]  <-  NA
 ## Use consistent zlim for all three data types
 zlim <- range(MatDat, na.rm=TRUE)
-if(model=='combined333'){
+if(model=='combined'){
   message('Making data maps by gear type...')
   for(ii in 1:3){
     PlotMap_Fn(MappingDetails=mdl$MappingDetails,
@@ -285,6 +288,20 @@ if(model=='combined333'){
                oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
 
+ ## Plot standard deviation of data
+  for(ii in 1:3){
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+               Mat=MatDatSD[,ii,Years2Include,drop=TRUE],
+               PlotDF=mdl$PlotDF,
+               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_data_sd_', ii),
+               Year_Set=Year_Set[Years2Include],
+               Legend=mdl$Legend, zlim=range(MatDatSD, na.rm=TRUE),
+               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+  }
+
 
   ## Plot log average catch in BTS divided by ATS 3-16. This shouldn't be
   ## possible b/c the BTS also includes the ATS data. Although this ignores
@@ -304,5 +321,7 @@ if(model=='combined333'){
              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
              textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
              oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+
+
 }
 
