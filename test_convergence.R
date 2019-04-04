@@ -190,18 +190,18 @@ run.iteration <- function(seed){
     fixed <- all[-Obj$env$random]
     ## Crashed out so save par values to test where
     out <- list(crashed=TRUE, all=all, fixed=fixed, init=Obj$par)
-    return(out)
   } else {
-    out <- c(crashed=FALSE, Opt[c( 'max_gradient', 'objective', 'par')], init=Obj$par)
-    return(out)
+    out <- list(crashed=FALSE, max_gradient=Opt$max_gradient,
+                objective=Opt$objective, par=Opt$par, init=Obj$par)
   }
   dyn.unload(dynlib(paste0(savedir,'/VAST_v8_0_0')))
   unlink(savedir, recursive=TRUE)
+  return(out)
 }
 
 library(snowfall)
-cores <- 10
-chains <- cores*30
+cores <- 20
+chains <- cores*10
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='convergence_progress.txt')
 sfExport('run.iteration')
 out.parallel <- sfLapply(1:chains, function(i) run.iteration(i))
