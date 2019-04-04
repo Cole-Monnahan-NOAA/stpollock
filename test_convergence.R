@@ -333,3 +333,45 @@ ggplot(xx, aes(Year, y=den, ymin=lwr, ymax=upr, color=Gear)) +
 
 
 
+## Try profiling all of the fixed effects. Maybe something with pop up?
+source("startup.R")
+## Test combined spatial model
+n_x <- 50
+model <- 'combined'; space <- 'ST'
+savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
+set.seed(111) ## seed 111 works for ST; 112 crashes out
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(iter.max=300, trace=1))
+mle <- Obj$env$last.par.best
+
+
+get.profile <- function(i, mle){
+  set.seed(111) ## seed 111 works for ST; 112 crashes out
+  n_x <<- 50
+  model <<- 'combined'; space <<- 'ST'
+  combinedoff <<- FALSE
+  savedir <<- paste0(getwd(), '/testing/test_prof_', i)
+  source('startup.R')
+  source("prepare_inputs.R")
+  err <- tryCatch(prof <- tmbprofile(obj=Obj, name=i, lower=TmbList$Lower[i], upper=TmbList$Upper[i]),
+                  error=function(e) NULL)
+  if(is.null(err)){
+    ## Crashed out
+    out <- list(crashed=TRUE, par=names(Obj$par)[i], prof=NULL)
+  } else {
+    out <- list(crashed=FALSE, par=names(Obj$par)[i], prof=prof)
+  }
+  return(out)
+}
+library(snowfall)
+cores <- 20
+pars <- 1:length(Obj$par)
+snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='prof_progress.txt')
+sfExport('get.profile')
+out.parallel <- sfLapply(pars[1:3], function(i) get.profile(i, Obj))
+saveRDS('testing/out.parallel.RDS', object=out.parallel)
+sfStop()
+
+
