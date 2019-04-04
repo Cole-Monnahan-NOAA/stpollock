@@ -6,6 +6,7 @@ ats <- read.csv('data/ats.csv')
 ## The ats data is really high resolution so truncating this for now to
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
+warning("still subsetting the ATS")
 ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
 
 ## Normalize the covariates. Does it make sense to do that here with depths
