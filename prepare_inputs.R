@@ -203,6 +203,7 @@ message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 Params$Beta_mean2_c <- Params$Beta_mean2_c+5
+Params$beta2_ft <- Params$beta2_ft+5
 if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
@@ -217,19 +218,17 @@ Params$logkappa1 <- Params$logkappa2 <- -5
 if(space=='ST' & model=='combined'){
   ## Assume rho is the same for strata
   if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
-  Map$Beta_rho1_f <- factor(c(1,1,1))
   if(length(Params$Beta_rho2_f)!=3) stop('problem with beta_rho2')
-  Map$Beta_rho2_f <- factor(c(1,1,1))
+  if(beta1temporal) Map$Beta_rho1_f <- factor(c(1,1,1))
+  if(beta2temporal) Map$Beta_rho2_f <- factor(c(1,1,1))
 }
 
 ## Rebuild with the new mapping stuff
 TmbList <- make_model(TmbData=TmbData, RunDir=savedir,
-                        Version=Version,  RhoConfig=RhoConfig,
-                        loc_x=Spatial_List$loc_x, Method=Method,
-                        Param=Params, TmbDir='models',
-                      Random='generate',
-                        ##Random=c('beta1_ft'),
-                        Map=Map)
+                      Version=Version,  RhoConfig=RhoConfig,
+                      loc_x=Spatial_List$loc_x, Method=Method,
+                      Param=Params, TmbDir='models',
+                      Random='generate', Map=Map)
 Obj  <-  TmbList[["Obj"]]
 if(silent) trash <-  Obj$env$beSilent()
 
