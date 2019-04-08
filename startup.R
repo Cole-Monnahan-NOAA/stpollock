@@ -13,6 +13,9 @@ library(snowfall)
 library(maps)
 library(mapdata)
 library(abind)
+library(tmbstan)
+library(shinystan)
+options(mc.cores = chains)
 Version <- "VAST_v8_0_0"
 
 source("simulator.R")

@@ -1,26 +1,53 @@
- ## File to run the fits to the real data
-rm(list=ls())
+## File to run the fits to the real data
+chains <- 5
 source('startup.R')
+
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
-indices.to.correct <- c('ColeIndex_cy', 'ln_ColeIndex_cy', 'Index_cyl', 'ln_Index_cyl')
 
-
-## Fit all versions of model
-n_x <- 50 # number of knots
+## Fit 2 versions of combined model with tmbstan
 model <- c('ats', 'bts', 'combined')[3]
 space <- c('NS', 'S', 'ST')[3]
-savedir <- paste0(getwd(), '/fit_', model, "_", space, '_', n_x)
+n_x <- 12
+
+control <- list(seed=121)
+savedir <- paste0(getwd(), '/fit_full_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
+## Run a few iterations to get closer to typical set and save on warmup time
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=1, getsd=FALSE,
                 upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=1))
-## TMBhelper::Check_Identifiable(Obj)
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
+                newtonsteps=0, control=list(trace=1, iter.max=10))
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=1200, open_progress=FALSE,
+               init=function() Obj$env$last.par,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file='fit_full.RDS')
+launch_shinystan(fit)
 
 
-## Test bias adjustment for index. Run this once then again with a slightly different n_x and change 
-## prepare_inputs to have epsilon rho = 0. Thus there's w & w/o bias correction on a model with and without a 
+## This is a simplified version where the second predictor is constant in
+## time but varies spatially
+control <- list(seed=121, n_omega2=0, n_eps2=0, beta2temporal=FALSE)
+savedir <- paste0(getwd(), '/fit_reduced_', model, "_", space, '_', n_x)
+source("prepare_inputs.R")
+## Run a few iterations to get closer to typical set and save on warmup time
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=1, getsd=FALSE,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(trace=1, iter.max=10))
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=1200, open_progress=FALSE,
+               init=function() Obj$env$last.par,
+               control=list(max_treedepth=4))
+saveRDS(object = fit, file='fit_full.RDS')
+launch_shinystan(fit)
+
+
+
+
+
+
+
+## Test bias adjustment for index. Run this once then again with a slightly different n_x and change
+## prepare_inputs to have epsilon rho = 0. Thus there's w & w/o bias correction on a model with and without a
 ## smoother on ST effects
 model <- 'combined'
 space <- 'ST'
@@ -36,6 +63,7 @@ plot.vastfit(results)
 savedir <- paste0(getwd(), '/bias_cor_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
 Obj$par <- Opt$par
+indices.to.correct <- c('ColeIndex_cy', 'ln_ColeIndex_cy', 'Index_cyl', 'ln_Index_cyl')
 Opt2 <- Optimize(obj=Obj, lower=TmbList$Lower,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=1, control=list(trace=10),
