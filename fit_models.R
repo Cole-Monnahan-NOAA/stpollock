@@ -20,7 +20,7 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=1200, open_progress=FALSE,
                init=function() Obj$env$last.par,
                control=list(max_treedepth=12))
-saveRDS(object = fit, file='fit_full.RDS')
+saveRDS(object = fit, file=paste0(savedir,'fit.RDS'))
 launch_shinystan(fit)
 
 
@@ -37,7 +37,7 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=1200, open_progress=FALSE,
                init=function() Obj$env$last.par,
                control=list(max_treedepth=4))
-saveRDS(object = fit, file='fit_full.RDS')
+saveRDS(object = fit, file='fit_reduced.RDS')
 launch_shinystan(fit)
 
 
