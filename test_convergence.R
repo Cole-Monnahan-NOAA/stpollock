@@ -341,12 +341,10 @@ model <- 'combined'; space <- 'ST'
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
 set.seed(111) ## seed 111 works for ST; 112 crashes out
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE, loopnum=1,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
-mle <- Obj$env$last.par.best
-
-
+mle <- Opt$par
 get.profile <- function(i, mle){
   set.seed(111) ## seed 111 works for ST; 112 crashes out
   n_x <<- 50
@@ -355,6 +353,7 @@ get.profile <- function(i, mle){
   savedir <<- paste0(getwd(), '/testing/test_prof_', i)
   source('startup.R')
   source("prepare_inputs.R")
+  Obj$par <- mle
   err <- tryCatch(prof <- tmbprofile(obj=Obj, name=i, lower=TmbList$Lower[i], upper=TmbList$Upper[i]),
                   error=function(e) NULL)
   if(is.null(err)){
@@ -366,12 +365,16 @@ get.profile <- function(i, mle){
   return(out)
 }
 library(snowfall)
-cores <- 20
+cores <- 18
 pars <- 1:length(Obj$par)
 snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='prof_progress.txt')
 sfExport('get.profile')
-out.parallel <- sfLapply(pars[1:3], function(i) get.profile(i, Obj))
-saveRDS('testing/out.parallel.RDS', object=out.parallel)
+out.parallel <- sfLapply(pars, function(i) get.profile(i, Obj))
+saveRDS('testing/prof.parallel.RDS', object=out.parallel)
 sfStop()
+par(mfrow=c(5,4))
+for(i in 1:length(pars))
+  err <- tryCatch(plot.tmbprofile(out.parallel[[i]]$prof),
+                  error=function(e) NULL)
 
 
