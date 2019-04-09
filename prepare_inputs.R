@@ -236,12 +236,19 @@ if(model=='combined'){
   message("Reworking L_xx to fix label switching")
   which.diag <- function(nrow, ncol){
     ## Returns the vector position of the diagonal elements of a nrow x ncol
-    ## matrix
-    m <- matrix(NA, nrow, ncol)
-    diag(m) <- 0
-    which(m[lower.tri(m, TRUE)]==0)
+    ## matrix. This matches the order when VAST converts a vector of L into a matrix
+    ## L.  Thus L_vec[which.diag(L_vec)] will be the diagonal elements.
+    counter  <- 1
+    out <- NULL
+    for(r in 1:nrow){
+      for(c in 1:ncol){
+        ## Only save index of the diagonals
+        if(r==c) out <- c(out,counter)
+        if(r>=c) counter <- counter+1
+      }
+    }
+    out
   }
-
   ## If using multiple factors set teh diagonals to be positive to prevent
   ## label switching
   TmbList$Lower[grep('L_omega1_z', names(TmbList$Lower))[which.diag(3,n_omega1)]] <- 0
