@@ -62,6 +62,8 @@ calculate.index.mcmc <- function(Obj, fit){
   }
   index.gear <- do.call(rbind, index.gear.tmp)
   index.strata <- do.call(rbind, index.strata.tmp)
+  index.gear$gear <- as.factor(index.gear$gear)
+  index.strata$stratum <- factor(index.strata$stratum, levels=strata)
   index.gear2 <- ddply(index.gear, .(year, gear), summarize,
                        lwr=quantile(density, probs=.025),
                        upr=quantile(density, probs=.975),
@@ -70,20 +72,45 @@ calculate.index.mcmc <- function(Obj, fit){
                          lwr=quantile(density, probs=.025),
                          upr=quantile(density, probs=.975),
                          est=median(density))
-  return(list(index.gear=index.gear2, index.strata=index.strata2))
+  ## Massage to get the catchability by gear type
+  tmp <- dcast(index.gear, year+iter~gear, value.var='density')
+  availability <- within(tmp, {BTS=BTS/(Total); ATS=ATS/(Total)})
+  availability <- melt(availability, id.vars=c('year', 'iter'),
+                       measure.vars=c('ATS', 'BTS'),
+                       variable.name='gear', value.name='availability')
+  availability2 <- ddply(availability, .(year, gear), summarize,
+                       lwr=quantile(availability, probs=.025),
+                       upr=quantile(availability, probs=.975),
+                       est=median(availability))
+  return(list(index.gear=index.gear2, index.strata=index.strata2, availability=availability2))
 }
 
 plot.index.mcmc <- function(index, savedir){
   g <- ggplot(index$index.gear, aes(year, y=est, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + facet_wrap('gear')+
+    geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
     ylab('log abundance') + scale_y_log10()
   ggsave(file.path(savedir, 'index_gear_mcmc.png'), g, width=7, height=5)
   g <- ggplot(index$index.strata, aes(year, y=est, group=stratum, fill=stratum)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + facet_wrap('stratum')+
+    geom_line() + geom_point()+ theme_bw() + # facet_wrap('stratum')+
     ylab('log abundance') + scale_y_log10()
   ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
+  g <- ggplot(availability2, aes(year, y=est, group=gear, fill=gear)) +
+    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+    geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
+    ylab('Availability to gear') + ylim(0,1)
+  ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
+  ## Do relative densities by strata and year for median
+  tmp <- dcast(index$index.strata, year~strata, value.var='est')
+  tmp[,2:4] <- tmp[,2:4]/rowSums(tmp[2:4])
+  index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
+                           value.name='pct.density')
+  index.strata.pct$stratum <- factor(index.strata.pct$stratum,
+                                     levels=rev(levels(index$index.strata$stratum)) )
+  g <- ggplot(index.strata.pct, aes(year, pct.density, fill=stratum)) +
+    geom_area()
+  ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
 }
 
 calculate.index <- function(Opt, Report, model, space, log, strata){
