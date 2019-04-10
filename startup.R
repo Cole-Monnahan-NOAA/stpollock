@@ -43,6 +43,49 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   return(Save)
 }
 
+calculate.index.mcmc <- function(Obj, fit){
+  ## Get parameters and drop log-posterior
+  df <- as.matrix(fit)
+  df <- df[,-ncol(df)]
+  strata <- c('0-3m', '3-16m', '16-surface')
+  gear <- c('Total', 'BTS', 'ATS')
+  index.gear.tmp <- index.strata.tmp <- list()
+  message("Looping through and calculating report...")
+  for(i in 1:nrow(df)){
+    tmp <- Obj$report(df[i,])
+    index.strata.tmp[[i]] <-
+      data.frame(year=rep(years, each=3), iter=i, density=as.numeric(tmp$Index_cy),
+                 stratum=strata)
+    index.gear.tmp[[i]] <-
+      data.frame(year=rep(years, each=3), iter=i, density=as.numeric(tmp$ColeIndex_cy),
+                 gear=gear)
+  }
+  index.gear <- do.call(rbind, index.gear.tmp)
+  index.strata <- do.call(rbind, index.strata.tmp)
+  index.gear2 <- ddply(index.gear, .(year, gear), summarize,
+                       lwr=quantile(density, probs=.025),
+                       upr=quantile(density, probs=.975),
+                       est=median(density))
+  index.strata2 <- ddply(index.strata, .(year, stratum), summarize,
+                         lwr=quantile(density, probs=.025),
+                         upr=quantile(density, probs=.975),
+                         est=median(density))
+  return(list(index.gear=index.gear2, index.strata=index.strata2))
+}
+
+plot.index.mcmc <- function(index, savedir){
+  g <- ggplot(index$index.gear, aes(year, y=est, group=gear, fill=gear)) +
+    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+    geom_line() + geom_point()+ theme_bw() + facet_wrap('gear')+
+    ylab('log abundance') + scale_y_log10()
+  ggsave(file.path(savedir, 'index_gear_mcmc.png'), g, width=7, height=5)
+  g <- ggplot(index$index.strata, aes(year, y=est, group=stratum, fill=stratum)) +
+    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+    geom_line() + geom_point()+ theme_bw() + facet_wrap('stratum')+
+    ylab('log abundance') + scale_y_log10()
+  ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
+}
+
 calculate.index <- function(Opt, Report, model, space, log, strata){
   ## If available use the bias corrected versions
   if(!is.null(Opt$SD$unbiased)){
