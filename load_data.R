@@ -24,6 +24,10 @@ ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 bts <- subset(bts, depth<200)
 ats <- subset(ats, depth<400)
 
+## Temporarily drop some years
+bts <- subset(bts, year <2011)
+ats <- subset(ats, year <2011)
+
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
                    Vessel='none', depth=bts$depth, depth2=bts$depth2)
