@@ -1,46 +1,47 @@
 ## File to run the fits to the real data
-chains <- 5
+chains <- 8
 source('startup.R')
 
 ## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
 
 ## Fit 2 versions of combined model with tmbstan
 model <- c('ats', 'bts', 'combined')[3]
-space <- c('NS', 'S', 'ST')[3]
-n_x <- 12
-
-control <- list(seed=121)
+#space <- c('NS', 'S', 'ST')[3]
+n_x <- 80
+space <- 'NS'
+control <- list(seed=121, temporal=2, beta2temporal=FALSE)
 savedir <- paste0(getwd(), '/fit_full_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
-## Run a few iterations to get closer to typical set and save on warmup time
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=1, getsd=FALSE,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=1, iter.max=10))
+## Run a single iteration to optimize random effects
+Obj$fn(Obj$par)
+init.fn <- function() Obj$env$last.par
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=1200, open_progress=FALSE,
-               init=function() Obj$env$last.par,
+               iter=1000, open_progress=FALSE,
+               init=init.fn,
                control=list(max_treedepth=12))
-saveRDS(object = fit, file=paste0(savedir,'fit.RDS'))
+saveRDS(object = fit, file=paste0(savedir,'/fit.RDS'))
 launch_shinystan(fit)
 
 
 ## This is a simplified version where the second predictor is constant in
 ## time but varies spatially
-control <- list(seed=121, n_omega2=0, n_eps2=0, beta2temporal=FALSE)
+space <- 'S'
+control <- list(seed=121, n_eps1=0, n_eps2=0, beta2temporal=FALSE, temporal=2)
 savedir <- paste0(getwd(), '/fit_reduced_', model, "_", space, '_', n_x)
 source("prepare_inputs.R")
-## Run a few iterations to get closer to typical set and save on warmup time
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=1, getsd=FALSE,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=0, control=list(trace=1, iter.max=10))
+## Run a single iteration to optimize random effects
+Obj$fn(Obj$par)
+init.fn <- function() Obj$env$last.par
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=1200, open_progress=FALSE,
-               init=function() Obj$env$last.par,
-               control=list(max_treedepth=4))
-saveRDS(object = fit, file='fit_reduced.RDS')
+               iter=1000, open_progress=FALSE,
+               init=init.fn,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir, '/fit.RDS'))
 launch_shinystan(fit)
 
-
+mon <- monitor(fit, print=FALSE)
+pars <- names(sort(log10(mon[,'n_eff']))[1:10])
+pairs(fit, pars=pars)
 
 
 
