@@ -233,7 +233,7 @@ Obj  <-  TmbList[["Obj"]]
 if(silent) trash <-  Obj$env$beSilent()
 
 if(model=='combined'){
-  message("Reworking L_xx to fix label switching")
+  message("Reworking L_xx to fix sign switching")
   which.diag <- function(nrow, ncol){
     ## Returns the vector position of the diagonal elements of a nrow x ncol
     ## matrix. This matches the order when VAST converts a vector of L into a matrix
@@ -255,6 +255,8 @@ if(model=='combined'){
   TmbList$Lower[grep('L_omega2_z', names(TmbList$Lower))[which.diag(3,n_omega2)]] <- 0
   TmbList$Lower[grep('L_epsilon1_z', names(TmbList$Lower))[which.diag(3,n_eps1)]] <- 0
   TmbList$Lower[grep('L_epsilon2_z', names(TmbList$Lower))[which.diag(3,n_eps2)]] <- 0
+  ## The beta's are just standard deviations in this case so >0
+  TmbList$Lower[grep('L_beta1_z', names(TmbList$Lower))] <- 0
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   par[grep('L_omega1_z', names(par))[which.diag(3,n_omega1)]]  <-
@@ -265,13 +267,14 @@ if(model=='combined'){
     abs( par[grep('L_epsilon1_z', names(par))[which.diag(3,n_eps1)]])
   par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]]  <-
     abs( par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]])
+  par[grep('L_beta1_z', names(par))] <- abs(par[grep('L_beta1_z', names(par))])
   Obj$par <- par
 }
 
-
-TmbList$Upper[grep('rho', names(TmbList$Upper))] <- .999
-TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -.999
-
+if(temporal==4){
+  TmbList$Upper[grep('rho', names(TmbList$Upper))] <- .999
+  TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -.999
+}
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
 loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
