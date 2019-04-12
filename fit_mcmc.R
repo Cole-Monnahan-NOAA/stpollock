@@ -20,7 +20,9 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                init=init.fn,
                control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/fit.RDS'))
+ind <- calculate.index.mcmc(Obj, fit)
 launch_shinystan(fit)
+pairs(fit)
 
 
 ## This is a simplified version where the second predictor is constant in

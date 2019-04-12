@@ -4,15 +4,20 @@ source("startup.R")
 ## Test combined spatial model
 n_x <- 50
 model <- 'combined'; space <- 'ST'
+control <- list(seed=112, n_eps2=0, beta2temporal=FALSE,
+                finescale=TRUE)
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
-set.seed(112) ## seed 111 works for ST; 112 crashes out
+##set.seed(112) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
-options(warn=2) # stop on a warning
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=3,
+## options(warn=2) # stop on a warning
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=10,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
 options(warn=0)
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results)
+
 ## Check where problem occurred
 all <- Obj$env$last.par
 fixed <- all[-Obj$env$random]
