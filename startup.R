@@ -15,7 +15,6 @@ library(mapdata)
 library(abind)
 library(tmbstan)
 library(shinystan)
-options(mc.cores = chains)
 Version <- "VAST_v8_0_0"
 
 source("simulator.R")
@@ -82,7 +81,15 @@ calculate.index.mcmc <- function(Obj, fit){
                        lwr=quantile(availability, probs=.025),
                        upr=quantile(availability, probs=.975),
                        est=median(availability))
-  return(list(index.gear=index.gear2, index.strata=index.strata2, availability=availability2))
+  index.gear2$space <- index.strata$space <- availability2$space <- space
+  index.gear2$combinedoff <- index.strata$combinedoff <-
+    availability2$combinedoff <- combinedoff
+  index.gear2$fixlambda <- index.strata$fixlambda <-
+    availability2$fixlambda <- fixlambda
+  out <- list(index.gear=index.gear2, index.strata=index.strata2,
+              availability=availability2)
+  saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
+  return(out)
 }
 
 plot.index.mcmc <- function(index, savedir){
@@ -96,13 +103,13 @@ plot.index.mcmc <- function(index, savedir){
     geom_line() + geom_point()+ theme_bw() + # facet_wrap('stratum')+
     ylab('log abundance') + scale_y_log10()
   ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
-  g <- ggplot(availability2, aes(year, y=est, group=gear, fill=gear)) +
+  g <- ggplot(index$availability, aes(year, y=est, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
     ylab('Availability to gear') + ylim(0,1)
   ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
   ## Do relative densities by strata and year for median
-  tmp <- dcast(index$index.strata, year~strata, value.var='est')
+  tmp <- dcast(index$index.strata, year~stratum, value.var='est')
   tmp[,2:4] <- tmp[,2:4]/rowSums(tmp[2:4])
   index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
                            value.name='pct.density')
@@ -111,6 +118,20 @@ plot.index.mcmc <- function(index, savedir){
   g <- ggplot(index.strata.pct, aes(year, pct.density, fill=stratum)) +
     geom_area()
   ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
+}
+plot.slow.mcmc <- function(fit, savedir, n=8){
+  mon <- monitor(fit, print=FALSE)
+  pars <- names(sort(log10(mon[,'n_eff']))[1:n])
+  print(mon[pars,'n_eff'])
+  mon <- as.data.frame(mon)
+  mon$par <- row.names(mon)
+  mon$space <- space; mon$combinedoff <- combinedoff
+  mon$fixlambda <- fixlambda
+  row.names(mon) <- NULL
+  saveRDS(file.path(savedir, 'monitor.RDS'), object=mon)
+  png(paste0(savedir, '/pairs_slow.png'), width=7, height=5, res=500, units='in')
+  pairs(fit, pars=pars, gap=0)
+  dev.off()
 }
 
 calculate.index <- function(Opt, Report, model, space, log, strata){

@@ -7,6 +7,10 @@
 
 ## Setup default configuration if not specified in input control list
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
+## default is to estimate both lambdas
+fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
+filterdata <- ifelse(is.null(control$filterdata), FALSE, control$filterdata)
+combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
 silent  <- ifelse(is.null(control$silent ), TRUE, control$silent )
@@ -14,6 +18,7 @@ temporal <- ifelse(is.null(control$temporal), 4, control$temporal)
 beta1temporal <- ifelse(is.null(control$beta1temporal), TRUE, control$beta1temporal)
 beta2temporal <- ifelse(is.null(control$beta2temporal), TRUE, control$beta2temporal)
 seed <- ifelse(is.null(control$seed), 9999, control$seed)
+n_x <- ifelse(is.null(control$n_x), 100, control$n_x)
 set.seed(seed)
 
 ## These depend on the model and spatial setup
@@ -29,17 +34,26 @@ if(model != 'combined'){
   n_eps2 <- ifelse(is.null(control$n_eps2), 2, control$n_eps2)
 }
 
-if(space!='ST'){
-  ## spatial only
-  n_eps1 <- n_eps2 <- 0
-  if(space=='NS'){
-    n_omega1 <- n_omega2 <- 0
-  }
-}
+## if(space!='ST'){
+##   ## spatial only
+##   n_eps1 <- n_eps2 <- 0
+##   if(space=='NS'){
+##     n_omega1 <- n_omega2 <- 0
+##   }
+## }
 
 stopifnot(temporal %in% c(2,4)) ## RW or AR1 only
 stopifnot(model %in% c('ats', 'bts', 'combined'))
-stopifnot(space %in% c('NS', 'S', 'ST'))
+## stopifnot(space %in% c('NS', 'S', 'ST'))
+if(n_eps1+n_eps2>0){
+  space <- 'ST'
+} else if(n_omega1+n_omega2>0){
+  space <- 'S'
+} else {
+  space <- 'NS'
+}
+
+
 
 ## Default to suppress messages to cleanup output
 silent.fn <- function(expr){
@@ -64,8 +78,8 @@ FieldConfig <- matrix(c("Omega1"= n_omega1,
 ## missing years there.
 RhoConfig <- c("Beta1"=ifelse(beta1temporal, temporal, 3),
                "Beta2"=ifelse(beta2temporal, temporal, 3),
-               "Epsilon1"=ifelse(space=='ST' & n_eps1>0, temporal, 0),
-               "Epsilon2"=ifelse(space=='ST' & n_eps2>0, temporal, 0))
+               "Epsilon1"=ifelse(n_eps1>0, temporal, 0),
+               "Epsilon2"=ifelse(n_eps2>0, temporal, 0))
 
 
 ### Step 3: Setup VAST inputs which are constant for the models
@@ -117,7 +131,6 @@ if(model=='combined'){
   ##  Data_Geostat <- rbind(Data_Geostat, tmp)
   c_iz <- matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
                  ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  if(!exists('combinedoff')) combinedoff <- FALSE
   ## This is a switch to turn off the combined part and revert back to
   ## standard multivariate model. For testing only.
   if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
@@ -174,7 +187,8 @@ XX$Cov_xtp <- NULL#(XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
 ## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
 
 ## Build data and object for first time
-TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
+message('Building first TMB object..')
+silent.fn(TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                    OverdispersionConfig=OverdispersionConfig,
                    RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
                    b_i=Data_Geostat[,'Catch_KG'],
@@ -189,14 +203,11 @@ TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                    X_gtp=XX$Cov_xtp,
                    spatial_list=Spatial_List,
                    Method=Spatial_List$Method, Options=Options,
-                   Aniso=FALSE)
-
-TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
+                   Aniso=FALSE))
+silent.fn(TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
                        Version=Version,  RhoConfig=RhoConfig,
                        loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir='models', Random="generate")
-TmbList0$Parameters$gamma1_ctp
-TmbList0$Map$gamma1_ctp
+                       TmbDir='models', Random="generate"))
 
 ## Tweak the Map based on inputs
 message("Updating input Map and Params...")
@@ -207,7 +218,12 @@ Params$beta2_ft <- Params$beta2_ft+5
 if(model=='combined'){
   Params$L_beta1_z <- c(.2,.3,.5)
   Params$L_beta2_z <- c(.6,.3,1)
-  ## Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  if(fixlambda==1) Map$lambda1_k <- factor(NA)
+  if(fixlambda==2) Map$lambda2_k <- factor(NA)
+  ## both off
+  if(fixlambda==12) {
+    Map$lambda1_k <- Map$lambda2_k <- factor(NA)
+  }
   Params$logSigmaM[1:3] <- c(1,1,1)
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
@@ -268,12 +284,16 @@ if(model=='combined'){
   par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]]  <-
     abs( par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]])
   par[grep('L_beta1_z', names(par))] <- abs(par[grep('L_beta1_z', names(par))])
+  ## Run it once to optimize the random effects and set that to
+  ## last.par.best which is the init in tmbstan.
   Obj$par <- par
+  Obj$fn(Obj$par)
+  Obj$env$last.par.best <- Obj$env$last.par
 }
 
 if(temporal==4){
-  TmbList$Upper[grep('rho', names(TmbList$Upper))] <- .999
-  TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -.999
+  TmbList$Upper[grep('rho', names(TmbList$Upper))] <- 1.0
+  TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -1.0
 }
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
