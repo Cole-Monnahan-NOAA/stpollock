@@ -1448,6 +1448,22 @@ Type objective_function<Type>::operator() ()
   jnll_comp(10) = -1 * (LogProb1_i * (Type(1.0)-PredTF_i)).sum();
   jnll_comp(11) = -1 * (LogProb2_i * (Type(1.0)-PredTF_i)).sum();
   jnll = jnll_comp.sum();
+  // Cole added some temporary priors here
+  Type prior=0.0;
+  prior -= dnorm(lambda1_k, Type(0.0), Type(5), true).sum();
+  prior -= dnorm(lambda2_k, Type(0.0), Type(5), true).sum();
+  for(int ii=0; ii<beta1_ft.rows();ii++){
+    for(int jj=0; jj<beta1_ft.cols();jj++){
+      prior -= dnorm(beta1_ft(ii,jj), Type(0.0), Type(5), true);
+    }
+  }
+  for(int ii=0; ii<beta2_ft.rows();ii++){
+    for(int jj=0; jj<beta2_ft.cols();jj++){
+      prior -= dnorm(beta2_ft(ii,jj), Type(0.0), Type(5), true);
+    }
+  }
+  REPORT(prior);
+  jnll+=prior;
   Type pred_jnll = -1 * ( LogProb1_i*PredTF_i + LogProb2_i*PredTF_i ).sum();
   REPORT( pred_jnll );
   REPORT( tmp_calc1 );
