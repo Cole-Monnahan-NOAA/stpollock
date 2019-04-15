@@ -42,8 +42,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   return(Save)
 }
 
-calculate.index.mcmc <- function(Obj, fit){
-  ## Get parameters and drop log-posterior
+calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   df <- as.matrix(fit)
   df <- df[,-ncol(df)]
   strata <- c('0-3m', '3-16m', '16-surface')
@@ -63,14 +62,23 @@ calculate.index.mcmc <- function(Obj, fit){
   index.strata <- do.call(rbind, index.strata.tmp)
   index.gear$gear <- as.factor(index.gear$gear)
   index.strata$stratum <- factor(index.strata$stratum, levels=strata)
-  index.gear2 <- ddply(index.gear, .(year, gear), summarize,
-                       lwr=quantile(density, probs=.025),
-                       upr=quantile(density, probs=.975),
-                       est=median(density))
-  index.strata2 <- ddply(index.strata, .(year, stratum), summarize,
+  ## handle NaN's in density to prevent error and keep running other scenarios
+  if(!all(is.finite(index.gear$density))){
+    return(NULL)
+  } else {
+    index.gear2 <- ddply(index.gear, .(year, gear), summarize,
                          lwr=quantile(density, probs=.025),
                          upr=quantile(density, probs=.975),
                          est=median(density))
+  }
+  if(!all(is.finite(index.strata$density))){
+    return(NULL)
+  } else {
+    index.strata2 <- ddply(index.strata, .(year, stratum), summarize,
+                           lwr=quantile(density, probs=.025),
+                           upr=quantile(density, probs=.975),
+                           est=median(density))
+  }
   ## Massage to get the catchability by gear type
   tmp <- dcast(index.gear, year+iter~gear, value.var='density')
   availability <- within(tmp, {BTS=BTS/(Total); ATS=ATS/(Total)})
@@ -78,9 +86,9 @@ calculate.index.mcmc <- function(Obj, fit){
                        measure.vars=c('ATS', 'BTS'),
                        variable.name='gear', value.name='availability')
   availability2 <- ddply(availability, .(year, gear), summarize,
-                       lwr=quantile(availability, probs=.025),
-                       upr=quantile(availability, probs=.975),
-                       est=median(availability))
+                         lwr=quantile(availability, probs=.025),
+                         upr=quantile(availability, probs=.975),
+                         est=median(availability))
   index.gear2$space <- index.strata$space <- availability2$space <- space
   index.gear2$combinedoff <- index.strata$combinedoff <-
     availability2$combinedoff <- combinedoff
@@ -92,7 +100,15 @@ calculate.index.mcmc <- function(Obj, fit){
   return(out)
 }
 
+plot.mcmc <- function(Obj, savedir, fit, n=8){
+  index <- calculate.index.mcmc(Obj, fit)
+  plot.index.mcmc(index, savedir)
+  plot.slow.mcmc(fit, savedir, n)
+  plot.pairs.mcmc(fit, savedir)
+}
+
 plot.index.mcmc <- function(index, savedir){
+  if(is.null(index)){ message("index is NULL so skipping plots"); return()}
   g <- ggplot(index$index.gear, aes(year, y=est, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
@@ -119,19 +135,74 @@ plot.index.mcmc <- function(index, savedir){
     geom_area()
   ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
 }
+
 plot.slow.mcmc <- function(fit, savedir, n=8){
   mon <- monitor(fit, print=FALSE)
-  pars <- names(sort(log10(mon[,'n_eff']))[1:n])
-  print(mon[pars,'n_eff'])
   mon <- as.data.frame(mon)
   mon$par <- row.names(mon)
+  mon$par.type <- 'fixed'
+  mon$par.type[grep('Omegainput|Epsiloninput', mon$par)] <- 'random'
+  mon$par.name <- sapply(strsplit(mon$par, split='\\['), function(x) x[[1]])
   mon$space <- space; mon$combinedoff <- combinedoff
   mon$fixlambda <- fixlambda
-  row.names(mon) <- NULL
+  row.names(mon) <- NULL; mon$energy__ <- NULL
+  pars.slow.fixed <- names(sort(mon[mon$par.type=='fixed','n_eff']))[1:n]
+  pars.slow.random <- names(sort(mon[mon$par.type=='random','n_eff']))[1:n]
+  print(mon[which(mon$pars %in% pars.slow.fixed),'n_eff'])
+  g <- ggplot(mon, aes(x=0, y=n_eff, color=par.name)) + geom_jitter(alpha=.5) +
+    scale_y_log10() + facet_wrap('par.type') + ylab('log10 ESS') +
+    theme(axis.text.x=element_blank())
+  ggsave(file.path(savedir, 'ess.png'), g, width=7, height=5)
   saveRDS(file.path(savedir, 'monitor.RDS'), object=mon)
-  png(paste0(savedir, '/pairs_slow.png'), width=7, height=5, res=500, units='in')
-  pairs(fit, pars=pars, gap=0)
+  png(paste0(savedir, '/pairs_slow_fixed.png'), width=7, height=5, res=500, units='in')
+  pairs(fit, pars=pars.slow.fixed, gap=0)
   dev.off()
+  if(length(pars.slow.random)>2){
+    png(paste0(savedir, '/pairs_slow_random.png'), width=7, height=5, res=500, units='in')
+    pairs(fit, pars=pars.slow.random, gap=0)
+    dev.off()
+  }
+}
+
+plot.pairs.mcmc <- function(fit, savedir){
+  message("Making pairs plots which can be slow..")
+  pars.all <- names(fit)
+  p <- pars.all[grep('L_omega1_z', x=pars.all)]
+  if(length(p)>1){
+    png(paste0(savedir, '/pairs_L_omega1.png'), width=9, height=9, res=500, units='in')
+    pairs(fit, pars=p, gap=0)
+    dev.off()
+  }
+  p <- pars.all[grep('L_omega2_z', x=pars.all)]
+  if(length(p)>1){
+    png(paste0(savedir, '/pairs_L_omega2.png'), width=7, height=5, res=500, units='in')
+    pairs(fit, pars=p, gap=0)
+    dev.off()
+  }
+  p <- pars.all[grep('L_epsilon1_z', x=pars.all)]
+  if(length(p)>1){
+    png(paste0(savedir, '/pairs_L_epsilon1.png'), width=7, height=5, res=500, units='in')
+    pairs(fit, pars=p, gap=0)
+    dev.off()
+  }
+  p <- pars.all[grep('L_epsilon2_z', x=pars.all)]
+  if(length(p)>1){
+    png(paste0(savedir, '/pairs_L_epsilon2.png'), width=7, height=5, res=500, units='in')
+    pairs(fit, pars=p, gap=0)
+    dev.off()
+  }
+  p <- pars.all[grep('kappa|Sigma|lp__|lambda|rho', x=pars.all)]
+  png(paste0(savedir, '/pairs_fixed.png'), width=7, height=5, res=500, units='in')
+  pairs(fit, pars=p, gap=0)
+  dev.off()
+  p <- pars.all[grep('lambda|beta2_ft|beta1_ft', x=pars.all)]
+  if(length(p)<10){
+  png(paste0(savedir, '/pairs_scale.png'), width=7, height=5, res=500, units='in')
+  pairs(fit, pars=p, gap=0)
+  dev.off()
+  } else {
+    warning("in plot.pairs.mcmc the 'scale' plot had too many parameters")
+  }
 }
 
 calculate.index <- function(Opt, Report, model, space, log, strata){
