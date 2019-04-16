@@ -42,7 +42,7 @@ if(model != 'combined'){
 ##   }
 ## }
 
-stopifnot(temporal %in% c(2,4)) ## RW or AR1 only
+#stopifnot(temporal %in% c(2,4)) ## RW or AR1 only
 stopifnot(model %in% c('ats', 'bts', 'combined'))
 ## stopifnot(space %in% c('NS', 'S', 'ST'))
 if(n_eps1+n_eps2>0){
@@ -263,6 +263,8 @@ if(model=='combined'){
         if(r>=c) counter <- counter+1
       }
     }
+    ## Why does this need to be positive too?
+    if(ncol==2) c(out,5)
     out
   }
   ## If using multiple factors set teh diagonals to be positive to prevent
