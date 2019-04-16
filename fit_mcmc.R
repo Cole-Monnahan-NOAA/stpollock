@@ -18,7 +18,7 @@ source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, thin=2,
                init='last.par.best',
-               control=list(max_treedepth=12))
+               control=list(max_treedepth=14))
 saveRDS(object = fit, file=paste0(savedir,'/mcmc_fit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 }
@@ -27,17 +27,26 @@ plot.mcmc(Obj, savedir, fit)
 
 ## This is our simplest base case model with the subsetted data (no
 ## temporal aspect
-control <- list(seed=121, beta2temporal=FALSE, n_x=50,
-                beta1temporal=FALSE, temporal=2, n_eps2=0)
-savedir <- paste0(getwd(), '/mcmc_combined_ST')
+control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=0,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE)
+savedir <- paste0(getwd(), '/mcmc_combined_S')
 source("prepare_inputs.R")
-## Run a single iteration to optimize random effects
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE,
                init='last.par.best',
                control=list(max_treedepth=14))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
-ind <- calculate.index.mcmc(Obj, fit)
-plot.index.mcmc(ind, savedir)
-plot.slow.mcmc(fit, savedir)
+
+## Combined off
+control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=0,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=TRUE)
+savedir <- paste0(getwd(), '/mcmc_combinedoff_S')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=800, open_progress=FALSE,
+               init='last.par.best',
+               control=list(max_treedepth=14))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
