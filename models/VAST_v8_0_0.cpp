@@ -607,6 +607,13 @@ Type objective_function<Type>::operator() ()
   // Preparatory bookkeeping
   ////////////////////////
 
+  // Cole scaled the random effects so they're closer to N(0,1) to speed up
+  // tmbstan tuning. To undo replace the _scaled version with blanks
+  array<Type> Omegainput1_sf_scaled = Omegainput1_sf*100.0;
+  array<Type> Omegainput2_sf_scaled = Omegainput2_sf*100.0;
+  array<Type> Epsiloninput1_sft_scaled = Epsiloninput1_sft*100.0;
+  array<Type> Epsiloninput2_sft_scaled = Epsiloninput2_sft*100.0;
+
   // Indices -- i=Observation; t=Year; c=Category; p=Dynamic-covariate
   int i,t,c,p,s,g;
   
@@ -677,9 +684,9 @@ Type objective_function<Type>::operator() ()
 
   // Define interaction matrix for Epsilon1, and also the impact of F_ct on intercepts
   int n_f1;
-  n_f1 = Epsiloninput1_sft.col(0).cols();
+  n_f1 = Epsiloninput1_sft_scaled.col(0).cols();
   int n_f2;
-  n_f2 = Epsiloninput2_sft.col(0).cols();
+  n_f2 = Epsiloninput2_sft_scaled.col(0).cols();
   matrix<Type> B_ff( n_f1, n_f1 );          // Interactions among factors
   B_ff = calculate_B( VamConfig(0), n_f1, VamConfig(1), Chi_fr, Psi_fr, jnll_comp(13) );
   matrix<Type> iota_ct( n_c, n_t );       // Cumulative impact of fishing mortality F_ct in years <= current year t
@@ -808,10 +815,10 @@ Type objective_function<Type>::operator() ()
   gmrf_Q = GMRF( Q1, bool(Options(9)) );
 
   // Omega1
-  array<Type> Omegamean1_sf(n_s, Omegainput1_sf.cols() );
+  array<Type> Omegamean1_sf(n_s, Omegainput1_sf_scaled.cols() );
   Omegamean1_sf.setZero();
   array<Type> Omega1_sc(n_s, n_c);
-  Omega1_sc = gmrf_by_category_nll(FieldConfig(0,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Omegainput1_sf, Omegamean1_sf, L_omega1_z, gmrf_Q, jnll_comp(0), this);
+  Omega1_sc = gmrf_by_category_nll(FieldConfig(0,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Omegainput1_sf_scaled, Omegamean1_sf, L_omega1_z, gmrf_Q, jnll_comp(0), this);
 
   // Projection for Omega1
   array<Type> Omega1_iz(n_i, c_iz.cols());
@@ -835,12 +842,12 @@ Type objective_function<Type>::operator() ()
   for(t=0; t<n_t; t++){
     // PDF for B0 (not tied to autoregressive variation)
     if( (Options(11)==1) & (t==(Options(11)-1)) ){
-      Epsilon1_sct.col(t) = gmrf_stationary_nll( Options_vec(7), n_s, n_c, logkappa1, Epsiloninput1_sft.col(t), covE1_cc, gmrf_Q, jnll_comp(1), this);
+      Epsilon1_sct.col(t) = gmrf_stationary_nll( Options_vec(7), n_s, n_c, logkappa1, Epsiloninput1_sft_scaled.col(t), covE1_cc, gmrf_Q, jnll_comp(1), this);
     }
     // PDF for first year of autoregression
     if( t==(Options(11)+0) ){
       Epsilonmean1_sf.setZero();
-      Epsilon1_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Epsiloninput1_sft.col(t), Epsilonmean1_sf, L_epsilon1_z, gmrf_Q, jnll_comp(1), this);
+      Epsilon1_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Epsiloninput1_sft_scaled.col(t), Epsilonmean1_sf, L_epsilon1_z, gmrf_Q, jnll_comp(1), this);
     }
     // PDF for subsequent years of autoregression
     if( t>=(Options(11)+1) ){
@@ -850,7 +857,7 @@ Type objective_function<Type>::operator() ()
         // If no interactions, then just autoregressive for factors
         for(s=0; s<n_s; s++){
         for(int f=0; f<n_f1; f++){
-          Epsilonmean1_sf(s,f) = Epsilon_rho1_f(f) * Epsiloninput1_sft(s,f,t-1);
+          Epsilonmean1_sf(s,f) = Epsilon_rho1_f(f) * Epsiloninput1_sft_scaled(s,f,t-1);
         }}
       }else{
         // Impact of interactions, B_ff
@@ -859,8 +866,8 @@ Type objective_function<Type>::operator() ()
         for(int f1=0; f1<n_f1; f1++){
         for(int f2=0; f2<n_f1; f2++){
           if( VamConfig(2)==0 ){
-            Epsilonmean1_sf(s,f1) += B_ff(f1,f2) * Epsiloninput1_sft(s,f2,t-1);
-            if( f1==f2 ) Epsilonmean1_sf(s,f1) += Epsilon_rho1_f(f1) * Epsiloninput1_sft(s,f2,t-1);
+            Epsilonmean1_sf(s,f1) += B_ff(f1,f2) * Epsiloninput1_sft_scaled(s,f2,t-1);
+            if( f1==f2 ) Epsilonmean1_sf(s,f1) += Epsilon_rho1_f(f1) * Epsiloninput1_sft_scaled(s,f2,t-1);
           }
           if( VamConfig(2)==1 ){
             Epsilonmean1_sf(s,f1) += B_ff(f1,f2) * Epsilon1_sct(s,f2,t-1);
@@ -869,7 +876,7 @@ Type objective_function<Type>::operator() ()
         }}}
       }
       // Hyperdistribution for spatio-temporal component
-      Epsilon1_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Epsiloninput1_sft.col(t), Epsilonmean1_sf, L_epsilon1_z, gmrf_Q, jnll_comp(1), this);
+      Epsilon1_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,0), Options_vec(7), VamConfig(2), n_s, n_c, logkappa1, Epsiloninput1_sft_scaled.col(t), Epsilonmean1_sf, L_epsilon1_z, gmrf_Q, jnll_comp(1), this);
     }
   }
 
@@ -929,10 +936,10 @@ Type objective_function<Type>::operator() ()
   gmrf_Q = GMRF( Q2, bool(Options(9)) );
 
   // Omega2
-  array<Type> Omegamean2_sf(n_s, Omegainput2_sf.cols() );
+  array<Type> Omegamean2_sf(n_s, Omegainput2_sf_scaled.cols() );
   Omegamean2_sf.setZero();
   array<Type> Omega2_sc(n_s, n_c);
-  Omega2_sc = gmrf_by_category_nll(FieldConfig(0,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Omegainput2_sf, Omegamean2_sf, L_omega2_z, gmrf_Q, jnll_comp(2), this);
+  Omega2_sc = gmrf_by_category_nll(FieldConfig(0,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Omegainput2_sf_scaled, Omegamean2_sf, L_omega2_z, gmrf_Q, jnll_comp(2), this);
 
   // Projection for Omega2
   array<Type> Omega2_iz(n_i, c_iz.cols());
@@ -956,12 +963,12 @@ Type objective_function<Type>::operator() ()
   for(t=0; t<n_t; t++){
     // PDF for B0 (not tied to autoregressive variation)
     if( (Options(11)==1) & (t==(Options(11)-1)) ){
-      Epsilon2_sct.col(t) = gmrf_stationary_nll( Options_vec(7), n_s, n_c, logkappa2, Epsiloninput2_sft.col(t), covE2_cc, gmrf_Q, jnll_comp(3), this);
+      Epsilon2_sct.col(t) = gmrf_stationary_nll( Options_vec(7), n_s, n_c, logkappa2, Epsiloninput2_sft_scaled.col(t), covE2_cc, gmrf_Q, jnll_comp(3), this);
     }
     // PDF for first year of autoregression
     if( t==(Options(11)+0) ){
       Epsilonmean2_sf.setZero();
-      Epsilon2_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Epsiloninput2_sft.col(t), Epsilonmean2_sf, L_epsilon2_z, gmrf_Q, jnll_comp(3), this);
+      Epsilon2_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Epsiloninput2_sft_scaled.col(t), Epsilonmean2_sf, L_epsilon2_z, gmrf_Q, jnll_comp(3), this);
     }
     // PDF for subsequent years of autoregression
     if( t>=(Options(11)+1) ){
@@ -971,7 +978,7 @@ Type objective_function<Type>::operator() ()
         // If no interactions, then just autoregressive for factors
         for(s=0; s<n_s; s++){
         for(int f=0; f<n_f2; f++){
-          Epsilonmean2_sf(s,f) = Epsilon_rho2_f(f) * Epsiloninput2_sft(s,f,t-1);
+          Epsilonmean2_sf(s,f) = Epsilon_rho2_f(f) * Epsiloninput2_sft_scaled(s,f,t-1);
         }}
       }else{
         // Impact of interactions, B_ff
@@ -980,8 +987,8 @@ Type objective_function<Type>::operator() ()
         for(int f1=0; f1<n_f2; f1++){
         for(int f2=0; f2<n_f2; f2++){
           if( VamConfig(2)==0 ){
-            Epsilonmean2_sf(s,f1) += B_ff(f1,f2) * Epsiloninput2_sft(s,f2,t-1);
-            if( f1==f2 ) Epsilonmean2_sf(s,f1) += Epsilon_rho2_f(f1) * Epsiloninput2_sft(s,f2,t-1);
+            Epsilonmean2_sf(s,f1) += B_ff(f1,f2) * Epsiloninput2_sft_scaled(s,f2,t-1);
+            if( f1==f2 ) Epsilonmean2_sf(s,f1) += Epsilon_rho2_f(f1) * Epsiloninput2_sft_scaled(s,f2,t-1);
           }
           if( VamConfig(2)==1 ){
             Epsilonmean2_sf(s,f1) += B_ff(f1,f2) * Epsilon2_sct(s,f2,t-1);
@@ -990,7 +997,7 @@ Type objective_function<Type>::operator() ()
         }}}
       }
       // Hyperdistribution for spatio-temporal component
-      Epsilon2_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Epsiloninput2_sft.col(t), Epsilonmean2_sf, L_epsilon2_z, gmrf_Q, jnll_comp(3), this);
+      Epsilon2_sct.col(t) = gmrf_by_category_nll(FieldConfig(1,1), Options_vec(7), VamConfig(2), n_s, n_c, logkappa2, Epsiloninput2_sft_scaled.col(t), Epsilonmean2_sf, L_epsilon2_z, gmrf_Q, jnll_comp(3), this);
     }
   }
 
@@ -1924,14 +1931,14 @@ Type objective_function<Type>::operator() ()
   REPORT( Index_gcyl );
   REPORT( Omega1_sc );
   REPORT( Omega2_sc );
-  REPORT( Omegainput1_sf );
-  REPORT( Omegainput2_sf );
+  REPORT( Omegainput1_sf_scaled );
+  REPORT( Omegainput2_sf_scaled );
   REPORT( Omega1_gc );
   REPORT( Omega2_gc );
   REPORT( Epsilon1_sct );
   REPORT( Epsilon2_sct );
-  REPORT( Epsiloninput1_sft );
-  REPORT( Epsiloninput2_sft );
+  REPORT( Epsiloninput1_sft_scaled );
+  REPORT( Epsiloninput2_sft_scaled );
   REPORT( Epsilon1_gct );
   REPORT( Epsilon2_gct );
   REPORT( H );
@@ -1997,14 +2004,14 @@ Type objective_function<Type>::operator() ()
   }
   // Calculate value of vactors at extrapolation-grid cells (e.g., for use when visualizing estimated or rotated factor estimates)
   if( Options(12)==1 ){
-    array<Type> Omegainput1_gf( n_g, Omegainput1_sf.cols() );
-    array<Type> Epsiloninput1_gft( n_g, Epsiloninput1_sft.col(0).cols(), n_t );
-    array<Type> Omegainput2_gf( n_g, Omegainput2_sf.cols() );
-    array<Type> Epsiloninput2_gft( n_g, Epsiloninput2_sft.col(0).cols(), n_t );
-    Omegainput1_gf = project_knots( n_g, Omegainput1_sf.cols(), int(1), int(0), Omegainput1_sf, Ags_ij, Ags_x );
-    Epsiloninput1_gft = project_knots( n_g, Epsiloninput1_sft.col(0).cols(), n_t, int(1), Epsiloninput1_sft, Ags_ij, Ags_x );
-    Omegainput2_gf = project_knots( n_g, Omegainput2_sf.cols(), int(1), int(0), Omegainput2_sf, Ags_ij, Ags_x );
-    Epsiloninput2_gft = project_knots( n_g, Epsiloninput2_sft.col(0).cols(), n_t, int(1), Epsiloninput2_sft, Ags_ij, Ags_x );
+    array<Type> Omegainput1_gf( n_g, Omegainput1_sf_scaled.cols() );
+    array<Type> Epsiloninput1_gft( n_g, Epsiloninput1_sft_scaled.col(0).cols(), n_t );
+    array<Type> Omegainput2_gf( n_g, Omegainput2_sf_scaled.cols() );
+    array<Type> Epsiloninput2_gft( n_g, Epsiloninput2_sft_scaled.col(0).cols(), n_t );
+    Omegainput1_gf = project_knots( n_g, Omegainput1_sf_scaled.cols(), int(1), int(0), Omegainput1_sf_scaled, Ags_ij, Ags_x );
+    Epsiloninput1_gft = project_knots( n_g, Epsiloninput1_sft_scaled.col(0).cols(), n_t, int(1), Epsiloninput1_sft_scaled, Ags_ij, Ags_x );
+    Omegainput2_gf = project_knots( n_g, Omegainput2_sf_scaled.cols(), int(1), int(0), Omegainput2_sf_scaled, Ags_ij, Ags_x );
+    Epsiloninput2_gft = project_knots( n_g, Epsiloninput2_sft_scaled.col(0).cols(), n_t, int(1), Epsiloninput2_sft_scaled, Ags_ij, Ags_x );
     REPORT( Omegainput1_gf );
     REPORT( Epsiloninput1_gft );
     REPORT( Omegainput2_gf );
