@@ -145,10 +145,12 @@ plot.slow.mcmc <- function(fit, savedir, n=8){
   mon$par.name <- sapply(strsplit(mon$par, split='\\['), function(x) x[[1]])
   mon$space <- space; mon$combinedoff <- combinedoff
   mon$fixlambda <- fixlambda
-  row.names(mon) <- NULL; mon$energy__ <- NULL
-  pars.slow.fixed <- names(sort(mon[mon$par.type=='fixed','n_eff']))[1:n]
-  pars.slow.random <- names(sort(mon[mon$par.type=='random','n_eff']))[1:n]
-  print(mon[which(mon$pars %in% pars.slow.fixed),'n_eff'])
+  mon <- mon[order(mon$n_eff),]
+  ## row.names(mon) <- NULL;
+  mon$energy__ <- NULL
+  pars.slow.fixed <- mon[mon$par.type=='fixed','par'][1:n]
+  pars.slow.random <- mon[mon$par.type=='random','par'][1:n]
+  print(mon[1:10,c('n_eff', 'Rhat')])
   g <- ggplot(mon, aes(x=0, y=n_eff, color=par.name)) + geom_jitter(alpha=.5) +
     scale_y_log10() + facet_wrap('par.type') + ylab('log10 ESS') +
     theme(axis.text.x=element_blank())
