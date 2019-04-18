@@ -275,6 +275,7 @@ if(model=='combined'){
   TmbList$Lower[grep('L_epsilon2_z', names(TmbList$Lower))[which.diag(3,n_eps2)]] <- 0
   ## The beta's are just standard deviations in this case so >0
   TmbList$Lower[grep('L_beta1_z', names(TmbList$Lower))] <- 0
+  TmbList$Lower[grep('L_beta2_z', names(TmbList$Lower))] <- 0
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   par[grep('L_omega1_z', names(par))[which.diag(3,n_omega1)]]  <-
@@ -286,6 +287,7 @@ if(model=='combined'){
   par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]]  <-
     abs( par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]])
   par[grep('L_beta1_z', names(par))] <- abs(par[grep('L_beta1_z', names(par))])
+  par[grep('L_beta2_z', names(par))] <- abs(par[grep('L_beta2_z', names(par))])
   ## Run it once to optimize the random effects and set that to
   ## last.par.best which is the init in tmbstan.
   Obj$par <- par
