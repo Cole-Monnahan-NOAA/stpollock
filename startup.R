@@ -351,9 +351,18 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
   return(index)
 }
 
+
 plot.vastfit <- function(results, plotQQ=FALSE){
   ## Need to reconstruct the Density including the log-normal bias
   ## adjustment
+  lambdas <- subset(results$est, par=='lambda1_k')
+  if(nrow(lambdas)>3){
+    lambdas$year <- years
+    g <- ggplot(lambdas, aes(year, y=est)) +
+      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_line() + geom_point()+ theme_bw() + ylab('BTS catchability')
+    ggsave(file.path(savedir, 'tv_lambdas.png'), g, width=7, height=5)
+  }
   sigtmp <- results$Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
   df <- data.frame(obs=log(Data_Geostat$Catch_KG),
                    predicted= log(results$Report$R2_i)-sigtmp,
@@ -401,7 +410,7 @@ plot.vastfit <- function(results, plotQQ=FALSE){
   g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() +
-    ylab('log abundance')
+    ylab('log abundance') + scale_y_log10()
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   ## Also create an index of the individual strata
   g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
