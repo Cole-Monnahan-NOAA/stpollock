@@ -1,19 +1,23 @@
 
 source("startup.R")
 model <- 'combined'
-space <- "ST"
 
-## Try fitting the ST model
-control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
-                filterdata=FALSE, beta1temporal=TRUE, beta2temporal=TRUE,
-                n_eps2=0, combinedoff=FALSE, temporal=2)
-savedir <- paste0(getwd(), '/fit_combined_ST')
+## Try fitting
+control <- list(seed=121, beta2temporal=TRUE, temporal=2, n_x=75, n_eps1=0,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE, fixlambda=-1)
+savedir <- paste0(getwd(), '/fit_combined_S_tvlambda')
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,
                 newtonsteps=0, control=list(trace=10))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=800, open_progress=FALSE,
+               init='last.par.best',
+               control=list(max_treedepth=8))
+saveRDS(object = fit, file=paste0(savedir,'/mcmc_fit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 
 

@@ -1,5 +1,5 @@
 ## File to run the fits to the real data
-chains <- 8
+chains <- 7
 options(mc.cores = chains)
 source('startup.R')
 model <- 'combined'
