@@ -134,7 +134,17 @@ if(model=='combined'){
   ## This is a switch to turn off the combined part and revert back to
   ## standard multivariate model. For testing only.
   if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
-  Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
+  if(fixlambda== -1){
+    ## Annual coefficient, create model matrix with sum to zero contrasts
+    ## to avoid confounding with betas
+    yearf <- factor(Data_Geostat$Year)
+    Q_ik <- model.matrix(~yearf, contrasts=list(yearf='contr.sum'))
+    ## Zero out non-BTS rows so they are unaffected by the lambdas
+    Q_ik[which(Data_Geostat$Gear!='Trawl'),] <- 0
+  } else {
+    ## Constant over time
+    Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
+  }
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
@@ -224,6 +234,7 @@ if(model=='combined'){
   if(fixlambda==12) {
     Map$lambda1_k <- Map$lambda2_k <- factor(NA)
   }
+  if(fixlambda==-1) Map$lambda2_k <- factor(NA *Params$lambda2_k)
   Params$logSigmaM[1:3] <- c(1,1,1)
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
