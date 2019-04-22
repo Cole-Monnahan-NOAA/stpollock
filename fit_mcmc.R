@@ -27,24 +27,26 @@ plot.mcmc(Obj, savedir, fit)
 
 ## This is our simplest base case model with the subsetted data (no
 ## temporal aspect
-control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=0,
-                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE)
-savedir <- paste0(getwd(), '/mcmc_combined_S')
+control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
+                kappaoff=TRUE, temporal=2, fixlambda=2)
+savedir <- paste0(getwd(), '/mcmc_combined_kappaoff_ST')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE,
+               iter=600, open_progress=FALSE,
                init='last.par.best',
                control=list(max_treedepth=14))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 ## Combined off
-control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=0,
-                beta1temporal=TRUE, n_eps2=0, combinedoff=TRUE)
-savedir <- paste0(getwd(), '/mcmc_combinedoff_S')
+control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=TRUE,
+                kappaoff=TRUE, temporal=2, fixlambda=2)
+savedir <- paste0(getwd(), '/mcmc_combinedoff_kappaoff_ST')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE,
+               iter=600, open_progress=FALSE,
                init='last.par.best',
                control=list(max_treedepth=14))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
