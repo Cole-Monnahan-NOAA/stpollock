@@ -105,6 +105,25 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.index.mcmc(index, savedir)
   plot.slow.mcmc(fit, savedir, n)
   plot.pairs.mcmc(fit, savedir)
+  ## Massage the output to get the beta's into a time format for ggplot
+  pars.all <- names(fit)
+  p <- pars.all[grep('beta1_ft|beta2_ft', x=pars.all)]
+  if(length(p)>0){
+    df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+    df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
+                          function(x) x[[1]])
+    df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
+    temp <- data.frame(stratum=c('0-3m', '3-16m', '16+'), year=rep(1:12, each=3), index=1:36)
+    df <- merge(df, temp, by='index')
+    df2 <- ddply(df, .(stratum, par.type, year), summarize,
+                 lwr=quantile(value, .01),
+                 upr=quantile(value, .99),
+                 med=median(value))
+    g <-  ggplot(df2, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~par.type)+
+      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
+    ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
+  }
 }
 
 plot.index.mcmc <- function(index, savedir){
@@ -197,11 +216,11 @@ plot.pairs.mcmc <- function(fit, savedir){
   png(paste0(savedir, '/pairs_fixed.png'), width=7, height=5, res=500, units='in')
   pairs(fit, pars=p, gap=0)
   dev.off()
-  p <- pars.all[grep('lambda|beta2_ft|beta1_ft', x=pars.all)]
-  if(length(p)<10){
-  png(paste0(savedir, '/pairs_scale.png'), width=7, height=5, res=500, units='in')
-  pairs(fit, pars=p, gap=0)
-  dev.off()
+  p <- pars.all[grep('lambda|Beta_mean|L_beta', x=pars.all)]
+  if(length(p)<14){
+    png(paste0(savedir, '/pairs_scale.png'), width=7, height=5, res=500, units='in')
+    pairs(fit, pars=p, gap=0)
+    dev.off()
   } else {
     warning("in plot.pairs.mcmc the 'scale' plot had too many parameters")
   }
