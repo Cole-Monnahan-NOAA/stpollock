@@ -216,8 +216,8 @@ Params <- TmbList0$Parameters
 Params$Beta_mean2_c <- Params$Beta_mean2_c+5
 Params$beta2_ft <- Params$beta2_ft+5
 if(model=='combined'){
-  Params$L_beta1_z <- c(.2,.3,.5)
-  Params$L_beta2_z <- c(.6,.3,1)
+  ## Params$L_beta1_z <- c(.2,.3,.5)
+  ## Params$L_beta2_z <- c(.6,.3,1)
   if(fixlambda==1) Map$lambda1_k <- factor(NA)
   if(fixlambda==2) Map$lambda2_k <- factor(NA)
   ## both off
@@ -228,7 +228,7 @@ if(model=='combined'){
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 } else {
-  Params$L_beta1_z <- Params$L_beta2_z <- .4
+  ##  Params$L_beta1_z <- Params$L_beta2_z <- .4
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
 if(space=='ST' & model=='combined'){
