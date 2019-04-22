@@ -33,7 +33,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
                     upr=ParHat+1.96*SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
   write.csv(est, file=paste0(savedir, "/estimates.csv"))
-  Index <- calculate.index(Opt, Report, model, space, log=FALSE, strata=FALSE)
+  Index <- calculate.index(Opt, Report, model, space, log=TRUE, strata=FALSE)
   Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
                  ParHatList=ParHatList, est=est, Index.strata=Index.strata,
@@ -124,7 +124,27 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
       geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
     ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
   }
+  p <- pars.all[grep('lambda1', x=pars.all)]
+  if(length(p)>2){
+    df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+    df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
+                          function(x) x[[1]])
+    df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
+    temp <- data.frame(year=years, index=1:12)
+    df <- merge(df, temp, by='index')
+    df2 <- ddply(df, .(par.type, year), summarize,
+                 lwr=quantile(value, .01),
+                 upr=quantile(value, .99),
+                 med=median(value))
+    g <-  ggplot(df2, aes(year, med)) +
+      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
+    ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=5)
+  }
 }
+
+
+
 
 plot.index.mcmc <- function(index, savedir){
   if(is.null(index)){ message("index is NULL so skipping plots"); return()}
@@ -330,6 +350,17 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 
 
 plot.vastfit <- function(results, plotQQ=FALSE){
+  beta1 <- data.frame(beta='beta1_ft',year=years,t(results$ParHatList$beta1_ft))
+  beta2 <- data.frame(beta='beta2_ft',year=years,t(results$ParHatList$beta2_ft))
+  names(beta1)[3:5] <- names(beta2)[3:5] <- c('0-3m', '3-16m', '16+')
+  betas <- rbind(beta1,beta2)
+  if(nrow(betas)>0){
+    df <- melt(betas, id.vars=c('year', 'beta'), variable.name='stratum')
+    g <-  ggplot(df, aes(year, value, group=beta, color=beta)) +
+      facet_wrap(stratum~.)+ geom_line(lwd=2)
+    ggsave(file.path(savedir, 'betas.png'), g, width=7, height=5)
+  }
+
   ## Need to reconstruct the Density including the log-normal bias
   ## adjustment
   lambdas <- subset(results$est, par=='lambda1_k')
@@ -383,11 +414,10 @@ plot.vastfit <- function(results, plotQQ=FALSE){
   ##   ggsave(file.path(savedir, 'map_omegas.png'), g, width=9, height=6, units='in')
   ## }
   Report <- results$Report
-  Index <- results$Index
-  g <- ggplot(Index, aes(year, y=est, group=strata, fill=strata)) +
+  g <- ggplot(results$Index, aes(year, y=est, group=strata, fill=strata)) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() +
-    ylab('log abundance') + scale_y_log10()
+    ylab('log abundance')
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   ## Also create an index of the individual strata
   g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
@@ -398,7 +428,7 @@ plot.vastfit <- function(results, plotQQ=FALSE){
                               Extrapolation_List=Extrapolation_List)
   Mapdetails$Legend$x <- Mapdetails$Legend$x-70
   Mapdetails$Legend$y <- Mapdetails$Legend$y-45
-
+  mdl <- Mapdetails
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
     Report$D_xcy <- Report$D_gcy
@@ -408,6 +438,10 @@ plot.vastfit <- function(results, plotQQ=FALSE){
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
                                         DirName=savedir)
+  ## Decide which years to plot
+  Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+  TmbData$n_x <- TmbData$n_g
   if(plotQQ){
     Q <- plot_quantile_diagnostic( TmbData=TmbData, Report=Report, FileName_PP="Posterior_Predictive",
                                   FileName_Phist="Posterior_Predictive-Histogram",
@@ -415,11 +449,6 @@ plot.vastfit <- function(results, plotQQ=FALSE){
     ## MapDetails_List = make_map_info( "Region"=Region,
     ##                                 "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap,
     ##                                 "Extrapolation_List"=Extrapolation_List )
-    ## Decide which years to plot
-    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-    Years2Include = which( Year_Set %in%
-                           sort(unique(Data_Geostat[,'Year'])))
-    TmbData$n_x <- TmbData$n_g
     plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
                    TmbData=TmbData, Report=Report, Q=Q, savedir=savedir,
                    MappingDetails=Mapdetails[["MappingDetails"]],
