@@ -17,6 +17,7 @@ silent  <- ifelse(is.null(control$silent ), TRUE, control$silent )
 temporal <- ifelse(is.null(control$temporal), 4, control$temporal)
 beta1temporal <- ifelse(is.null(control$beta1temporal), TRUE, control$beta1temporal)
 beta2temporal <- ifelse(is.null(control$beta2temporal), TRUE, control$beta2temporal)
+kappaoff <- ifelse(is.null(control$kappaoff), TRUE, control$kappaoff)
 seed <- ifelse(is.null(control$seed), 9999, control$seed)
 n_x <- ifelse(is.null(control$n_x), 100, control$n_x)
 set.seed(seed)
@@ -231,12 +232,16 @@ if(model=='combined'){
   Params$L_beta1_z <- Params$L_beta2_z <- .4
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
+if(kappaoff){
+  message("mapping off kappas...")
+  Map$logkappa1 <- Map$logkappa2 <- factor(NA)
+}
 if(space=='ST' & model=='combined'){
-  ## Assume rho is the same for strata
+  ## Assume rho is the same for strata but only turn on for AR1
   if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
   if(length(Params$Beta_rho2_f)!=3) stop('problem with beta_rho2')
-  if(beta1temporal) Map$Beta_rho1_f <- factor(c(1,1,1))
-  if(beta2temporal) Map$Beta_rho2_f <- factor(c(1,1,1))
+  if(beta1temporal & temporal==4) Map$Beta_rho1_f <- factor(c(1,1,1))
+  if(beta2temporal & temporal==4) Map$Beta_rho2_f <- factor(c(1,1,1))
 }
 
 ## Rebuild with the new mapping stuff
@@ -288,17 +293,17 @@ if(model=='combined'){
     abs( par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]])
   par[grep('L_beta1_z', names(par))] <- abs(par[grep('L_beta1_z', names(par))])
   par[grep('L_beta2_z', names(par))] <- abs(par[grep('L_beta2_z', names(par))])
-  ## Run it once to optimize the random effects and set that to
-  ## last.par.best which is the init in tmbstan.
-  Obj$par <- par
-  Obj$fn(Obj$par)
-  Obj$env$last.par.best <- Obj$env$last.par
 }
-
 if(temporal==4){
   TmbList$Upper[grep('rho', names(TmbList$Upper))] <- 1.0
   TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -1.0
 }
+## Run it once to optimize the random effects and set that to
+## last.par.best which is the init in tmbstan.
+Obj$par <- par
+Obj$fn(Obj$par)
+Obj$env$last.par.best <- Obj$env$last.par
+
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
 loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])

@@ -121,10 +121,33 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
                  med=median(value))
     g <-  ggplot(df2, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~par.type)+
       geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-      geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
+      geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
     ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
   }
+  ## Plot omegas to see
+  p <- pars.all[grep('Omegainput', x=pars.all)]
+  if(length(p)>0){
+    df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+    df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
+                          function(x) x[[1]])
+    df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
+    n <- max(df$index)/2 # nmber of knots per factor (numer of rows)
+    temp <- data.frame(factor=rep(c('factor1', 'factor2'), each=n), knot=rep(1:n,times=2), index=1:(2*n))
+    df <- merge(df, temp, by='index')
+    df2 <- ddply(df, .(factor, par.type, knot), summarize,
+                 lwr=quantile(value, .01),
+                 upr=quantile(value, .99),
+                 med=median(value))
+    g <-  ggplot(df2, aes(knot, med, fill=factor, color=factor)) +  facet_grid(factor~par.type)+
+      geom_pointrange(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_point()+ theme_bw() + ylab("value")
+    ggsave(file.path(savedir, 'omegas_mcmc.png'), g, width=7, height=5)
+  }
 }
+
+
+
+
 
 plot.index.mcmc <- function(index, savedir){
   if(is.null(index)){ message("index is NULL so skipping plots"); return()}

@@ -4,8 +4,8 @@ model <- 'combined'
 space <- "ST"
 
 ## Try fitting the ST model
-control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
-                filterdata=FALSE, beta1temporal=TRUE, beta2temporal=TRUE,
+control <- list(seed=125, beta2temporal=TRUE, n_x=50, n_eps1=2,
+                filterdata=FALSE, beta1temporal=TRUE, beta2temporal=FALSE,
                 n_eps2=0, combinedoff=FALSE, temporal=2)
 savedir <- paste0(getwd(), '/fit_combined_ST')
 source("prepare_inputs.R")
