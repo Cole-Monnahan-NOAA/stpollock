@@ -1,36 +1,15 @@
 ## File to run the fits to the real data
-chains <- 7
+chains <- 6
 options(mc.cores = chains)
 source('startup.R')
 model <- 'combined'
 
 
-## Start with simplest model possible and do w/ and w/o the combined
-## likelihood and different combinations of estimating catchability
-for(combinedoff in c(TRUE,FALSE)){
-for(fixlambda in c(0,1,2,12)){
-control <- list(seed=121, beta2temporal=FALSE, filterdata=TRUE,
-                n_eps1=0, n_eps2=0, n_omega1=0, n_omega2=0,
-                beta1temporal=FALSE, fixlambda=fixlambda,
-                combinedoff=combinedoff )
-savedir <- paste0(getwd(), '/mcmc_NS_combined',combinedoff, '_lambda',fixlambda)
-source("prepare_inputs.R")
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, thin=2,
-               init='last.par.best',
-               control=list(max_treedepth=14))
-saveRDS(object = fit, file=paste0(savedir,'/mcmc_fit.RDS'))
-plot.mcmc(Obj, savedir, fit)
-}
-}
-
-
-## This is our simplest base case model with the subsetted data (no
-## temporal aspect
+## ST1 with estimated kappa1
 control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
                 beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
-                kappaoff=TRUE, temporal=2, fixlambda=2)
-savedir <- paste0(getwd(), '/mcmc_combined_kappaoff_ST')
+                kappaoff=2, temporal=2, fixlambda=2)
+savedir <- paste0(getwd(), '/mcmc_kappa1est_fixlambda1_ST')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,
@@ -39,11 +18,24 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
-## Combined off
+## ST1 w/ kappa1 fixed by timevarying catchability
 control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
-                beta1temporal=TRUE, n_eps2=0, combinedoff=TRUE,
-                kappaoff=TRUE, temporal=2, fixlambda=2)
-savedir <- paste0(getwd(), '/mcmc_combinedoff_kappaoff_ST')
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
+                kappaoff=12, temporal=2, fixlambda=-1)
+savedir <- paste0(getwd(), '/mcmc_kappaoff_tvlambda_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best',
+               control=list(max_treedepth=14))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+## ST1 w/ kappa1 estimated and with timevarying catchability
+control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
+                kappaoff=2, temporal=2, fixlambda=-1)
+savedir <- paste0(getwd(), '/mcmc_kappa1est_tvlambda_ST')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,
