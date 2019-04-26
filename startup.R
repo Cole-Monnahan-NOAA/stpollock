@@ -94,8 +94,10 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
     availability2$combinedoff <- combinedoff
   index.gear2$fixlambda <- index.strata$fixlambda <-
     availability2$fixlambda <- fixlambda
+  ## grab scenario from savedir
+  scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
-              availability=availability2)
+              availability=availability2, scenario=scenario)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
   return(out)
 }
