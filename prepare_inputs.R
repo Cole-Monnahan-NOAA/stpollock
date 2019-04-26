@@ -17,7 +17,7 @@ silent  <- ifelse(is.null(control$silent ), TRUE, control$silent )
 temporal <- ifelse(is.null(control$temporal), 4, control$temporal)
 beta1temporal <- ifelse(is.null(control$beta1temporal), TRUE, control$beta1temporal)
 beta2temporal <- ifelse(is.null(control$beta2temporal), TRUE, control$beta2temporal)
-kappaoff <- ifelse(is.null(control$kappaoff), TRUE, control$kappaoff)
+kappaoff <- ifelse(is.null(control$kappaoff), 0, control$kappaoff)
 seed <- ifelse(is.null(control$seed), 9999, control$seed)
 n_x <- ifelse(is.null(control$n_x), 100, control$n_x)
 set.seed(seed)
@@ -136,6 +136,7 @@ if(model=='combined'){
   ## standard multivariate model. For testing only.
   if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
   if(fixlambda== -1){
+    message('turning on annual catchability')
     ## Annual coefficient, create model matrix with sum to zero contrasts
     ## to avoid confounding with betas
     yearf <- factor(Data_Geostat$Year)
@@ -243,10 +244,17 @@ if(model=='combined'){
   ##  Params$L_beta1_z <- Params$L_beta2_z <- .4
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
-if(kappaoff){
-  message("mapping off kappas...")
+if(kappaoff==1){
+  message("mapping off kappa1")
+  Map$logkappa1 <- factor(NA)
+} else if(kappaoff==2){
+  message("mapping off kappa2")
+  Map$logkappa2 <- factor(NA)
+} else if(kappaoff==12){
+  message("mapping off kappa1 and kappa2")
   Map$logkappa1 <- Map$logkappa2 <- factor(NA)
 }
+
 if(space=='ST' & model=='combined'){
   ## Assume rho is the same for strata but only turn on for AR1
   if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
