@@ -52,10 +52,10 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   for(i in 1:nrow(df)){
     tmp <- Obj$report(df[i,])
     index.strata.tmp[[i]] <-
-      data.frame(year=rep(years, each=3), iter=i, density=as.numeric(tmp$Index_cy),
+      data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$Index_cy)),
                  stratum=strata)
     index.gear.tmp[[i]] <-
-      data.frame(year=rep(years, each=3), iter=i, density=as.numeric(tmp$ColeIndex_cy),
+      data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
   }
   index.gear <- do.call(rbind, index.gear.tmp)
@@ -116,19 +116,16 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
     temp <- data.frame(stratum=c('0-3m', '3-16m', '16+'), year=rep(1:12, each=3), index=1:36)
     df <- merge(df, temp, by='index')
     df2 <- ddply(df, .(stratum, par.type, year), summarize,
-                 lwr=quantile(value, .01),
-                 upr=quantile(value, .99),
+                 lwr=quantile(value, .025),
+                 upr=quantile(value, .975),
                  med=median(value))
     g <-  ggplot(df2, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~par.type)+
       geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
       geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
     ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
   }
-
   p <- pars.all[grep('lambda1', x=pars.all)]
   if(length(p)>2){
-
-    ## Plot omegas to see
     df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
     df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
                           function(x) x[[1]])
@@ -143,21 +140,33 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
       geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
       geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
     ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=5)
+  } else if(length(p)==1){
+    ## just a constant
+    df <- as.data.frame(fit)[,p, drop=FALSE]
+    df$exp_lambda1_k <- exp(df[,1])
+    df2 <- melt(df, id.vars=NULL)
+    g <- ggplot(df2, aes(value))  + geom_histogram(bins=20) +
+      facet_wrap('variable', scale='free') + theme_bw()
+    ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=3.5)
+  } else {
+    warning("not plot setup for 2 lambdas")
   }
-    p <- pars.all[grep('Omegainput', x=pars.all)]
-    if(length(p)>0){
-    n <- max(df$index)/2 # nmber of knots per factor (numer of rows)
-    temp <- data.frame(factor=rep(c('factor1', 'factor2'), each=n), knot=rep(1:n,times=2), index=1:(2*n))
-    df <- merge(df, temp, by='index')
-    df2 <- ddply(df, .(factor, par.type, knot), summarize,
-                 lwr=quantile(value, .01),
-                 upr=quantile(value, .99),
-                 med=median(value))
-    g <-  ggplot(df2, aes(knot, med, fill=factor, color=factor)) +  facet_grid(factor~par.type)+
-      geom_pointrange(aes(ymin=lwr, ymax=upr), alpha=.5) +
-      geom_point()+ theme_bw() + ylab("value")
-    ggsave(file.path(savedir, 'omegas_mcmc.png'), g, width=7, height=5)
-  }
+  ## This is currently broken and probably not helpful anyway
+  ## p <- pars.all[grep('Omegainput', x=pars.all)]
+  ## if(length(p)>0){
+  ##   df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+  ##   df <- merge(df, temp, by='index')
+  ##   n <- max(df$index)/2 # nmber of knots per factor (numer of rows)
+  ##   temp <- data.frame(factor=rep(c('factor1', 'factor2'), each=n), knot=rep(1:n,times=2), index=1:(2*n))
+  ##   df2 <- ddply(df, .(factor, par.type, knot), summarize,
+  ##                lwr=quantile(value, .01),
+  ##                upr=quantile(value, .99),
+  ##                med=median(value))
+  ##   g <-  ggplot(df2, aes(knot, med, fill=factor, color=factor)) +  facet_grid(factor~par.type)+
+  ##     geom_pointrange(aes(ymin=lwr, ymax=upr), alpha=.5) +
+  ##     geom_point()+ theme_bw() + ylab("value")
+  ##   ggsave(file.path(savedir, 'omegas_mcmc.png'), g, width=7, height=5)
+  ## }
 }
 
 
@@ -165,19 +174,19 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
 
 plot.index.mcmc <- function(index, savedir){
   if(is.null(index)){ message("index is NULL so skipping plots"); return()}
-  g <- ggplot(index$index.gear, aes(year, y=est, group=gear, fill=gear)) +
+  g <- ggplot(index$index.gear, aes(year, y=est, color=gear, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
-    ylab('log abundance') + scale_y_log10()
+    geom_line(lwd=1.5, alpha=.5)+ theme_bw() +
+    ylab('log abundance')
   ggsave(file.path(savedir, 'index_gear_mcmc.png'), g, width=7, height=5)
-  g <- ggplot(index$index.strata, aes(year, y=est, group=stratum, fill=stratum)) +
+  g <- ggplot(index$index.strata, aes(year, y=est, color=stratum,  group=stratum, fill=stratum)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + # facet_wrap('stratum')+
-    ylab('log abundance') + scale_y_log10()
+    geom_line(lwd=1.5, alpha=.5) + theme_bw() + # facet_wrap('stratum')+
+    ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
-  g <- ggplot(index$availability, aes(year, y=est, group=gear, fill=gear)) +
+  g <- ggplot(index$availability, aes(year, y=est, color=gear, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() +# facet_wrap('gear')+
+    geom_line(lwd=1.5, alpha=.5) + theme_bw() +# facet_wrap('gear')+
     ylab('Availability to gear') + ylim(0,1)
   ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
   ## Do relative densities by strata and year for median
