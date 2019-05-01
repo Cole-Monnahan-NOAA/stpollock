@@ -47,7 +47,21 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   df <- df[,-ncol(df)] # drop lp__ column
   strata <- c('0-3m', '3-16m', '16-surface')
   gear <- c('Total', 'BTS', 'ATS')
+  ## Save text file of results
+  fixed <- (df[, -Obj$env$random])
+  fixed.summary <- do.call(rbind, apply(fixed, 2, function(x)
+    round(data.frame(median=median(x), mean=mean(x), sd=sd(x), min=min(x),
+                     max=max(x)),3)))
+  fixed.summary <- cbind(par=rownames(fixed.summary), fixed.summary)
+  write.csv(file=paste0(savedir,'/fixed.estimates.csv'), x=fixed.summary, row.names=FALSE)
+  random <- (df[, Obj$env$random])
+  random.summary <- do.call(rbind, apply(random, 2, function(x)
+    round(data.frame(median=median(x), mean=mean(x), sd=sd(x), min=min(x),
+                     max=max(x)),3)))
+  random.summary <- cbind(par=rownames(random.summary), random.summary)
+  write.csv(file=paste0(savedir,'/random.estimates.csv'), x=random.summary, row.names=FALSE)
   index.gear.tmp <- index.strata.tmp <- D_gcy.list <- list()
+  covcor_omega1.list <- covcor_omega2.list <- covcor_epsilon1.list <- list()
   message("Looping through and calculating report...")
   for(i in 1:nrow(df)){
     tmp <- Obj$report(df[i,])
@@ -58,10 +72,19 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
       data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
     D_gcy.list[[i]] <- tmp$D_gcy
+    covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
+    covcor_omega2.list[[i]] <- tmp$lowercov_uppercor_omega2
+    covcor_epsilon1.list[[i]] <- tmp$lowercov_uppercor_epsilon1
   }
   ## Merge this into 4d array
   D_gcyn <- array(do.call(c, D_gcy.list), dim=c(dim(tmp$D_gcy), nrow(df)))
   stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
+  ## Organize the corcov matrices
+  covcor_omega1 <- array(do.call(c, covcor_omega1.list), dim=c(3,3, nrow(df)))
+  covcor_omega2 <- array(do.call(c, covcor_omega2.list), dim=c(3,3, nrow(df)))
+  covcor_epsilon1 <- array(do.call(c, covcor_epsilon1.list), dim=c(3,3, nrow(df)))
+  covcor <- list(covcor_omega1=covcor_omega1, covcor_omega2=covcor_omega2,
+                 covcor_epsilon1=covcor_epsilon1)
   index.gear <- do.call(rbind, index.gear.tmp)
   index.strata <- do.call(rbind, index.strata.tmp)
   index.gear$gear <- as.factor(index.gear$gear)
@@ -102,70 +125,152 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
-              D_gcyn=D_gcyn)
+              D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
   return(out)
 }
 
-
+plot.covcor.mcmc <- function(index){
+  plot.covcor <- function(covcor, Llab){
+    par(mfrow=c(3,3), mgp=c(3,.5,0), mar=c(2,.5,2,.5), oma=c(0,0,2,0))
+    for(i in 1:3){
+      for(j in 1:3){
+        if(j<=i){
+          xlim <- c(-1,1)
+          lab <- paste0('cor(',i, ',', j, ')')
+          if(j==i){
+            xlim <- c(0, max(covcor[j,i,]))
+            lab <- paste0('var(', j,')')
+          }
+          hist(covcor[j,i,], xlim=xlim, ylab=NA, xlab=NA, main=lab, yaxt='n'); box()
+        } else {
+          plot(0,0, type='n', axes=FALSE, ann=FALSE)
+        }
+      }
+    }
+    mtext(Llab, line=0, outer=TRUE, cex=1.5)
+  }
+  ## Plot each one separately
+  savedir <- index$savedir
+  png(paste0(savedir, '/covcor_omega1.png'), width=7, height=5, res=500, units='in')
+  plot.covcor(index$covcor$covcor_omega1, 'omega1')
+  dev.off()
+  png(paste0(savedir, '/covcor_omega2.png'), width=7, height=5, res=500, units='in')
+  plot.covcor(index$covcor$covcor_omega2, 'omega2')
+  dev.off()
+  png(paste0(savedir, '/covcor_epsilon1.png'), width=7, height=5, res=500, units='in')
+  plot.covcor(index$covcor$covcor_epsilon1, 'epsilon1')
+  dev.off()
+}
 
 plot.availability.map.mcmc <- function(index){
   if(is.null(index$D_gcyn)){
     warning("D_gcyn missing from index so skipping availability maps")
-  }
-  Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
-                              Extrapolation_List=Extrapolation_List)
-  Mapdetails$Legend$x <- Mapdetails$Legend$x-70
-  Mapdetails$Legend$y <- Mapdetails$Legend$y-45
-  mdl <- Mapdetails
-  Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-  ## For each draw calculate a surface of catchability by gear type
-  MatTotal <- apply(D_gcyn, c(1,3,4), sum)
-  ## Sum across first two strata
-  MatBTS <- apply(D_gcyn[,-3,,], c(1,3,4), sum)/MatTotal
-  ## Now the second two
-  MatATS <- apply(D_gcyn[,-1,,], c(1,3,4), sum)/MatTotal
-  ## Calculate CV and mean over posterior draws
-  MatBTSCV <- apply(MatBTS, 1:2, function(x) sd(x)/mean(x))
-  MatATSCV <- apply(MatATS, 1:2, function(x) sd(x)/mean(x))
-  MatBTS <- apply(MatBTS, 1:2, mean)
-  MatATS <- apply(MatATS, 1:2, mean)
-  MatList <- list(BTS=MatBTS, ATS=MatATS)
-  for(ii in c("ATS", 'BTS')){
-    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-               Mat=MatList[[ii]],
-               PlotDF=mdl$PlotDF,
-               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-               FileName=paste0(savedir, '/mcmc_map_availability_',ii),
-               Year_Set=Year_Set[Years2Include],
-               Legend=mdl$Legend, zlim=c(0,1),
-               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-               textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
-  }
-  ## Repeat with CVs
-  MatList <- list(BTS=MatBTSCV, ATS=MatATSCV)
-  zlimtmp <- c(0, max(unlist(MatList)))
-  for(ii in c("ATS", 'BTS')){
-    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-               Mat=MatList[[ii]],
-               PlotDF=mdl$PlotDF,
-               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-               FileName=paste0(savedir, '/mcmc_map_availability_CV_',ii),
-               Year_Set=Year_Set[Years2Include],
-               Legend=mdl$Legend, zlim=zlimtmp,
-               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-               textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+  } else {
+    D_gcyn <- index$D_gcyn
+    Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
+                                Extrapolation_List=Extrapolation_List)
+    Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+    Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+    mdl <- Mapdetails
+    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+    ## For each draw calculate a surface of catchability by gear type
+    MatTotal <- apply(D_gcyn, c(1,3,4), sum)
+    ## Sum across first two strata
+    MatBTS <- apply(D_gcyn[,-3,,], c(1,3,4), sum)/MatTotal
+    ## Now the second two
+    MatATS <- apply(D_gcyn[,-1,,], c(1,3,4), sum)/MatTotal
+    ## Calculate CV and mean over posterior draws
+    MatBTSCV <- apply(MatBTS, 1:2, function(x) sd(x)/mean(x))
+    MatATSCV <- apply(MatATS, 1:2, function(x) sd(x)/mean(x))
+    MatBTS <- apply(MatBTS, 1:2, mean)
+    MatATS <- apply(MatATS, 1:2, mean)
+    MatList <- list(BTS=MatBTS, ATS=MatATS)
+    for(ii in c("ATS", 'BTS')){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatList[[ii]],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_availability_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=c(0,1),
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
+    ## Repeat with CVs
+    MatList <- list(BTS=MatBTSCV, ATS=MatATSCV)
+    zlimtmp <- c(0, max(unlist(MatList)))
+    for(ii in c("ATS", 'BTS')){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatList[[ii]],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_availability_CV_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=zlimtmp,
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
   }
 }
+
+plot.density.map.mcmc <- function(index){
+  if(is.null(index$D_gcyn)){
+    warning("D_gcyn missing from index so skipping density maps")
+  } else {
+    D_gcyn <- index$D_gcyn
+    Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
+                                Extrapolation_List=Extrapolation_List)
+    Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+    Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+    mdl <- Mapdetails
+    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+    ## For each strata calculate the mean density
+    MatStrata <- log(apply(D_gcyn, 1:3, mean))
+    zlimtmp <- range(MatStrata)
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatStrata[,ii,],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_density_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=zlimtmp,
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
+    ## Repeat with CVs
+    MatStrata <- apply(D_gcyn, 1:3, function(x) sd(x)/mean(x))
+    zlimtmp <- c(0, max(MatStrata))
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatStrata[,ii,],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_densityCV_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=zlimtmp,
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
+  }
+}
+
+
 plot.mcmc <- function(Obj, savedir, fit, n=8){
   index <- calculate.index.mcmc(Obj, fit)
   plot.index.mcmc(index, savedir)
   plot.slow.mcmc(fit, savedir, n)
   plot.pairs.mcmc(fit, savedir)
   plot.availability.map.mcmc(index)
+  plot.density.map.mcmc(index)
+  plot.covcor.mcmc(index)
   ## Massage the output to get the beta's into a time format for ggplot
   pars.all <- names(fit)
   p <- pars.all[grep('beta1_ft|beta2_ft', x=pars.all)]
@@ -229,6 +334,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   ##   ggsave(file.path(savedir, 'omegas_mcmc.png'), g, width=7, height=5)
   ## }
 }
+
 
 
 
