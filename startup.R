@@ -61,6 +61,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   random.summary <- cbind(par=rownames(random.summary), random.summary)
   write.csv(file=paste0(savedir,'/random.estimates.csv'), x=random.summary, row.names=FALSE)
   index.gear.tmp <- index.strata.tmp <- D_gcy.list <- list()
+  R1_gcy.list <- R2_gcy.list <- list()
   covcor_omega1.list <- covcor_omega2.list <- covcor_epsilon1.list <- list()
   message("Looping through and calculating report...")
   for(i in 1:nrow(df)){
@@ -72,13 +73,19 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
       data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
     D_gcy.list[[i]] <- tmp$D_gcy
+    R1_gcy.list[[i]] <- tmp$R1_gcy
+    R2_gcy.list[[i]] <- tmp$R2_gcy
     covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
     covcor_omega2.list[[i]] <- tmp$lowercov_uppercor_omega2
     covcor_epsilon1.list[[i]] <- tmp$lowercov_uppercor_epsilon1
   }
-  ## Merge this into 4d array
+  ## Merge these into 4d arrays, last dimension is posterior draw number
   D_gcyn <- array(do.call(c, D_gcy.list), dim=c(dim(tmp$D_gcy), nrow(df)))
   stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
+  R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
+  stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
+  R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
+  stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
   ## Organize the corcov matrices
   covcor_omega1 <- array(do.call(c, covcor_omega1.list), dim=c(3,3, nrow(df)))
   covcor_omega2 <- array(do.call(c, covcor_omega2.list), dim=c(3,3, nrow(df)))
@@ -127,6 +134,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
+              R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
   return(out)
@@ -261,6 +269,52 @@ plot.density.map.mcmc <- function(index){
                  textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
+  }
+}
+
+
+plot.R1.map.mcmc <- function(index){
+  if(is.null(index$R1_gcyn)){
+    warning("R1_gcyn missing from index so skipping density maps")
+  } else {
+    R1_gcyn <- index$R1_gcyn
+    Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
+                                Extrapolation_List=Extrapolation_List)
+    Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+    Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+    mdl <- Mapdetails
+    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+    Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+    ## For each strata calculate mean probability of occurence
+    MatStrata <- apply(R1_gcyn, 1:3, mean)
+    zlimtmp <- c(0,1)
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatStrata[,ii,],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_R1_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=zlimtmp,
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
+    ## ## Repeat with CVs
+    ## MatStrata <- apply(R1_gcyn, 1:3, function(x) sd(x)/mean(x))
+    ## zlimtmp <- c(0, max(MatStrata))
+    ## for(ii in 1:3){
+    ##   PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+    ##              Mat=MatStrata[,ii,],
+    ##              PlotDF=mdl$PlotDF,
+    ##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+    ##              FileName=paste0(savedir, '/mcmc_map_R1CV_',ii),
+    ##              Year_Set=Year_Set[Years2Include],
+    ##              Legend=mdl$Legend, zlim=zlimtmp,
+    ##              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+    ##              textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+    ##              oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    ## }
   }
 }
 
