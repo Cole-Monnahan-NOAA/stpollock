@@ -239,8 +239,8 @@ plot.density.map.mcmc <- function(index){
     mdl <- Mapdetails
     Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
     Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-    ## For each strata calculate the mean density
-    MatStrata <- log(apply(D_gcyn, 1:3, mean))
+    ## For each strata calculate the mean log density
+    MatStrata <- apply(log(D_gcyn), 1:3, mean)
     zlimtmp <- range(MatStrata)
     for(ii in 1:3){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
