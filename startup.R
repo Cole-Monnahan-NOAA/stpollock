@@ -108,7 +108,9 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   }
   ## Massage to get the catchability by gear type
   tmp <- dcast(index.gear, year+iter~gear, value.var='density')
-  availability <- within(tmp, {BTS=BTS/(Total); ATS=ATS/(Total)})
+  ## Availability is in natural space
+  availability <- within(tmp, {BTS=exp(BTS)/exp(Total);
+    ATS=exp(ATS)/exp(Total)})
   availability <- melt(availability, id.vars=c('year', 'iter'),
                        measure.vars=c('ATS', 'BTS'),
                        variable.name='gear', value.name='availability')
