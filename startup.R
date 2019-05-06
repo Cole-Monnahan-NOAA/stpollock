@@ -19,6 +19,50 @@ Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
+locate.year <- function(yr){
+  library(maps)
+  library(geosphere)
+  map('world2', xlim=c(180, 202), ylim=c(53,63), add=FALSE)
+  map.axes()
+  with(subset(ats, year==yr), points(360+lon,lat, pch=16, cex=.1))
+  with(subset(bts, year==yr), points(360+lon, lat, pch=1, cex=.1, col=2))
+  locs <- as.data.frame(locator())
+  points(locs, pch=15)
+  iseq <- seq(1, nrow(locs), by=2)
+  out <- list()
+  for(i in iseq){
+    ## this gap is 1/2 nautical miles
+    out[[i]] <- add.zeroes(locs[i,], locs[i+1,], gap=0.926)
+    points(out[[i]], pch=5, cex=.1)
+  }
+  out <- do.call(rbind, out)
+  df <- data.frame(X=-999, year=yr, lon=out[,1]-360, lat=out[,2],
+                   dist=NA, surface=NA, ground=NA,
+                   strata1=0, strata2=0, strata3=0)
+  return(df)
+}
+
+## out <- add.zeroes(c(-175,59), c(-174, 56), gap=.01)
+## plot(out, pch=5)
+add.zeroes <- function(p1, p2, gap){
+  ## Function to add points with zero observations between coordinates p1
+  ## and p2 with a distance between them of gap (in km).
+  p1 <- as.numeric(p1)
+  p2 <- as.numeric(p2)
+  ## Need to get distance on globe then calculate how many points to create
+  ## equally space ones with the right gap.
+  ## distance in km
+  dist <- distHaversine(p1=c(p1[1]-360, p1[2]), p2=c(p2[1]-360, p2[2]))/1000
+  steps <- round(dist/gap)
+  if(p1[1]==p2[1]) p2[1] <- p2[1]+.01 # prevent infinite slope
+  z2 <- p2-p1; z1 <- c(0,0)
+  slope <- z2[2]/z2[1]
+  if(slope<0)  xseq <- seq(z2[1], z1[1], length=steps)
+  else xseq <- seq(z1[1], z2[1], length=steps)
+  yseq <- xseq*slope
+  out <- data.frame(lon=xseq+p1[1], lat=yseq+p1[2])
+  out
+}
 
 process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Report  <-  Obj$report()
