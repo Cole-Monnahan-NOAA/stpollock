@@ -141,25 +141,6 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
 }
 
 plot.covcor.mcmc <- function(index){
-  plot.covcor <- function(covcor, Llab){
-    par(mfrow=c(3,3), mgp=c(3,.5,0), mar=c(2,.5,2,.5), oma=c(0,0,2,0))
-    for(i in 1:3){
-      for(j in 1:3){
-        if(j<=i){
-          xlim <- c(-1,1)
-          lab <- paste0('cor(',i, ',', j, ')')
-          if(j==i){
-            xlim <- c(0, max(covcor[j,i,]))
-            lab <- paste0('var(', j,')')
-          }
-          hist(covcor[j,i,], xlim=xlim, ylab=NA, xlab=NA, main=lab, yaxt='n'); box()
-        } else {
-          plot(0,0, type='n', axes=FALSE, ann=FALSE)
-        }
-      }
-    }
-    mtext(Llab, line=0, outer=TRUE, cex=1.5)
-  }
   ## Plot each one separately
   savedir <- index$savedir
   png(paste0(savedir, '/covcor_omega1.png'), width=7, height=5, res=500, units='in')
@@ -172,6 +153,27 @@ plot.covcor.mcmc <- function(index){
   plot.covcor(index$covcor$covcor_epsilon1, 'epsilon1')
   dev.off()
 }
+
+plot.covcor <- function(covcor, Llab){
+  par(mfrow=c(3,3), mgp=c(3,.5,0), mar=c(2,.5,2,.5), oma=c(0,0,2,0))
+  for(i in 1:3){
+    for(j in 1:3){
+      if(j<=i){
+        xlim <- c(-1,1)
+        lab <- paste0('cor(',i, ',', j, ')')
+        if(j==i){
+          xlim <- c(0, max(covcor[j,i,]))
+          lab <- paste0('var(', j,')')
+        }
+        hist(covcor[j,i,], xlim=xlim, ylab=NA, xlab=NA, main=lab, yaxt='n'); box()
+      } else {
+        plot(0,0, type='n', axes=FALSE, ann=FALSE)
+      }
+    }
+  }
+  mtext(Llab, line=0, outer=TRUE, cex=1.5)
+}
+
 
 plot.availability.map.mcmc <- function(index){
   if(is.null(index$D_gcyn)){
