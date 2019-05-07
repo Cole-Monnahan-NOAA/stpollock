@@ -9,7 +9,7 @@
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 ## default is to estimate both lambdas
 fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
-filterdata <- ifelse(is.null(control$filterdata), FALSE, control$filterdata)
+filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
@@ -291,6 +291,10 @@ if(model=='combined'){
     if(ncol==2) c(out,5)
     out
   }
+  ## Put broad uniform priors on all parameters
+  TmbList$Lower[grep('L_omega|L_epsil', names(TmbList$Lower))] <- -10
+  TmbList$Upper[grep('L_omega|L_epsil', names(TmbList$Upper))] <- 10
+
   ## If using multiple factors set teh diagonals to be positive to prevent
   ## label switching
   TmbList$Lower[grep('L_omega1_z', names(TmbList$Lower))[which.diag(3,n_omega1)]] <- 0

@@ -3,12 +3,6 @@
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
 
-## The ats data is really high resolution so truncating this for now to
-## make things faster and fix the mesh which is overly weighted to the ats
-## data otherwise
-## warning("still subsetting the ATS")
-## ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
-
 ## ## The hard part is getting the coordinates to plot between. I do this by
 ## ## plotting the annual data on a map and then use the locator() function to
 ## ## manually select pairs of points which mimic the track of the AT survey
@@ -32,9 +26,17 @@ ats <- read.csv('data/ats.csv')
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
 ats <- rbind(ats.zeroes, ats)
-g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
-  facet_wrap('year') + theme_bw()
-ggsave('plots/ats.zeroes.png', g, width=10, height=7)
+## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
+##   facet_wrap('year') + theme_bw()
+## ggsave('plots/ats.zeroes.png', g, width=10, height=7)
+
+## The ats data is really high resolution so truncating this for now to
+## make things faster and fix the mesh which is overly weighted to the ats
+## data otherwise
+if(filterdata){
+  warning("still subsetting the ATS")
+  ats <- ats[seq(1, nrow(ats), len=3*nrow(bts)),]
+}
 
 ## Normalize the covariates. Does it make sense to do that here with depths
 ## in different strata??
@@ -53,11 +55,11 @@ ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 ## ats <- subset(ats, depth<400)
 
 ## Temporarily drop some years
-if(filterdata){
-  message("filtering out years <2011")
-  bts <- subset(bts, year <2011)
-  ats <- subset(ats, year <2011)
-}
+## if(filterdata){
+##   message("filtering out years <2011")
+##   bts <- subset(bts, year <2011)
+##   ats <- subset(ats, year <2011)
+## }
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
