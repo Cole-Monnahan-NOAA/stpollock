@@ -335,6 +335,8 @@ Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
 
 
 if(make_plots){
+  if(!dir.exists(paste0(savedir, '/data_plots')))
+    dir.create(paste0(savedir, '/data_plots'))
   silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
                       Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
   ## Some custom maps of the data properties
@@ -361,7 +363,7 @@ if(make_plots){
                  Mat=MatDat[,ii,Years2Include,drop=TRUE],
                  PlotDF=mdl$PlotDF,
                  MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-                 FileName=paste0(savedir, '/map_data_avg_', ii),
+                 FileName=paste0(savedir, '/data_plots/map_data_avg_', ii),
                  Year_Set=Year_Set[Years2Include],
                  Legend=mdl$Legend, zlim=zlim,
                  mfrow = c(ceiling(sqrt(length(Years2Include))),
@@ -377,7 +379,7 @@ if(make_plots){
                  Mat=MatDat[,ii,Years2Include,drop=TRUE],
                  PlotDF=mdl$PlotDF,
                  MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-                 FileName=paste0(savedir, '/map_data_pres_', ii),
+                 FileName=paste0(savedir, '/data_plots/map_data_pres_', ii),
                  Year_Set=Year_Set[Years2Include],
                  Legend=mdl$Legend, zlim=c(0,1),
                  mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
@@ -390,7 +392,7 @@ if(make_plots){
                  Mat=MatDatSD[,ii,Years2Include,drop=TRUE],
                  PlotDF=mdl$PlotDF,
                  MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-                 FileName=paste0(savedir, '/map_data_sd_', ii),
+                 FileName=paste0(savedir, '/data_plots/map_data_sd_', ii),
                  Year_Set=Year_Set[Years2Include],
                  Legend=mdl$Legend, zlim=range(MatDatSD, na.rm=TRUE),
                  mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
@@ -409,15 +411,48 @@ if(make_plots){
                Mat=MatDat[,Years2Include],
                PlotDF=mdl$PlotDF, zlim=c(0,1),
                MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-               FileName=paste0(savedir, '/map_data_ratio'),
+               FileName=paste0(savedir, '/data_plots/map_data_ratio'),
                Year_Set=Year_Set[Years2Include],
                Legend=mdl$Legend,
                mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
                textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
                oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
-}
 
+  ## Calculate raw indices from the data. Took the vAST code and modified to
+  ## do it in R
+  gears <- c('BTS', 'ATS_3-16m', 'ATS>16m')
+  a_g <- as.numeric(TmbData$a_gl)
+  D_gcy <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                  FUN=mean, na.rm=TRUE)
+  Index_cy <- matrix(0, nrow=3, ncol=nyr,
+                     dimnames=list(gear=gears,
+                                   year=years))
+  Index_gcy <- array(NA, dim=c(length(a_g), 3, nyr),
+                     dimnames=list(knot=1:length(a_g), gear=gears,
+                                   year=years))
+  for(y in 1:length(years)){
+    ## Expand by area and convert from kg to metric tonnes
+    for(c in 1:3){
+      for(g in 1:length(a_g)){
+        if(!is.na(D_gcy[g,c,y])){
+          Index_gcy[g,c,y] <- D_gcy[g,c,y]*a_g[g]/1000
+          Index_cy[c,y] <- Index_cy[c,y]+ D_gcy[g,c,y]*a_g[g]/1000
+        }
+      }
+    }
+  }
+  index.data <- melt(Index_cy)
+  index.data <- index.data[-which(index.data$value==0),]
+  g <- ggplot(index.data, aes(year, log(value), group=gear, color=gear)) +
+    geom_line() + geom_point() + ylab("Log density") + ggtitle('Raw Data Index')
+  ggsave(paste0(savedir, '/data_plots/raw_data_index.png'), g, width=7, height=5)
+  index.data.knot <- dcast(melt(Index_gcy), year+knot~gear)
+  png(paste0(savedir, '/data_plots/raw_data_pairs.png'), width=7, height=5,
+      units='in', res=500)
+  pairs(log(index.data.knot[, c(3:5)]), upper.panel=NULL)
+  dev.off()
+}
 
 ### old experimental stuff
 ## Params$beta2_ft <- Params$beta2_ft+5
