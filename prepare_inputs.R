@@ -418,11 +418,13 @@ if(make_plots){
                textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
                oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
-
   ## Calculate raw indices from the data. Took the vAST code and modified to
-  ## do it in R
-  gears <- c('BTS', 'ATS_3-16m', 'ATS>16m')
+  ## do it in R. First the totally naive way without space which includes
+  ## the added zeroes
   a_g <- as.numeric(TmbData$a_gl)
+  IndexNaive <- ddply(subset(Data_Geostat, X != -999), .(Gear,Year), summarize,
+                density=sum(a_g)/1000*mean(Catch_KG, na.rm=TRUE))
+  gears <- levels(IndexNaive$Gear) ##c('BTS', 'ATS_3-16m', 'ATS>16m')
   D_gcy <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                   FUN=mean, na.rm=TRUE)
   Index_cy <- matrix(0, nrow=3, ncol=nyr,
@@ -444,13 +446,26 @@ if(make_plots){
   }
   index.data <- melt(Index_cy)
   index.data <- index.data[-which(index.data$value==0),]
-  g <- ggplot(index.data, aes(year, log(value), group=gear, color=gear)) +
-    geom_line() + geom_point() + ylab("Log density") + ggtitle('Raw Data Index')
-  ggsave(paste0(savedir, '/data_plots/raw_data_index.png'), g, width=7, height=5)
+  names(IndexNaive) <- names(index.data)
+  index.raw <- rbind(cbind(type='Naive Spatial',index.data), cbind(type='Naive',IndexNaive))
+  g <- ggplot(index.raw, aes(year, log(value), group=gear, color=gear)) +
+    geom_line() + geom_point() + ylab("Log density") +
+    ggtitle(paste0('Raw Data Index w/ n_x=', control$n_x)) + facet_wrap('type') + theme_bw()
+  ggsave(paste0(savedir, '/data_plots/raw_data_index.png'), g, width=9, height=5)
   index.data.knot <- dcast(melt(Index_gcy), year+knot~gear)
   png(paste0(savedir, '/data_plots/raw_data_pairs.png'), width=7, height=5,
       units='in', res=500)
-  pairs(log(index.data.knot[, c(3:5)]), upper.panel=NULL)
+  pairs(log(index.data.knot[, c(3:5)]), upper.panel=NULL, cex=.75,
+        col=rgb(0,0,0,.5), main=paste('n_x=', control$n_x))
+  dev.off()
+  ## Also make pairs of presence
+  P_gcy <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                  FUN=function(x) mean(x>0, na.rm=TRUE))
+  index.presence.knot <- dcast(melt(P_gcy), Year+knot_i~Gear)
+  png(paste0(savedir, '/data_plots/raw_data_pairs_presence.png'), width=7, height=5,
+      units='in', res=500)
+  pairs(index.presence.knot[, c(3:5)], upper.panel=NULL, cex=.75,
+        col=rgb(0,0,0,.5), main=paste('n_x=', control$n_x), xlim=c(0,1), ylim=c(0,1))
   dev.off()
 }
 

@@ -63,13 +63,13 @@ ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
-                   Vessel='none', depth=bts$depth, depth2=bts$depth2)
+                   Vessel='none', depth=bts$depth, depth2=bts$depth2, X=bts$X)
 DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2)
+                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
 DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2)
+                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
 
 ## ## Simulate a fake process
 ## f <- function(mu, sd, p){
