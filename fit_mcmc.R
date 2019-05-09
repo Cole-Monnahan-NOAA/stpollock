@@ -5,6 +5,35 @@ source('startup.R')
 model <- 'combined'
 
 
+## Base model: ST1 w/ kappas off and with timevarying catchability.
+control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=2,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
+                kappaoff=12, temporal=2, fixlambda=-1, make_plots=TRUE)
+savedir <- paste0(getwd(), '/mcmc_kappaoff_tvlambda_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best', thin=2,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+## Base model: Same but with 3 factors for S and ST effects
+control <- list(seed=121, beta2temporal=TRUE, n_x=75,
+                n_eps1=3, n_omega1=3, n_omega2=3, n_eps2=0,
+                beta1temporal=TRUE, combinedoff=FALSE,
+                kappaoff=12, temporal=2, fixlambda=-1, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_base_nf3')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+
+
 ## ST1 with estimated kappa1
 control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
                 beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
@@ -18,29 +47,30 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
-## ST1 w/ kappa1 fixed by timevarying catchability
-control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
+## ST1 w/ kappa1 estimated and timevarying catchability and more knots for
+## higher resolution but only on LP1
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, n_eps1=2,
                 beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
-                kappaoff=12, temporal=2, fixlambda=-1)
-savedir <- paste0(getwd(), '/mcmc_kappaoff_tvlambda_ST')
+                kappaoff=12, temporal=2, fixlambda=-1, finescale=TRUE)
+savedir <- paste0(getwd(), '/mcmc_kappa1est_tvlambda_ST_finescale')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,
-               init='last.par.best',
-               control=list(max_treedepth=14))
+               init='last.par.best', thin=2,
+               control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 ## ST1 w/ kappa1 estimated and with timevarying catchability
-control <- list(seed=121, beta2temporal=TRUE, n_x=50, n_eps1=2,
+control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=2,
                 beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
-                kappaoff=2, temporal=2, fixlambda=-1)
-savedir <- paste0(getwd(), '/mcmc_kappa1est_tvlambda_ST')
+                kappaoff=12, temporal=2, fixlambda=-1, make_plots=TRUE)
+savedir <- paste0(getwd(), '/mcmc_kappaoff_tvlambda_ST')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,
-               init='last.par.best',
-               control=list(max_treedepth=14))
+               init='last.par.best', thin=2,
+               control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
@@ -113,4 +143,52 @@ covs <- data.frame(t(apply(xx2, 1, L_to_cov)))
 names(covs) <- paste0('cov_vec', 1:6)
 png('plots/cov_vec_test2.png', width=9, height=7, res=500, units='in')
 pairs(covs, col=ifelse(pos, 1,2), gap=0, cex=.5)
+dev.off()
+
+
+## What are the implied priors on the covariances and correlations?
+L_to_covcor <- function(Lvec, ncol=2, nrow=3){
+  ## Take L vector and create lower triangular matrix with correlations and
+  ## diagonals are variances
+  Lvec <- as.numeric(Lvec)
+  L <- matrix(0, nrow, ncol)
+  counter <- 1
+  for(r in 1:nrow){
+    for(c in 1:ncol){
+      if(r>=c){
+        L[r,c] <- Lvec[counter]
+        counter <- counter+1
+      }
+    }
+  }
+  covar <- L %*% t(L)
+  covcor <- cov2cor(covar)
+  diag(covcor) <- diag(covar)
+  covcor
+}
+
+
+## Random draws from uniform L with three types of bounds. First with
+## really broad on all Ls
+nsim <- 100000
+L <- matrix(runif(nsim*5, min=-100, max=100), ncol=5)
+covcor <- aperm(laply(1:nsim, function(i) L_to_covcor(L[i,])), perm=c(2,3,1))
+png('plots/covcor_100.png', width=7, height=5, units='in', res=500)
+plot.covcor(covcor, '[-100,100] bounds')
+dev.off()
+
+## Repeat with narrower bounds
+L <- matrix(runif(nsim*5, min=-5, max=5), ncol=5)
+covcor <- aperm(laply(1:nsim, function(i) L_to_covcor(L[i,])), perm=c(2,3,1))
+png('plots/covcor_5.png', width=7, height=5, units='in', res=500)
+plot.covcor(covcor, '[-5,5] bounds')
+dev.off()
+
+## Repeat with the bounds currently used
+ind <- grep(x=names(TmbList$Upper), 'L_omega1_z')
+L <- t(sapply(1:nsim, function(i)  runif(5, min=TmbList$Lower[ind], max=TmbList$Upper[ind])))
+
+covcor <- aperm(laply(1:nsim, function(i) L_to_covcor(L[i,])), perm=c(2,3,1))
+png('plots/covcor_constrained.png', width=7, height=5, units='in', res=500)
+plot.covcor(covcor, '[-5,5] bounds')
 dev.off()

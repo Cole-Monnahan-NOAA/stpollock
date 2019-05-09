@@ -2,22 +2,18 @@
 source("startup.R")
 model <- 'combined'
 
-## Try fitting
-control <- list(seed=121, beta2temporal=TRUE, temporal=2, n_x=75, n_eps1=0,
-                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE, fixlambda=-1)
-savedir <- paste0(getwd(), '/fit_combined_S_tvlambda')
+## ST1 w/ kappas fixed and with timevarying catchability
+control <- list(seed=121, beta2temporal=TRUE, n_x=1000, n_eps1=2,
+                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
+                kappaoff=12, temporal=2, fixlambda=-1, make_plots=TRUE)
+savedir <- paste0(getwd(), '/fit_kappaoff_tvlambda_ST')
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,
                 newtonsteps=0, control=list(trace=10))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE,
-               init='last.par.best',
-               control=list(max_treedepth=8))
-saveRDS(object = fit, file=paste0(savedir,'/mcmc_fit.RDS'))
-plot.mcmc(Obj, savedir, fit)
+
 
 
 
