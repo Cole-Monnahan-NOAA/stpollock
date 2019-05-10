@@ -206,10 +206,13 @@ plot.covcor <- function(covcor, Llab){
         xlim <- c(-1,1)
         lab <- paste0('cor(',i, ',', j, ')')
         if(j==i){
-          xlim <- c(0, max(covcor[j,i,]))
-          lab <- paste0('var(', j,')')
+          xlim <- c(0, max(sqrt(covcor[j,i,])))
+          lab <- paste0('SD(', j,')')
+          hist(sqrt(covcor[j,i,]), xlim=xlim, ylab=NA, xlab=NA, main=lab, yaxt='n'); box()
+        } else {
+          hist(covcor[j,i,], xlim=xlim, ylab=NA, xlab=NA, main=lab,
+               yaxt='n'); box()
         }
-        hist(covcor[j,i,], xlim=xlim, ylab=NA, xlab=NA, main=lab, yaxt='n'); box()
       } else {
         plot(0,0, type='n', axes=FALSE, ann=FALSE)
       }
@@ -220,6 +223,7 @@ plot.covcor <- function(covcor, Llab){
 
 
 plot.availability.map.mcmc <- function(index){
+  savedir <- index$savedir
   if(is.null(index$D_gcyn)){
     warning("D_gcyn missing from index so skipping availability maps")
   } else {
@@ -274,6 +278,7 @@ plot.availability.map.mcmc <- function(index){
 }
 
 plot.density.map.mcmc <- function(index){
+  savedir <- index$savedir
   if(is.null(index$D_gcyn)){
     warning("D_gcyn missing from index so skipping density maps")
   } else {
