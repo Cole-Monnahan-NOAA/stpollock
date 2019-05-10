@@ -287,8 +287,6 @@ if(model=='combined'){
         if(r>=c) counter <- counter+1
       }
     }
-    ## Why does this need to be positive too?
-    if(ncol==2) c(out,5)
     out
   }
   ## Put broad uniform priors on all parameters
