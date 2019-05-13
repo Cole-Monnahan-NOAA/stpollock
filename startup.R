@@ -131,9 +131,13 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
   stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
   ## Organize the corcov matrices
-  covcor_omega1 <- array(do.call(c, covcor_omega1.list), dim=c(3,3, nrow(df)))
-  covcor_omega2 <- array(do.call(c, covcor_omega2.list), dim=c(3,3, nrow(df)))
-  covcor_epsilon1 <- array(do.call(c, covcor_epsilon1.list), dim=c(3,3, nrow(df)))
+  covcor_omega1 <- covcor_omega2 <- covcor_epsilon1 <- NULL
+  if(length(covcor_omega1.list)>0)
+    covcor_omega1 <- array(do.call(c, covcor_omega1.list), dim=c(3,3, nrow(df)))
+  if(length(covcor_omega2.list)>0)
+    covcor_omega2 <- array(do.call(c, covcor_omega2.list), dim=c(3,3, nrow(df)))
+  if(length(covcor_epsilon1.list)>0)
+    covcor_epsilon1 <- array(do.call(c, covcor_epsilon1.list), dim=c(3,3, nrow(df)))
   covcor <- list(covcor_omega1=covcor_omega1, covcor_omega2=covcor_omega2,
                  covcor_epsilon1=covcor_epsilon1)
   index.gear <- do.call(rbind, index.gear.tmp)
@@ -187,15 +191,21 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
 plot.covcor.mcmc <- function(index){
   ## Plot each one separately
   savedir <- index$savedir
-  png(paste0(savedir, '/covcor_omega1.png'), width=7, height=5, res=500, units='in')
-  plot.covcor(index$covcor$covcor_omega1, 'omega1')
-  dev.off()
-  png(paste0(savedir, '/covcor_omega2.png'), width=7, height=5, res=500, units='in')
-  plot.covcor(index$covcor$covcor_omega2, 'omega2')
-  dev.off()
-  png(paste0(savedir, '/covcor_epsilon1.png'), width=7, height=5, res=500, units='in')
-  plot.covcor(index$covcor$covcor_epsilon1, 'epsilon1')
-  dev.off()
+  if(!is.null(index$covcor$covcor_omega1)){
+    png(paste0(savedir, '/covcor_omega1.png'), width=7, height=5, res=500, units='in')
+    plot.covcor(index$covcor$covcor_omega1, 'omega1')
+    dev.off()
+  }
+  if(!is.null(index$covcor$covcor_omega2)){
+    png(paste0(savedir, '/covcor_omega2.png'), width=7, height=5, res=500, units='in')
+    plot.covcor(index$covcor$covcor_omega2, 'omega2')
+    dev.off()
+  }
+  if(!is.null(index$covcor$covcor_epsilon1)){
+    png(paste0(savedir, '/covcor_epsilon1.png'), width=7, height=5, res=500, units='in')
+    plot.covcor(index$covcor$covcor_epsilon1, 'epsilon1')
+    dev.off()
+  }
 }
 
 plot.covcor <- function(covcor, Llab){

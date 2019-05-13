@@ -30,9 +30,9 @@ if(model != 'combined'){
   n_eps2 <- ifelse(is.null(control$n_eps2), 1, control$n_eps2)
 } else {
   n_omega1 <- ifelse(is.null(control$n_omega1), 2, control$n_omega1)
-  n_omega2 <- ifelse(is.null(control$n_omega2), 2, control$n_omega2)
+  n_omega2 <- ifelse(is.null(control$n_omega2), 0, control$n_omega2)
   n_eps1 <- ifelse(is.null(control$n_eps1), 2, control$n_eps1)
-  n_eps2 <- ifelse(is.null(control$n_eps2), 2, control$n_eps2)
+  n_eps2 <- ifelse(is.null(control$n_eps2), 0, control$n_eps2)
 }
 
 ## if(space!='ST'){
@@ -433,11 +433,11 @@ if(make_plots){
                                    year=years))
   for(y in 1:length(years)){
     ## Expand by area and convert from kg to metric tonnes
-    for(c in 1:3){
+    for(cc in 1:3){
       for(g in 1:length(a_g)){
-        if(!is.na(D_gcy[g,c,y])){
-          Index_gcy[g,c,y] <- D_gcy[g,c,y]*a_g[g]/1000
-          Index_cy[c,y] <- Index_cy[c,y]+ D_gcy[g,c,y]*a_g[g]/1000
+        if(!is.na(D_gcy[g,cc,y])){
+          Index_gcy[g,cc,y] <- D_gcy[g,cc,y]*a_g[g]/1000
+          Index_cy[cc,y] <- Index_cy[cc,y]+ D_gcy[g,cc,y]*a_g[g]/1000
         }
       }
     }
