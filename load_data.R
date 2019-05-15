@@ -35,7 +35,7 @@ ats <- rbind(ats.zeroes, ats)
 ## data otherwise
 if(filterdata){
   warning("still subsetting the ATS")
-  ats <- ats[seq(1, nrow(ats), len=3*nrow(bts)),]
+  ats <- ats[seq(1, nrow(ats), len=1*nrow(bts)),]
 }
 
 ## Normalize the covariates. Does it make sense to do that here with depths
@@ -55,11 +55,11 @@ ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 ## ats <- subset(ats, depth<400)
 
 ## Temporarily drop some years
-## if(filterdata){
-##   message("filtering out years <2011")
-##   bts <- subset(bts, year <2011)
-##   ats <- subset(ats, year <2011)
-## }
+if(filteryears){
+  message("filtering out years <2011")
+  bts <- subset(bts, year <2011)
+  ats <- subset(ats, year <2011)
+}
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
