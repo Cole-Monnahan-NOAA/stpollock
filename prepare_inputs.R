@@ -10,6 +10,7 @@ finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 ## default is to estimate both lambdas
 fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
+filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
@@ -46,9 +47,11 @@ if(model != 'combined'){
 #stopifnot(temporal %in% c(2,4)) ## RW or AR1 only
 stopifnot(model %in% c('ats', 'bts', 'combined'))
 ## stopifnot(space %in% c('NS', 'S', 'ST'))
-if(n_eps1+n_eps2>0){
+## Be careful since these n's can be equal to "IID" which does weird things
+## with logical statements
+if(any(n_eps1>0, n_eps2>0)){
   space <- 'ST'
-} else if(n_omega1+n_omega2>0){
+} else if(any(n_omega1>0,n_omega2>0)){
   space <- 'S'
 } else {
   space <- 'NS'
@@ -92,7 +95,8 @@ ObsModel <- c(1,1)
 Options <-  c("SD_site_density"=0, "SD_site_logdensity"=1,
               "Calculate_Range"=1, "Calculate_evenness"=0,
               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
-              'Calculate_Synchrony'=0, 'Calculate_Coherence'=0)
+              'Calculate_Synchrony'=0, 'Calculate_Coherence'=0,
+              'Calculate_proportion'=1)
 ## Stratification for results
 strata.limits <- data.frame('STRATA'="All_areas")
 Region <- "Eastern_Bering_Sea"
@@ -280,6 +284,7 @@ if(model=='combined'){
     ## L.  Thus L_vec[which.diag(L_vec)] will be the diagonal elements.
     counter  <- 1
     out <- NULL
+    if(ncol=="IID") return(1:3)
     for(r in 1:nrow){
       for(c in 1:ncol){
         ## Only save index of the diagonals
