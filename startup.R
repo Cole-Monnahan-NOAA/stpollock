@@ -659,7 +659,7 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 }
 
 
-plot.vastfit <- function(results, plotQQ=FALSE){
+plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   beta1 <- data.frame(beta='beta1_ft',year=years,t(results$ParHatList$beta1_ft))
   beta2 <- data.frame(beta='beta2_ft',year=years,t(results$ParHatList$beta2_ft))
   names(beta1)[3:5] <- names(beta2)[3:5] <- c('0-3m', '3-16m', '16+')
@@ -773,61 +773,63 @@ plot.vastfit <- function(results, plotQQ=FALSE){
                    zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
                    oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   }
-  plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
-                  TmbData=TmbData )
-  ## Some built-in maps
-  tmp <- c(1,2,3, 11, 12)
-  if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
-  ## Temporary hack to get v8.0.0 to work with this function
-  Report$D_xcy <- Report$D_gcy
-  Report$R1_xcy <- Report$R1_gcy
-  Report$R2_xcy <- Report$R2_gcy
-  Report$D_gcy <- Report$R1_gcy <- Report$R2_gcy <- NULL
-  TmbData$X_xtp <- TmbData$X_gtp
-  Dens_xt = plot_maps(plot_set=tmp,
-                      MappingDetails=Mapdetails[["MappingDetails"]],
-                      Report=Report, Sdreport=Opt$SD,
-                      TmbData=TmbData,
-                      PlotDF=Mapdetails[["PlotDF"]],
-                      MapSizeRatio=Mapdetails[["MapSizeRatio"]],
-                      Xlim=Mapdetails[["Xlim"]],
-                      Ylim=Mapdetails[["Ylim"]], FileName=paste0(savedir,'/'),
-                      Year_Set=Year_Set, Years2Include=Years2Include,
-                      Rotate=Mapdetails[["Rotate"]],
-                      Cex=Mapdetails[["Cex"]],
-                      Legend=Mapdetails[["Legend"]],
-                      zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
-                      oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
-  ## Dens_DF = cbind( "Density"=as.vector(Dens_xt),
-  ##                 "Year"=Year_Set[col(Dens_xt)],
-  ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
-  ##                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
-  Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
-  ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
-  plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
-  if(results$Index$model[1]=='combined'){
-    ## Plot ratio of observed/predicted by grid cell for the three gear types
-    MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
-                      FUN=mean, na.rm=TRUE))
-    MatExp <- Report$D_xcy
-    MatRatio <- array(NA, dim=dim(MatDat))
-    ## BTS is sum over first two strata
-    MatRatio[,1,] <- MatDat[,1,]/apply(MatExp[,-3,], 2, sum)
-    MatRatio[,2,] <- MatDat[,2,]/MatExp[,2,]
-    MatRatio[,3,] <- MatDat[,3,]/MatExp[,3,]
-    MatRatio <- log(MatRatio)
-    MatRatio[is.infinite(MatRatio)] <- NA
-    for(ii in 1:3){
-      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-                 Mat=MatRatio[,ii,Years2Include,drop=TRUE],
-                 PlotDF=mdl$PlotDF,
-                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-                 FileName=paste0(savedir, '/map_data_ratio_', ii),
-                 Year_Set=Year_Set[Years2Include],
-                 Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
-                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-                 textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
-                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+  if(plotmaps){
+    plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
+                    TmbData=TmbData )
+    ## Some built-in maps
+    tmp <- c(1,2,3, 11, 12)
+    if(results$Index$space[1]=='ST') tmp <- c(tmp, 6,7)
+    ## Temporary hack to get v8.0.0 to work with this function
+    Report$D_xcy <- Report$D_gcy
+    Report$R1_xcy <- Report$R1_gcy
+    Report$R2_xcy <- Report$R2_gcy
+    Report$D_gcy <- Report$R1_gcy <- Report$R2_gcy <- NULL
+    TmbData$X_xtp <- TmbData$X_gtp
+    Dens_xt = plot_maps(plot_set=tmp,
+                        MappingDetails=Mapdetails[["MappingDetails"]],
+                        Report=Report, Sdreport=Opt$SD,
+                        TmbData=TmbData,
+                        PlotDF=Mapdetails[["PlotDF"]],
+                        MapSizeRatio=Mapdetails[["MapSizeRatio"]],
+                        Xlim=Mapdetails[["Xlim"]],
+                        Ylim=Mapdetails[["Ylim"]], FileName=paste0(savedir,'/'),
+                        Year_Set=Year_Set, Years2Include=Years2Include,
+                        Rotate=Mapdetails[["Rotate"]],
+                        Cex=Mapdetails[["Cex"]],
+                        Legend=Mapdetails[["Legend"]],
+                        zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
+                        oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+    ## Dens_DF = cbind( "Density"=as.vector(Dens_xt),
+    ##                 "Year"=Year_Set[col(Dens_xt)],
+    ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
+    ##                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
+    Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
+    ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
+    plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
+    if(results$Index$model[1]=='combined'){
+      ## Plot ratio of observed/predicted by grid cell for the three gear types
+      MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
+                        FUN=mean, na.rm=TRUE))
+      MatExp <- Report$D_xcy
+      MatRatio <- array(NA, dim=dim(MatDat))
+      ## BTS is sum over first two strata
+      MatRatio[,1,] <- MatDat[,1,]/apply(MatExp[,-3,], 2, sum)
+      MatRatio[,2,] <- MatDat[,2,]/MatExp[,2,]
+      MatRatio[,3,] <- MatDat[,3,]/MatExp[,3,]
+      MatRatio <- log(MatRatio)
+      MatRatio[is.infinite(MatRatio)] <- NA
+      for(ii in 1:3){
+        PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                   Mat=MatRatio[,ii,Years2Include,drop=TRUE],
+                   PlotDF=mdl$PlotDF,
+                   MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                   FileName=paste0(savedir, '/map_data_ratio_', ii),
+                   Year_Set=Year_Set[Years2Include],
+                   Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
+                   mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                   textmargin='log(Obs/Exp)', zone=mdl$Zone, mar=c(0,0,2,0),
+                   oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+      }
     }
   }
   ## Pearson resids for detection and catch rate
