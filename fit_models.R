@@ -2,15 +2,15 @@
 source("startup.R")
 model <- 'combined'
 
-## ST1 w/ kappas fixed and with timevarying catchability
-control <- list(seed=121, beta2temporal=TRUE, n_x=1000, n_eps1=2,
-                beta1temporal=TRUE, n_eps2=0, combinedoff=FALSE,
-                kappaoff=12, temporal=2, fixlambda=-1, make_plots=TRUE)
-savedir <- paste0(getwd(), '/fit_kappaoff_tvlambda_ST')
+control <- list(seed=121, beta2temporal=TRUE, beta1temporal=TRUE,
+                n_eps1='IID', n_eps2='IID', n_omega1="IID", n_omega2='IID',
+                combinedoff=FALSE, filteryears=TRUE,
+                kappaoff=0, temporal=0, fixlambda=12)
+savedir <- paste0(getwd(), '/fit_IID_test1')
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5, getsd=TRUE,
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=0, control=list(trace=10))
+                newtonsteps=1, control=list(trace=10))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 
