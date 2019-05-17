@@ -448,9 +448,11 @@ if(make_plots){
     }
   }
   index.data <- melt(Index_cy)
-  index.data <- index.data[-which(index.data$value==0),]
+  index.data <- index.data[which(index.data$value>0),]
   names(IndexNaive) <- names(index.data)
-  index.raw <- rbind(cbind(type='Naive Spatial',index.data), cbind(type='Naive',IndexNaive))
+  index.raw <- rbind(cbind(type='Naive Spatial',index.data),
+                     cbind(type='Naive',IndexNaive))
+  write.csv(index.raw, file=paste0(savedir, '/index.raw.csv'))
   g <- ggplot(index.raw, aes(year, log(value), group=gear, color=gear)) +
     geom_line() + geom_point() + ylab("Log density") +
     ggtitle(paste0('Raw Data Index w/ n_x=', control$n_x)) + facet_wrap('type') + theme_bw()
