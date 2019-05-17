@@ -19,6 +19,19 @@ Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
+get.resids.tmp <- function(case){
+  type <- 'combined'
+  if(length(grep('combinedoff', x=savedir))>0) type <- 'combinedoff'
+  results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+  sigtmp <- results$Report$SigmaM[as.numeric(Data_Geostat$Gear)]^2/2
+  df <- data.frame(obs=log(Data_Geostat$Catch_KG),
+                   predicted= log(results$Report$R2_i)-sigtmp,
+                   gear=Data_Geostat$Gear,
+                   year=Data_Geostat$Year, case=case, type=type)
+  df <- subset(df, obs>0) ## drop zeroes
+  df
+}
+
 get.index.tmp <- function(case){
   type <- 'combined'
   if(length(grep('combinedoff', x=savedir))>0) type <- 'combinedoff'
