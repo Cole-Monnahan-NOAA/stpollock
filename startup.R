@@ -19,6 +19,37 @@ Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
+get.index.tmp <- function(case){
+  type <- 'combined'
+  if(length(grep('combinedoff', x=savedir))>0) type <- 'combinedoff'
+  results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+  index.model <- results$Index.strata
+  if(type=='combined'){
+    ## Need to recalculate the gears for BTS, ats1 and ats2
+    tmp <- dcast(index.model[,c('year', 'strata', 'est')],
+                 year~strata, value.var='est')
+    tmp[,'BTS'] <- log(exp(tmp$stratum1)+exp(tmp$stratum2))
+    tmp[,'ATS1'] <- tmp$stratum2
+    tmp[,'ATS2'] <- tmp$stratum3
+    index.model <- melt(tmp[, c('year', 'BTS', 'ATS1', 'ATS2')],
+                        id.vars='year', value.name='logdensity', variable.name='gear')
+  } else {
+    ## strata here are actually gears b/c not summing
+    levels(index.model$strata) <- c("BTS", 'ATS1', 'ATS2')
+    index.model$gear <- index.model$strata
+    index.model$logdensity <- index.model$est
+  }
+  index.model$model <- 'model'
+  index.raw$model <- 'raw data'
+  index.model$case <- index.raw$case <- case
+  index.model$type <- index.raw$type <- type
+  index.raw$logdensity <- log(index.raw$value)
+  x <- c('case', 'model', 'type', 'year', 'gear', 'logdensity')
+  out <- rbind(index.model[,x], index.raw[,x])
+  out
+}
+
+
 locate.year <- function(yr){
   library(maps)
   library(geosphere)
