@@ -56,9 +56,14 @@ ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 
 ## Temporarily drop some years
 if(filteryears){
-  message("filtering out years <2011")
-  bts <- subset(bts, year <2011)
-  ats <- subset(ats, year <2011)
+  message("filtering out years w/o ATS data")
+  ## bts <- subset(bts, year <2011)
+  ## ats <- subset(ats, year <2011)
+  bts <- subset(bts, year %in% unique(ats$year))
+  ## Put these in numeric order to prevent bugs in code later. Otherwise
+  ## VAST will make predictions in those years without any data.
+  bts$year <- as.numeric(as.factor(bts$year))
+  ats$year <- as.numeric(as.factor(ats$year))
 }
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
