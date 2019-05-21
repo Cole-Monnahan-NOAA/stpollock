@@ -1,17 +1,52 @@
-## script to dig deeper into convergence issues by looking deeper at betas ñ
+
+## Look at what happens with Ls at crash point with different model structure
+source("startup.R")
+## Test combined spatial model
+model <- 'combined'; space <- 'ST'
+control <- list(seed=112, n_eps1=0, n_eps2=0, beta2temporal=FALSE, beta1temporal=TRUE,
+                n_omega2=0, n_omega1=2, n_x=25)
+savedir <- paste0(getwd(), '/test_omega1only')
+##set.seed(112) ## seed 111 works for ST; 112 crashes out
+options(warn=0)
+source("prepare_inputs.R")
+options(warn=2) # stop on a warning
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE, loopnum=3,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(iter.max=300, trace=1))
+options(warn=0)
+
+## What are the implied priors on covariance among strata?
+all <- Obj$env$last.par
+fixed <- all[-Obj$env$random]
+fixed[grep('L_omega1',names(fixed))]
+rep <- Obj$report(all)
+rep$lowercov_uppercor_omega1
+rep$lowercov_uppercor_omega2
+rep$lowercov_uppercor_epsilon1
+
+## Keep the diagonal L's away from 0
+TmbList$Lower[c(2,4)] <- .1
+options(warn=2) # stop on a warning
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE, loopnum=3,
+                upper=TmbList$Upper,  savedir=savedir,
+                newtonsteps=0, control=list(iter.max=300, trace=1))
+options(warn=0)
+
+ 109139.67-108695.73
+
+## script to dig deeper into convergence issues by looking deeper at betas
 
 source("startup.R")
 ## Test combined spatial model
-n_x <- 50
 model <- 'combined'; space <- 'ST'
-control <- list(seed=112, n_eps2=0, beta2temporal=FALSE,
-                finescale=TRUE)
+control <- list(seed=112, n_eps1=0, n_eps2=0, beta2temporal=TRUE, beta1temporal=TRUE,
+                n_omega2=0, n_omega1=2, n_x=25)
 savedir <- paste0(getwd(), '/fit_', model, "_", space,  "_", n_x)
 ##set.seed(112) ## seed 111 works for ST; 112 crashes out
 options(warn=0)
 source("prepare_inputs.R")
-## options(warn=2) # stop on a warning
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=TRUE, loopnum=10,
+options(warn=2) # stop on a warning
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, getsd=FALSE, loopnum=10,
                 upper=TmbList$Upper,  savedir=savedir,
                 newtonsteps=0, control=list(iter.max=300, trace=1))
 options(warn=0)
@@ -31,6 +66,13 @@ sort(evs$values)[1:4]
 png('testing/eigenvalues.png', res=500, units='in', width=7, height=5)
 plot(log10(evs$values+1e-4))
 dev.off()
+
+## What are the implied priors on covariance among strata?
+fixed[grep('L_omega1',names(fixed))]
+rep <- Obj$report(all)
+rep$lowercov_uppercor_omega1
+rep$lowercov_uppercor_omega1
+rep$lowercov_uppercor_epsilon1
 
 ## Try rebuilding it with LA turned off and fixed effects at the MLE
 Map$L_beta1_z <- factor(c(NA, NA, NA))
