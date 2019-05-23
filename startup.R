@@ -519,7 +519,7 @@ plot.index.mcmc <- function(index, savedir){
   ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
   ## Do relative densities by strata and year for median
   tmp <- dcast(index$index.strata, year~stratum, value.var='est')
-  tmp[,2:4] <- tmp[,2:4]/rowSums(tmp[2:4])
+  tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
   index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
                            value.name='pct.density')
   index.strata.pct$stratum <- factor(index.strata.pct$stratum,
@@ -778,6 +778,17 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
+
+  ## Do relative densities by strata and year for median
+  tmp <- dcast(results$Index.strata, year~strata, value.var='est')
+  tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
+  index.strata.pct <- melt(tmp, 'year', variable.name='strata',
+                           value.name='pct.density')
+  index.strata.pct$strata <- factor(index.strata.pct$strata,
+                                     levels=rev(levels(results$Index.strata$strata)) )
+  g <- ggplot(index.strata.pct, aes(year, pct.density, fill=strata)) +
+    geom_area()
+  ggsave(file.path(savedir, 'pct_strata.png'), g, width=7, height=5)
   Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                               Extrapolation_List=Extrapolation_List)
   Mapdetails$Legend$x <- Mapdetails$Legend$x-70
