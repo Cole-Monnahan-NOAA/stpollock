@@ -1,8 +1,24 @@
 ## File to run the fits to the real data
-chains <- 5
+chains <- 12
 options(mc.cores = chains)
 source('startup.R')
 model <- 'combined'
+
+
+## Base model: IID ST w/ kappas off and filtered years but no temporal
+## smoothing on anything.
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE,
+                kappaoff=12, temporal=0, fixlambda=12, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_base_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=10))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 
 ## Base model: ST1 w/ kappas off and with timevarying catchability.
@@ -10,6 +26,19 @@ control <- list(seed=121, beta2temporal=TRUE, n_x=75, n_eps1=2,
                 beta1temporal=TRUE, n_eps2=0, n_omega2=0,
                 kappaoff=12, temporal=2, fixlambda=-1, make_plots=TRUE)
 savedir <- paste0(getwd(), '/mcmc_omega2off_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+## Base model: ST1 w/ kappas off and with timevarying catchability.
+control <- list(seed=121, beta2temporal=FALSE, n_x=75, n_eps1=0, filteryears=TRUE,
+                n_omega1='IID', beta1temporal=TRUE, n_eps2=0, n_omega2=0,
+                kappaoff=12, temporal=0, fixlambda=12, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_base_IID_S')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,

@@ -564,7 +564,7 @@ plot.pairs.mcmc <- function(fit, savedir){
   pars.all <- names(fit)
   p <- pars.all[grep('L_omega1_z', x=pars.all)]
   if(length(p)>1){
-    png(paste0(savedir, '/pairs_L_omega1.png'), width=9, height=9, res=500, units='in')
+    png(paste0(savedir, '/pairs_L_omega1.png'), width=7, height=5, res=500, units='in')
     pairs(fit, pars=p, gap=0)
     dev.off()
   }
@@ -591,12 +591,12 @@ plot.pairs.mcmc <- function(fit, savedir){
   pairs(fit, pars=p, gap=0)
   dev.off()
   p <- pars.all[grep('lambda|Beta_mean|L_beta', x=pars.all)]
-  if(length(p)<14){
+  if(length(p)<14 & length(p) >0){
     png(paste0(savedir, '/pairs_scale.png'), width=7, height=5, res=500, units='in')
     pairs(fit, pars=p, gap=0)
     dev.off()
   } else {
-    warning("in plot.pairs.mcmc the 'scale' plot had too many parameters")
+    warning("in plot.pairs.mcmc the 'scale' plot had too many/few parameters")
   }
 }
 
