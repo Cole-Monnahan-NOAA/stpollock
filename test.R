@@ -1,27 +1,51 @@
+source("startup.R")
+model <- 'combined'
 
-### Test effect of increasing number of knots
-fits <- list()
-for(n in c(10,20,40)){
-control <- list(beta2temporal=FALSE, n_x=n,
-                n_eps1='IID', n_eps2='IID', n_omega2="IID", n_omega1="IID",
-                beta1temporal=FALSE, filteryears=TRUE,
-                kappaoff=12, temporal=0, fixlambda=2, make_plots=FALSE)
+### Test effect of increasing number of knots. Note I commented out the
+### prepare.inputs line where I run teh model once for this test
+nlls0 <- nlls <- inits0 <- inits <- results0 <- fits <- list()
+nn <- seq(10, 100, by=5)
+for(n in nn){
+control <- list(beta2temporal=TRUE, n_x=n,
+                ## n_eps1='IID', n_eps2='IID',
+                n_eps1=0, n_eps2=0,
+                n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE, combinedoff=TRUE,
+                kappaoff=0, temporal=0, fixlambda=12, make_plots=FALSE)
 savedir <- paste0(getwd(), '/test_', control$n_x)
 source("prepare_inputs.R")
+inits0[[n]] <- Obj$report(Obj$env$last.par)$jnll
+nlls0[[n]] <- Obj$report()$jnll_comp
+inits[[n]] <- Obj$fn()
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=FALSE,
                 upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=0, control=list(trace=10))
+                newtonsteps=1, control=list(trace=10))
+## results0[[n]] <- process.results(Opt, Obj, Inputs, model, space, savedir)
+## plot.vastfit(results[[n]])
 fits[[n]] <- Opt
+nlls[[n]] <- Obj$report()$jnll_comp
 }
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
 
-unlist(sapply(fits, function(x) x$objective))
+par(mfrow=c(1,3))
+plot(nn, unlist(inits0), type='b')
+do.call(rbind, nlls0)
+rowSums(do.call(rbind, nlls0))-unlist(inits0)
+plot(nn, unlist(inits), type='b')
+do.call(rbind, nlls)
+rowSums(do.call(rbind, nlls))-unlist(inits)
+plot(nn, unlist(sapply(fits, function(x) x$objective)), type='b',
+     xlab='n_knots', y='NLL')
+unlist(sapply(fits, function(x) x$max_grad))
+
+par(mfrow=c(1,1))
+tmp <- unlist(sapply(fits, function(x) x$objective))
+plot(x=nn, type='b', xlab='n_knots', ylab='NLL',
+     y=tmp-min(tmp))
 
 
 ## Look at why betas and lambdas can go so crazy
 chains <- 1
-options(mc.cores = chains)
+options(mc.cores = \chains)
 source('startup.R')
 model <- 'combined'
 control <- list(seed=121, beta2temporal=FALSE, filterdata=TRUE,
