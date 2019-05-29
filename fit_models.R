@@ -2,17 +2,43 @@
 source("startup.R")
 model <- 'combined'
 
-control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+control <- list(seed=121, beta2temporal=TRUE, n_x=51,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=TRUE,
-                kappaoff=12, temporal=0, fixlambda=12, make_plots=FALSE)
+                kappaoff=12, temporal=0, fixlambda=2, make_plots=FALSE)
 savedir <- paste0(getwd(), '/fit_base_ST')
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,
                 newtonsteps=0, control=list(trace=10))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Base + smoothing even the no missing years
+control <- list(seed=121, beta2temporal=TRUE, n_x=51,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_smoother_ST')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=10))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Base + smoothing w/ missing years
+control <- list(seed=121, beta2temporal=TRUE, n_x=51,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_smootherfull_ST')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=10))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
 
 
 

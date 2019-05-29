@@ -10,7 +10,7 @@ res1.1 <- res1.2 <- res2.1 <- res2.2 <- res3.1 <- res3.2 <-
 
 ## Base case simplified model
 control <- list(seed=121, beta2temporal=FALSE, beta1temporal=TRUE,
-                n_eps1=0, n_eps2=0, n_omega1=0, n_omega2=0, n_x=100,
+                n_eps1=0, n_eps2=0, n_omega1=0, n_omega2=0, n_x=51,
                 combinedoff=FALSE, filteryears=TRUE, make_plots=TRUE,
                 kappaoff=0, temporal=0, fixlambda=12)
 savedir <- paste0(getwd(), '/test1_combined')
@@ -29,6 +29,7 @@ plot.vastfit(results)
 control$combinedoff <- TRUE; control$make_plots <- FALSE
 savedir <- paste0(getwd(), '/test1_combinedoff')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
@@ -41,6 +42,7 @@ res1.2 <- get.resids.tmp('1: base case')
 control$combinedoff <- FALSE; control$beta2temporal=TRUE
 savedir <- paste0(getwd(), '/test2_combined')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
@@ -51,6 +53,7 @@ res2.1 <- get.resids.tmp("2: + beta2 FE")
 control$combinedoff <- TRUE
 savedir <- paste0(getwd(), '/test2_combinedoff')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
@@ -63,6 +66,7 @@ res2.2 <- get.resids.tmp("2: + beta2 FE")
 control$combinedoff <- FALSE; control$n_omega1 <- control$n_omega2 <- 'IID'
 savedir <- paste0(getwd(), '/test3_combined')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper, savedir=savedir, newtonsteps=0)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
@@ -73,6 +77,7 @@ res3.1 <- get.resids.tmp("3: + spatial IID")
 control$combinedoff <- TRUE
 savedir <- paste0(getwd(), '/test3_combinedoff')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
@@ -84,10 +89,12 @@ res3.2 <- get.resids.tmp("3: + spatial IID")
 
 ## Add spatiotemporal
 control$combinedoff <- FALSE; control$n_eps1 <- control$n_eps2 <- 'IID'
+control$n_x <- 49
 savedir <- paste0(getwd(), '/test4_combined')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
+                upper=TmbList$Upper, savedir=savedir, newtonsteps=0)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 aic4.1 <- Opt$AIC
@@ -96,8 +103,9 @@ res4.1 <- get.resids.tmp("4: + spatiotemporal IID")
 control$combinedoff <- TRUE
 savedir <- paste0(getwd(), '/test4_combinedoff')
 source("prepare_inputs.R")
+rm(Opt)
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper, savedir=savedir, newtonsteps=1)
+                upper=TmbList$Upper, savedir=savedir, newtonsteps=0)
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results)
 aic4.2 <- Opt$AIC
@@ -117,7 +125,8 @@ g <- ggplot(subset(res.all, year==1), aes(obs, predicted, color=type)) + geom_po
   facet_grid(case~gear) + geom_abline(slope=1, intercept=0)
 ggsave('plots/index_buildup_resids.png', g, width=8, height=9)
 
-aic.table <- cbind(c(aic1.1, aic2.1, aic3.1, aic4.1, aic5.1, aic6.1),
-                   c(aic1.2, aic2.2, aic3.2, aic4.2, aic5.2, aic6.2))
+aic.table <- cbind(c(aic1.1, aic2.1, aic3.1, aic4.1),
+                   c(aic1.2, aic2.2, aic3.2, aic4.2))
+aic.table
 delta.aic.table <- aic.table-apply(aic.table, 2, min)
 delta.aic.table
