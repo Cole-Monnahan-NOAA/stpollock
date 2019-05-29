@@ -34,9 +34,50 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
+## Base model + smoothing on years but  w/ missing years
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE,
+                kappaoff=12, temporal=2, fixlambda=12, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_smootherfull_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE, warmup=200,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 
+## Base model + smoothing on years but  w/ missing years + catchability estimated
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_smootherfull_lambda1_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE, warmup=200,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=8))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
+
+## Base model + smoothing on years but  w/ missing years + catchability
+## estimated + finescale
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE, finescale=TRUE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/mcmc_smootherfull_lambda1_finscale_ST')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=600, open_progress=FALSE,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 
 ## Temp code to plot indices and availability by the three scenarios above
