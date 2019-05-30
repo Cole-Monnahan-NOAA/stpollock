@@ -28,3 +28,4 @@ convergence_progress.txt
 testing
 .Rproj.user
 mcmc_*
+fit_*
