@@ -19,6 +19,39 @@ Version <- "VAST_v8_0_0"
 
 source("simulator.R")
 
+plot.change <- function(Report){
+  Dtmp <- Report()$D_gcy
+  dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+  Dtmp.wide <- melt(Dtmp)
+  pct <- ddply(Dtmp.wide, .(cell, year), mutate, pct=value/sum(value))
+  ## g <- ggplot(pct, aes(year, pct, fill=stratum)) + geom_area() + facet_wrap('cell')
+  pct2 <- subset(pct, stratum=='0-3m')
+  MatDat <- ddply(pct2, .(cell), function(x) {
+    fit <- lm(pct~year, data=x)
+    out <- data.frame(slope=coef(fit)[2], pvalue=summary(fit)$coefficients[2,4] )
+    row.names(out) <- NULL
+    out
+  })
+  temp <- merge(pct2, MatDat, by='cell')
+  temp$significant <- temp$pvalue<.05
+  ## g <- ggplot(temp, aes(year, pct, group=cell, color=slope)) + geom_line() + facet_wrap('significant')
+  ## MatDat[,2] <- ifelse(MatDat$pvalue<.05, MatDat[,2], 0)
+  mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
+                       Extrapolation_List=Extrapolation_List )
+  ## Some grids have only zero observations
+
+  PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(MatDat[,2], ncol=1),
+             PlotDF=mdl$PlotDF, zlim=range(MatDat[,2]),
+             MapSizeRatio=mdl$MapSizeRatio,
+             Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+             FileName=paste0(savedir, '/map_change'),
+             Year_Set=Year_Set[1], Legend=mdl$Legend,
+             mfrow = c(1,1),
+             zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+             oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+
+}
+
 get.resids.tmp <- function(case){
   type <- 'combined'
   if(length(grep('combinedoff', x=savedir))>0) type <- 'combinedoff'
@@ -937,6 +970,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
     geom_point(alpha=.5) + theme_bw()
   ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
          width=7, height=5)
+  plot.change(Report)
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my
