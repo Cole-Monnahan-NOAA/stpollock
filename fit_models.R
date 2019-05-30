@@ -2,6 +2,22 @@
 source("startup.R")
 model <- 'combined'
 
+## Base case for paper
+control <- list(seed=121, beta2temporal=TRUE, n_x=200,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
+savedir <- paste0(getwd(), '/fit_basecase')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=10))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+
+
+
 control <- list(seed=121, beta2temporal=TRUE, n_x=51,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=TRUE,
@@ -41,6 +57,19 @@ results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results, plotmaps=TRUE)
 
 
+## Base model + smoothing on years but  w/ missing years + catchability
+## estimated + more knots but no finescale
+control <- list(seed=121, beta2temporal=TRUE, n_x=200,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
+savedir <- paste0(getwd(), '/fit_smootherfull_lambda1_hires')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=10))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
 
 
 ## Test bias adjustment for index. Run this once then again with a slightly different n_x and change
