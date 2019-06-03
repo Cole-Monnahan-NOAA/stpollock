@@ -3,11 +3,11 @@ source("startup.R")
 model <- 'combined'
 
 ## Base case for paper
-control <- list(seed=121, beta2temporal=TRUE, n_x=200,
+control <- list(seed=121, beta2temporal=TRUE, n_x=100,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
                 kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/fit_basecase')
+savedir <- paste0(getwd(), '/fit_basecase_100')
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,

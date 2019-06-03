@@ -1,21 +1,21 @@
 ## File to run the fits to the real data
-chains <- 12
+chains <- 8
 options(mc.cores = chains)
 source('startup.R')
 model <- 'combined'
 
 
 ## Base case for paper
-control <- list(seed=121, beta2temporal=TRUE, n_x=200,
+control <- list(seed=121, beta2temporal=TRUE, n_x=100,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
                 kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/mcmc_basecase')
+savedir <- paste0(getwd(), '/mcmc_basecase_100')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, warmup=200,
                init='last.par.best', thin=1,
-               control=list(max_treedepth=14))
+               control=list(max_treedepth=10))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
