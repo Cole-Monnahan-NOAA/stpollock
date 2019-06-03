@@ -4,14 +4,13 @@ model <- 'combined'
 ### Test effect of increasing number of knots. Note I commented out the
 ### prepare.inputs line where I run teh model once for this test
 nlls0 <- nlls <- inits0 <- inits <- results0 <- fits <- list()
-nn <- seq(10, 100, by=5)
+nn <- seq(10, 50, by=5)
 for(n in nn){
 control <- list(beta2temporal=TRUE, n_x=n,
                 ## n_eps1='IID', n_eps2='IID',
-                n_eps1=0, n_eps2=0,
-                n_omega2="IID", n_omega1="IID",
+                n_omega2='IID', n_omega1="IID",
                 beta1temporal=TRUE, filteryears=TRUE, combinedoff=TRUE,
-                kappaoff=0, temporal=0, fixlambda=12, make_plots=FALSE)
+                kappaoff=12, temporal=0, fixlambda=12, make_plots=FALSE)
 savedir <- paste0(getwd(), '/test_', control$n_x)
 source("prepare_inputs.R")
 inits0[[n]] <- Obj$report(Obj$env$last.par)$jnll
