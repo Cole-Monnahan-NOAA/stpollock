@@ -20,7 +20,8 @@ Version <- "VAST_v8_0_0"
 source("simulator.R")
 
 plot.change <- function(Report){
-  Dtmp <- Report()$D_gcy
+  ## Look at trend in % of population <3m.
+  Dtmp <- Report$D_gcy
   dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
   Dtmp.wide <- melt(Dtmp)
   pct <- ddply(Dtmp.wide, .(cell, year), mutate, pct=value/sum(value))
@@ -38,8 +39,6 @@ plot.change <- function(Report){
   ## MatDat[,2] <- ifelse(MatDat$pvalue<.05, MatDat[,2], 0)
   mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
                        Extrapolation_List=Extrapolation_List )
-  ## Some grids have only zero observations
-
   PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(MatDat[,2], ncol=1),
              PlotDF=mdl$PlotDF, zlim=range(MatDat[,2]),
              MapSizeRatio=mdl$MapSizeRatio,
@@ -50,6 +49,103 @@ plot.change <- function(Report){
              zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
              oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
 
+  ## Look at correlation among strata in each grid cell
+  Dtmp <- Report$Epsilon1_gct
+  if(!is.null(Dtmp)){
+    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+    Dtmp.wide <- melt(Dtmp)
+    Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
+    names(Dtmp.long)[3:5] <- c('stratum1', 'stratum2', 'stratum3')
+    g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
+      geom_point()+ facet_wrap('cell') +
+      theme(strip.background = element_blank(), strip.text.x = element_blank())
+    ggsave(file.path(savedir, 'eps1_correlations_pairwise.png'), g, width=12, height=9)
+    cors <- ddply(Dtmp.wide, .(cell), function(x){
+      s1=subset(x, stratum=='0-3m')$value
+      s2=subset(x, stratum=='3-16m')$value
+      s3=subset(x, stratum=='16+')$value
+      data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
+    })
+    cors.wide <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,2], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps1_cor12'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,3], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps1_cor13'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,4], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps1_cor23'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+  }
+  ## Repeat for eps2
+  Dtmp <- Report$Epsilon2_gct
+  if(!is.null(Dtmp)){
+    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+    Dtmp.wide <- melt(Dtmp)
+    Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
+    names(Dtmp.long)[3:5] <- c('stratum1', 'stratum2', 'stratum3')
+    g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
+      geom_point()+ facet_wrap('cell') +
+      theme(strip.background = element_blank(), strip.text.x = element_blank())
+    ggsave(file.path(savedir, 'eps2_correlations_pairwise.png'), g, width=12, height=9)
+    cors <- ddply(Dtmp.wide, .(cell), function(x){
+      s1=subset(x, stratum=='0-3m')$value
+      s2=subset(x, stratum=='3-16m')$value
+      s3=subset(x, stratum=='16+')$value
+      data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
+    })
+    cors.wide2 <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
+    cors.wide3 <- rbind(cbind(variable='epsilon1',cors.wide), cbind(variable='epsilon2',cors.wide2))
+    names(cors.wide3)[2] <- 'correlation'
+    g <- ggplot(cors.wide3, aes(x=value)) + geom_histogram(position='identity', bins=20) +
+      facet_grid(variable~correlation)
+    ggsave(file.path(savedir, 'eps_correlations.png'), g, width=7, height=5)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,2], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps2_cor12'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,3], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps2_cor13'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,4], ncol=1),
+               PlotDF=mdl$PlotDF, zlim=c(-1,1),
+               MapSizeRatio=mdl$MapSizeRatio,
+               Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/map_eps2_cor23'),
+               Year_Set=Year_Set[1], Legend=mdl$Legend,
+               mfrow = c(1,1),
+               zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=.5, plot_legend_fig=FALSE, pch=16)
+  }
 }
 
 get.resids.tmp <- function(case){
