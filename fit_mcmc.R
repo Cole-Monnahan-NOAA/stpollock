@@ -1,5 +1,5 @@
 ## File to run the fits to the real data
-chains <- 8
+chains <- 10
 options(mc.cores = chains)
 source('startup.R')
 model <- 'combined'
@@ -15,7 +15,7 @@ source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, warmup=200,
                init='last.par.best', thin=1,
-               control=list(max_treedepth=10))
+               control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
@@ -31,7 +31,7 @@ source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=600, open_progress=FALSE,
                init='last.par.best', thin=1,
-               control=list(max_treedepth=10))
+               control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
