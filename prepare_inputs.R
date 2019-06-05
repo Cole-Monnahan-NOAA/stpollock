@@ -114,15 +114,6 @@ trash <- file.copy(file.path('models', paste0(Version, '.dll')),
                    to=file.path(savedir, paste0(Version, '.dll')))
 trash <- file.copy(file.path('models', paste0(Version, '.o')),
                    to=file.path(savedir, paste0(Version, '.o')))
-Record <- list("Version"=Version, "Method"=Method,
-               "grid_size_km"=grid_size_km, "n_x"=n_x,
-               "FieldConfig"=FieldConfig, "RhoConfig"=RhoConfig,
-               "OverdispersionConfig"=OverdispersionConfig,
-               "ObsModel"=ObsModel, "Region"=Region,
-               "strata.limits"=strata.limits,
-               control=control)
-save( Record, file=file.path(savedir,"Record.RData"))
-capture.output( Record, file=paste0(savedir,"/Record.txt"))
 
 ### Step 4: Construct VAST model based on inputs and data
 Q_ik <- NULL ## catchability covariates, updated below for combined model?
@@ -473,6 +464,19 @@ if(make_plots){
         col=rgb(0,0,0,.5), main=paste('n_x=', control$n_x), xlim=c(0,1), ylim=c(0,1))
   dev.off()
 }
+
+Record <- list(Version=Version, Method=Method,
+               grid_size_km=grid_size_km, n_x=n_x,
+               FieldConfig=FieldConfig, RhoConfig=RhoConfig,
+               OverdispersionConfig=OverdispersionConfig,
+               ObsModel=ObsModel, Region=Region,
+               strata.limits=strata.limits,
+               control=control, Extrapolation_List=Extrapolation_List,
+               Spatial_List=Spatial_List, Data_Geostat=Data_Geostat,
+               PlotDF=PlotDF)
+save( Record, file=file.path(savedir,"Record.RData"))
+
+
 
 ### old experimental stuff
 ## Params$beta2_ft <- Params$beta2_ft+5
