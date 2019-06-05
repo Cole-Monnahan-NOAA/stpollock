@@ -326,6 +326,11 @@ Obj$env$last.par.best <- Obj$env$last.par
 loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
 names(loc) <- c('E_km', 'N_km')
 Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
+## MapDetails_list for saving and plotting
+mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
+                     Extrapolation_List=Extrapolation_List )
+mdl$Legend$x <- mdl$Legend$x-70
+mdl$Legend$y <- mdl$Legend$y-45
 
 
 if(make_plots){
@@ -336,10 +341,6 @@ if(make_plots){
   ## Some custom maps of the data properties
   if(model=='combined'){
     ## Plot log average catch in grid
-    mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
-                         Extrapolation_List=Extrapolation_List )
-    mdl$Legend$x <- mdl$Legend$x-70
-    mdl$Legend$y <- mdl$Legend$y-45
     Year_Set <- sort(unique(Data_Geostat$Year))
     Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
     MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
@@ -473,7 +474,7 @@ Record <- list(Version=Version, Method=Method,
                strata.limits=strata.limits,
                control=control, Extrapolation_List=Extrapolation_List,
                Spatial_List=Spatial_List, Data_Geostat=Data_Geostat,
-               PlotDF=PlotDF)
+               MapDetails_List=mdl)
 save( Record, file=file.path(savedir,"Record.RData"))
 
 
