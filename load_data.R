@@ -2,35 +2,79 @@
 
 bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
-set.seed(1)
-ats$surface <- rnorm(nrow(ats))
-bts$depth <- rnorm(nrow(bts))
+
+## ## The hard part is getting the coordinates to plot between. I do this by
+## ## plotting the annual data on a map and then use the locator() function to
+## ## manually select pairs of points which mimic the track of the AT survey
+## ## if it had kept going. Then I place points between each pair. This is
+## ## totally manual but I can save the locator output to file for
+## ## reproducibility.
+## ## To reproduce this, uncomment the below lines and run through each year
+## ## using the locator function (see help). Build year at a time and then
+## ## combine them together and save to file.
+## locs <- list()
+## locs[[2007]] <- locate.year(2007)
+## locs[[2008]] <- locate.year(2008)
+## locs[[2009]] <- locate.year(2009)
+## locs[[2010]] <- locate.year(2010)
+## locs[[2012]] <- locate.year(2012)
+## locs[[2014]] <- locate.year(2014)
+## locs[[2016]] <- locate.year(2016)
+## locs[[2018]] <- locate.year(2018)
+## ats.zeroes <- do.call(rbind, locs)
+## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
+message("Adding zeroes onto ATS data set")
+ats.zeroes <- readRDS('data/ats.zeroes.RDS')
+ats <- rbind(ats.zeroes, ats)
+## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
+##   facet_wrap('year') + theme_bw()
+## ggsave('plots/ats.zeroes.png', g, width=10, height=7)
 
 ## The ats data is really high resolution so truncating this for now to
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
-ats <- ats[seq(1, nrow(ats), len=nrow(bts)),]
+if(filterdata){
+  warning("still subsetting the ATS")
+  ats <- ats[seq(1, nrow(ats), len=1*nrow(bts)),]
+}
 
-## Normalize the covariates
+## Normalize the covariates. Does it make sense to do that here with depths
+## in different strata??
 norm <- function(x) (x-mean(x, na.rm=TRUE))/sd(x, na.rm=TRUE)
-bts$depth <- norm(bts$depth)
+## bts$depth <- norm(bts$depth)
 bts$depth2 <- bts$depth^2
-## bts$mlength <- norm(bts$mean_length)
-## bts$temp.bottom <- norm(bts$temp.bottom)
-## bts$temp.surface <- norm(bts$temp.surface)
-ats$depth <- norm(ats$surface)
+ats$depth <- ats$surface# norm(ats$surface)
 ats$depth2 <- ats$depth^2
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 
+
+## Filter data off the shelf
+## hist(bts$depth)
+## hist(ats$depth)
+## bts <- subset(bts, depth<200)
+## ats <- subset(ats, depth<400)
+
+## Temporarily drop some years
+if(filteryears){
+  message("filtering out years w/o ATS data")
+  ## bts <- subset(bts, year <2011)
+  ## ats <- subset(ats, year <2011)
+  bts <- subset(bts, year %in% unique(ats$year))
+  ## Put these in numeric order to prevent bugs in code later. Otherwise
+  ## VAST will make predictions in those years without any data.
+  bts$year <- as.numeric(as.factor(bts$year))
+  ats$year <- as.numeric(as.factor(ats$year))
+}
+
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
-                   Vessel='none', depth=bts$depth, depth2=bts$depth2)
+                   Vessel='none', depth=bts$depth, depth2=bts$depth2, X=bts$X)
 DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2)
+                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
 DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2)
+                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
 
 ## ## Simulate a fake process
 ## f <- function(mu, sd, p){

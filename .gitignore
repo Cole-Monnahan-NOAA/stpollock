@@ -24,4 +24,8 @@ fit_*/*Record.RData
 fit_*/parameter_estimates.RData
 QQ_Fn
 simulation_progress.txt
-
+convergence_progress.txt
+testing
+.Rproj.user
+mcmc_*
+fit_*

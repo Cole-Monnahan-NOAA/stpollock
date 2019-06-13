@@ -1,55 +1,89 @@
-## File to run the fits to the real data
-rm(list=ls())
-source('startup.R')
-## Models are (combined, bts only, ats only) x (no space, space, spatiotemporal)
 
+source("startup.R")
 
+## Use the posterior medians for initial values of fixed effects
+fit <- readRDS("mcmc_basecase_100/mcmcfit.RDS")
+pars.fixed <- apply(as.data.frame(fit)[,-Obj$env$random], 2, median)
+pars.all <- apply(as.data.frame(fit), 2, median)
 
-
-## Fit all versions of model
-n_x <- 200 # number of knots
-for(m in 3){
-for(s in 1:3){
-model <- c('ats', 'bts', 'combined')[m]
-space <- c('NS', 'S', 'ST')[s]
-savedir <- paste0(getwd(), '/fit_', model, "_", space, '_', n_x)
+## Base case for paper: combined model
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_100')
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
-                upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=1, control=list(trace=10))
-## TMBhelper::Check_Identifiable(Obj)
+Obj$env$last.par <- pars.all[-length(pars.all)]
+Obj$par <- pars.fixed[-length(pars.fixed)]
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=6, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=1, control=list(trace=1))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results)
-}
-}
+plot.vastfit(results, plotmaps=TRUE)
 
-## Test increasing resolution
-for(n_x in 2^(11:12)){
-  space <- "S"; model <- 'combined'
-  savedir <- paste0(getwd(), '/knots_combined_S_',n_x)
+## Repeat with just the BTS
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='bts',
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_100_bts')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=1, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Repeat with just the ATS
+control$model <- 'ats'
+savedir <- paste0(getwd(), '/fit_basecase_100_ats')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=1, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Base case for paper w/ finescale on
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=FALSE, finescale=TRUE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_finscale')
+source("prepare_inputs.R")
+Obj$par <- pars.fixed[-length(pars.fixed)]
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=6, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+
+### Fit some resolution tests on the two independent model since they're
+### stable
+library(snowfall)
+sfInit(parallel=TRUE, cpus=4)
+inputs <- expand.grid(n_x=2^(4:5), fs=c(FALSE, TRUE)[1], model=c('ats', 'bts')[1])
+sfExport('inputs')
+results.list <- sfLapply(1:nrow(inputs), function(ii){
+  fs <- inputs$fs[ii]
+  n_x <- inputs$n_x[ii]
+  model <- inputs$model[ii]
+  source("startup.R")
+  control <<- list(seed=121, beta2temporal=TRUE, n_x=n_x, finescale=fs,
+                   ## n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                   n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                   beta1temporal=TRUE, filteryears=FALSE,
+                   kappaoff=0, temporal=2, fixlambda=12,
+                   make_plots=FALSE)
+  savedir <<- paste0(getwd(), '/resolution_tests/test_', n_x, '_', model)
+  if(fs) savedir <<- paste0(savedir, '_finescale')
   source("prepare_inputs.R")
-  Opt <- Optimize(obj=Obj, lower=TmbList$Lower,
-                  upper=TmbList$Upper,  savedir=savedir,
-                newtonsteps=1, control=list(trace=10))
-  ## TMBhelper::Check_Identifiable(Obj)
+  Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                  upper=TmbList$Upper,   savedir=savedir,
+                  newtonsteps=0, control=list(trace=10))
   results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-}
+  results$n_x <- n_x; results$finescale <- fs
+  return(results)
+})
 
-
-### Some MCMC tests
-library(tmbstan)
-library(shinystan)
-options(mc.cores = 7)
-## n_x <- 200
-## model <- 'combined'
-## space <- 'S'
-## source("prepare_inputs.R")
-lwr <- TmbList$Lower
-lwr[grep('L_', names(lwr))] <- 0
-mcmc <- tmbstan(obj=Obj, iter=1000, chains=7,
-                init='par', upper= TmbList$Upper,
-                lower=lwr,
-                 control=list(max_treedepth=8, adapt_delta=.9),
-                open_progress=FALSE)
-saveRDS(mcmc, file='mcmc.RDS')
-launch_shinystan(mcmc)

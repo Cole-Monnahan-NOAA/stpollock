@@ -1,9 +1,9 @@
 ## Read in results and evalulate the models
 library(plyr)
 library(ggplot2)
+xx <- list.dirs(full.names=FALSE, recursive=FALSE)
 
 ## Pull out the results for the main fits to the model and plot key results
-xx <- list.dirs(full.names=FALSE, recursive=FALSE)
 dirs <- xx[grep('fit_', xx)]
 indices <- ldply(dirs, function(x) {
   ff <- file.path(x, 'Save.RData')
@@ -19,6 +19,25 @@ g <- ggplot(indices, aes(year, est, group=model, color=model,  fill=model)) +
   geom_line() + geom_point()+
   facet_grid(strata~space)
 ggsave('plots/initial_fits.png', g, width=7, height=5)
+
+## Bias corrected test
+dirs <- xx[grep('bias', xx)]
+indices <- ldply(dirs, function(x) {
+  ff <- file.path(x, 'Save.RData')
+  if(file.exists(ff)){
+    load(ff)
+    y <- length(grep('cor', x))>0
+    return(cbind(bias.corrected=y, Save$Index))
+  } else {
+    return(NULL)
+  }
+})
+g <- ggplot(indices, aes(year, est, group=bias.corrected, color=bias.corrected,  fill=bias.corrected)) +
+  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.33) +
+  geom_line() + geom_point()+
+  facet_grid(strata~space)
+ggsave('plots/bias.corrected_test.png', g, width=7, height=5)
+
 
 dirs2 <- dirs[-grep('NS', x=dirs)]
 fields <- llply(dirs2, function(x) {
