@@ -62,23 +62,22 @@ plot.vastfit(results, plotmaps=TRUE)
 ### Fit some resolution tests on the two independent model since they're
 ### stable
 library(snowfall)
-sfInit(parallel=TRUE, cpus=12)
-inputs <- expand.grid(n_x=2^(4:10), fs=c(FALSE, TRUE), model=c('ats', 'bts'))
+sfInit(parallel=TRUE, cpus=4)
+inputs <- expand.grid(n_x=2^(4:5), fs=c(FALSE, TRUE)[1], model=c('ats', 'bts')[1])
 sfExport('inputs')
 results.list <- sfLapply(1:nrow(inputs), function(ii){
-  fs <<- inputs$fs[ii]
+  fs <- inputs$fs[ii]
   n_x <- inputs$n_x[ii]
   model <- inputs$model[ii]
   source("startup.R")
-  control <<- list(seed=121, beta2temporal=TRUE,
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, filteryears=FALSE,
-                kappaoff=0, temporal=2, fixlambda=12, make_plots=FALSE)
+  control <<- list(seed=121, beta2temporal=TRUE, n_x=n_x, finescale=fs,
+                   ## n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                   n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                   beta1temporal=TRUE, filteryears=FALSE,
+                   kappaoff=0, temporal=2, fixlambda=12,
+                   make_plots=FALSE)
   savedir <<- paste0(getwd(), '/resolution_tests/test_', n_x, '_', model)
   if(fs) savedir <<- paste0(savedir, '_finescale')
-  control$n_x <<- n_x; control$finescale <<- fs
-  control$n_eps1 <<- control$n_eps2 <<- 0
-  control$n_omega1 <<- control$n_omega2 <<- 0
   source("prepare_inputs.R")
   Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                   upper=TmbList$Upper,   savedir=savedir,
