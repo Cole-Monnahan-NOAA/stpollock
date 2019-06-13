@@ -254,7 +254,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Index.strata <- calculate.index(Opt, Report, model, space, log=TRUE, strata=TRUE)
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
                  ParHatList=ParHatList, est=est, Index.strata=Index.strata,
-                 SE=SE, Inputs=Inputs, savedir=savedir)
+                 SE=SE, Inputs=Inputs, savedir=savedir, model=model)
   save(Save, file=paste0(savedir,"/Save.RData"))
   return(Save)
 }
@@ -835,7 +835,11 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   beta1 <- data.frame(beta='beta1_ft',year=years,t(results$ParHatList$beta1_ft))
   beta2 <- data.frame(beta='beta2_ft',year=years,t(results$ParHatList$beta2_ft))
-  names(beta1)[3:5] <- names(beta2)[3:5] <- c('0-3m', '3-16m', '16+')
+  if(results$model=='combined'){
+    names(beta1)[3:5] <- names(beta2)[3:5] <- c('0-3m', '3-16m', '16+')
+  } else {
+    names(beta1)[3] <- names(beta2)[3] <- results$model
+  }
   betas <- rbind(beta1,beta2)
   if(nrow(betas)>0){
     df <- melt(betas, id.vars=c('year', 'beta'), variable.name='stratum')
@@ -903,11 +907,11 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
     ylab('log abundance')
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   ## Also create an index of the individual strata
-  g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
-    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
-  ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
-
+  if(results$model=='combined'){
+    g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
+      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
+    ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
   ## Do relative densities by strata and year for median
   tmp <- dcast(results$Index.strata, year~strata, value.var='est')
   tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
@@ -918,6 +922,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   g <- ggplot(index.strata.pct, aes(year, pct.density, fill=strata)) +
     geom_area()
   ggsave(file.path(savedir, 'pct_strata.png'), g, width=7, height=5)
+  }
   Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                               Extrapolation_List=Extrapolation_List)
   Mapdetails$Legend$x <- Mapdetails$Legend$x-70
@@ -1034,7 +1039,9 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   }
   df <- cbind(Data_Geostat, PR1=PR1_i, PR2=PR2_i, positive=ifelse(Data_Geostat$Catch_KG>0,1,0))
   xlim <- range(df$Lon); ylim <- range(df$Lat)
-  for(gr in 1:3){
+  tmp <- 1:3
+  if(results$model!='combined') tmp <- 1
+  for(gr in tmp){
     gt <- levels(Data_Geostat$Gear)[gr]
     g <- ggplot(subset(df, Gear==gt & positive==1), aes(Lon, Lat, size=abs(PR2), color=PR2>0))+
       geom_point(alpha=.25) + facet_wrap('Year') + xlim(xlim) + ylim(ylim)+
@@ -1048,6 +1055,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
            width=7, height=5)
   }
 
+
   ## QQplots
   get.qq <- function(gr, presence){
     gears <- levels(Data_Geostat$Gear)
@@ -1060,13 +1068,19 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
       }
     })
   }
-  qq <- rbind(get.qq(1,1), get.qq(2,1), get.qq(3,1))
+  if(results$model=='combined'){
+    qq <- rbind(get.qq(1,1), get.qq(2,1), get.qq(3,1))
+  } else {
+    qq <- get.qq(1,1)
+  }
   g <- ggplot(qq, aes(x,y, group=gear, color=gear)) +
     geom_abline(slope=1,intercept=0) + facet_wrap('year') +
-    geom_point(alpha=.5) + theme_bw()
+    geom_point(alpha=.5) + theme_bw() + xlab("Theoretical Quantiles") +
+  ylab("Sample Quantiles")
   ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
          width=7, height=5)
-  plot.change(Report)
+  if(results$model=='combined')
+    plot.change(Report)
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my

@@ -1,19 +1,66 @@
 
 source("startup.R")
-model <- 'combined'
 
-## Base case for paper
-control <- list(seed=121, beta2temporal=TRUE, n_x=100,
+## Use the posterior medians for initial values of fixed effects
+fit <- readRDS("mcmc_basecase_100/mcmcfit.RDS")
+pars.fixed <- apply(as.data.frame(fit)[,-Obj$env$random], 2, median)
+pars.all <- apply(as.data.frame(fit), 2, median)
+
+## Base case for paper: combined model
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
 savedir <- paste0(getwd(), '/fit_basecase_100')
+source("prepare_inputs.R")
+Obj$env$last.par <- pars.all[-length(pars.all)]
+Obj$par <- pars.fixed[-length(pars.fixed)]
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=6, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=1, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Repeat with just the BTS
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='bts',
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_100_bts')
 source("prepare_inputs.R")
 Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                 upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=0, control=list(trace=10))
+                newtonsteps=1, control=list(trace=1))
 results <- process.results(Opt, Obj, Inputs, model, space, savedir)
 plot.vastfit(results, plotmaps=TRUE)
+
+## Repeat with just the ATS
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='ats',
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_100_ats')
+source("prepare_inputs.R")
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=1, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
+## Base case for paper w/ finescale on
+control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                beta1temporal=TRUE, filteryears=FALSE, finescale=TRUE,
+                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+savedir <- paste0(getwd(), '/fit_basecase_finscale')
+source("prepare_inputs.R")
+Obj$par <- pars.fixed[-length(pars.fixed)]
+Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=6, getsd=TRUE,
+                upper=TmbList$Upper,   savedir=savedir,
+                newtonsteps=0, control=list(trace=1))
+results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+plot.vastfit(results, plotmaps=TRUE)
+
 
 
 

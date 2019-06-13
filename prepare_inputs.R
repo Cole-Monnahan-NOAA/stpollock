@@ -21,6 +21,8 @@ beta2temporal <- ifelse(is.null(control$beta2temporal), TRUE, control$beta2tempo
 kappaoff <- ifelse(is.null(control$kappaoff), 12, control$kappaoff)
 seed <- ifelse(is.null(control$seed), 9999, control$seed)
 n_x <- ifelse(is.null(control$n_x), 50, control$n_x)
+model <- ifelse(is.null(control$model), 'combined', control$model)
+
 set.seed(seed)
 
 ## These depend on the model and spatial setup
@@ -220,8 +222,10 @@ silent.fn(TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
 message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
-Params$Beta_mean2_c <- Params$Beta_mean2_c+5
-Params$beta2_ft <- Params$beta2_ft+5
+if(model=='combined'){
+  Params$Beta_mean1_c <- c(1.67, -3.1, -3.5)
+  Params$Beta_mean2_c <- c(2.8, 3.5,4.2)
+}
 if(model=='combined'){
   ## Params$L_beta1_z <- c(.2,.3,.5)
   ## Params$L_beta2_z <- c(.6,.3,1)
@@ -310,7 +314,20 @@ if(model=='combined'){
     abs( par[grep('L_epsilon2_z', names(par))[which.diag(3,n_eps2)]])
   par[grep('L_beta1_z', names(par))] <- abs(par[grep('L_beta1_z', names(par))])
   par[grep('L_beta2_z', names(par))] <- abs(par[grep('L_beta2_z', names(par))])
+} else {
+  ## These are standard deviations so bound below
+  TmbList$Lower['L_omega1_z'] <- 0
+  TmbList$Lower['L_omega2_z'] <- 0
+  TmbList$Lower['L_epsilon1_z'] <- 0
+  TmbList$Lower['L_epsilon2_z'] <- 0
+  TmbList$Lower['L_beta1_z'] <- 0
+  TmbList$Lower['L_beta2_z'] <- 0
+  ## make sure inits are positive and thus in bound
+  par <- Obj$par
+  ind <- grep("L_", x=names(par))
+  par[ind] <- abs(par[ind])
 }
+
 if(temporal==4){
   TmbList$Upper[grep('rho', names(TmbList$Upper))] <- 1.0
   TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -1.0
