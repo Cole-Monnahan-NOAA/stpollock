@@ -316,16 +316,16 @@ if(model=='combined'){
   par[grep('L_beta2_z', names(par))] <- abs(par[grep('L_beta2_z', names(par))])
 } else {
   ## These are standard deviations so bound below
-  TmbList$Lower['L_omega1_z'] <- 0
-  TmbList$Lower['L_omega2_z'] <- 0
-  TmbList$Lower['L_epsilon1_z'] <- 0
-  TmbList$Lower['L_epsilon2_z'] <- 0
-  TmbList$Lower['L_beta1_z'] <- 0
-  TmbList$Lower['L_beta2_z'] <- 0
+  if(!is.na(TmbList$Lower['L_omega1_z'] )) TmbList$Lower['L_omega1_z'] <- 0
+  if(!is.na(TmbList$Lower['L_omega2_z'] )) TmbList$Lower['L_omega2_z'] <- 0
+  if(!is.na(TmbList$Lower['L_epsilon1_z'] )) TmbList$Lower['L_epsilon1_z'] <- 0
+  if(!is.na(TmbList$Lower['L_epsilon2_z'] )) TmbList$Lower['L_epsilon2_z'] <- 0
+  if(!is.na(TmbList$Lower['L_beta1_z'] )) TmbList$Lower['L_beta1_z'] <- 0
+  if(!is.na(TmbList$Lower['L_beta2_z'] )) TmbList$Lower['L_beta2_z'] <- 0
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   ind <- grep("L_", x=names(par))
-  par[ind] <- abs(par[ind])
+  if(length(ind)>0) par[ind] <- abs(par[ind])
 }
 
 if(temporal==4){
