@@ -11,6 +11,7 @@ finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
+simdata <- ifelse(is.null(control$simdata), FALSE, control$simdata)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
@@ -67,8 +68,11 @@ silent.fn <- function(expr){
 }
 
 ### Step 1: Load in the real data if not doing simulation
-if(!exists('simulated.data')) simulated.data <- FALSE
-if(!simulated.data) source("load_data.R")
+if(!simdata){
+  source("load_data.R")
+} else {
+  message("Using simulated data DF1, DF2, DF3 in global workspace")
+}
 
 ### Step 2: Configure the spatial factors which depend on inputs
 FieldConfig <- matrix(c("Omega1"= n_omega1,
