@@ -1,14 +1,88 @@
 ### This files runs the simulation testing component of the analysis.
+
 rm(list=ls())
 source("startup.R")
-## the simulated data is based on the real data so process that now
+## We condition the OM on the fitted base case model
+load('fit_basecase_100/Save.RData')
+load('fit_basecase_100/Record.RData')
+names(Save)
+names(Record)
+## Rebuild the Obj with the MLEs
+mle <- Save$est$est
+par.names <- as.character(Save$est$par)
+control <- Record$control
+savedir <- paste0(getwd(), '/sim_basecase_100')
+source("prepare_inputs.R")
+Obj$par <- mle
+Obj$fn(mle) -  Save$Opt$objective ## check MLE fit
+Obj$gr(mle) ## check that the gradients are 0
+pars.all <- Obj$env$last.par ## the full parameter vector
+
+report <- Obj$report(pars.all)
+report$Beta_mean1_c
+par(mfrow=c(2,2))
+matplot(report$beta1_tc)
+matplot(report$beta2_tc)
+matplot(report$beta1_tc-matrix(report$Beta_mean1_c, ncol=3, nrow=12, byrow=TRUE))
+matplot(report$beta2_tc-matrix(report$Beta_mean2_c, ncol=3, nrow=12, byrow=TRUE))
+
+
+## Put the simulated parameters back into the model
+beta1_ft <- (pars.all[grep('beta1_ft', names(pars.all))])
+beta1_ft <- matrix(beta1_ft, ncol=3, byrow=TRUE)
+as.vector(t(beta1_ft))
+par(mfrow=c(1,2))
+matplot(beta1_ft)
+beta1 <- cbind(c(seq(0,-1.5, len=6), seq(-1.25, 3.5, len=6)),
+               c(seq(.5,-1, len=6), seq(-1.25, 2.5, len=6)),
+               c(seq(.5,-.5, len=6), seq(-.75,2, len=6)))
+matplot(beta1)
+pars.all[grep('beta1_ft', names(pars.all))] <- as.vector(t(beta1))
+
+## Simulate the sampling process.
+sim <- Obj$report(pars.all)
+saveRDS(sim, paste0(savedir, '/simreport.RDS'))
+encounters <- rbinom(length(sim$R1_i), size=1, prob=sim$R1_i)
+## Carefully index to get the right SigmaObs by gear type
+sigma.obs <- sim$SigmaM[,1][as.numeric(Data_Geostat$Gear)]
+logcatches <- rnorm(length(sim$R2_i), log(sim$R2_i)-sigma.obs^2/2, sigma.obs)
+catches <- exp(logcatches)*encounters
+
+
+## Rebuild the Obj with the new data
+Data_Geostat$Catch_KG <- catches
+DF1 <- subset(Data_Geostat, Gear=='Trawl')
+DF2 <- subset(Data_Geostat, Gear=='Acoustic_3-16')
+DF3 <- subset(Data_Geostat, Gear=='Acoustic_16-surface')
+control$simdata <- TRUE
+source("prepare_inputs.R")
+
+
+
+
+
+
 
 
 ## Basic simulation
 set.seed(1)
+nyr <- 12
+p3 <- seq(.1, .4, len=nyr/2)
+p3 <- c(p3, rev(p3))
+p2 <- seq(.3, .5, len=nyr/2)
+p2 <- c(p2, rev(p2))
+p1 <- 1-p3-p2
+plot(years, p1, type='n', ylim=c(0,1), xlab=NA, lty=1,
+     lwd=2, ylab='Proportion Abundance')
+yy <- c(years, rev(years))
+polygon(yy, c(rep(0, len=nyr), rev(p1)), col=gray(.2), border=1)
+polygon(yy, c(p1,  rev(p1+p2)), col=gray(.5), border=1)
+polygon(yy, c(p1+p2,  rev(p1+p2+p3)), col=gray(.8), border=1)
+box(col=gray(.5))
+
 atrend <- c(seq(0,1, len=5), seq(1,-1, len=5))
 vtrend <- c(4,16,24,16, 20, 25,14, 12,12,12)
-vtrend <- c(rep(5, 5), rep(5,5)); atrend <- rep(1, 10)
+
 
 ## currently depth has no impact but should add that and other covariates later
 Nsamples <- 300
