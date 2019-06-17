@@ -161,7 +161,7 @@ if(model=='combined'){
   Data_Geostat <- DF1
   c_iz <- rep(0, nrow(Data_Geostat))
 }
-years <- sort(unique(Data_Geostat$Year))
+years <- min(Data_Geostat$Year):max(Data_Geostat$Year)
 nyr <- length(years)
 
 ### Derived objects for spatio-temporal estimation
