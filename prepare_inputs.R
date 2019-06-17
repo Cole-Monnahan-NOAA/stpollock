@@ -159,7 +159,7 @@ if(model=='combined'){
   years <- sort(unique(bts$year))
   c_iz <- rep(0, nrow(Data_Geostat))
 }
-years <- sort(unique(Data_Geostat$Year))
+years <- sort(unique(bts$year))
 nyr <- length(years)
 
 ### Derived objects for spatio-temporal estimation
@@ -239,8 +239,12 @@ if(model=='combined'){
   Params$logSigmaM[1:3] <- c(1,1,1)
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
+} else if(model=='ats'){
+  Params$Beta_mean1_c <- -2
+  Params$Beta_mean2_c <- 5
 } else {
-  ##  Params$L_beta1_z <- Params$L_beta2_z <- .4
+  Params$Beta_mean1_c <- 1
+  Params$Beta_mean2_c <- 3.3
 }
 Params$logkappa1 <- Params$logkappa2 <- -5
 if(kappaoff==1){
