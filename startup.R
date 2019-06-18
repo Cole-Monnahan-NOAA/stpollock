@@ -21,7 +21,7 @@ dir.create('simulations', showWarnings=FALSE)
 dir.create('plots', showWarnings=FALSE)
 dir.create('simulations/plots', showWarnings=FALSE)
 
-source("simulator.R")
+## source("simulator.R")
 
 plot.change <- function(Report){
   ## Look at trend in % of population <3m.
@@ -260,6 +260,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
                  ParHatList=ParHatList, est=est, Index.strata=Index.strata,
                  SE=SE, Inputs=Inputs, savedir=savedir, model=model)
   save(Save, file=paste0(savedir,"/Save.RData"))
+  saveRDS(Save, file='Save.RDS')
   return(Save)
 }
 
@@ -735,36 +736,48 @@ plot.pairs.mcmc <- function(fit, savedir){
 
 calculate.index <- function(Opt, Report, model, space, log, strata){
   ## If available use the bias corrected versions
-  if(!is.null(Opt$SD$unbiased)){
-    rr <- as.list(Opt$SD, "Est. (bias.correct)", report=TRUE)
-  } else {
-    ## Not available so used uncorrected version
-    rr <- as.list(Opt$SD, what='Estimate', report=TRUE)
-  }
-  ## Assuming for now that the SDs aren't bias corrected
-  ss <- as.list(Opt$SD, what='Std. Error', report=TRUE)
-  if(strata){
-    ## the strata versions
+  if(is.null(Opt$SD)){
+    ## If no sdeport need to exit with just the MLEs
     if(log){
-      ## calculate in log space?
-      ses <- t(ss$ln_Index_cyl[,,1])
-      ests <- t(rr$ln_Index_cyl[,,1])
+      ests <- Report$ln_ColeIndex_cy
     } else {
-      ses <- t(ss$Index_cyl[,,1])
-      ests <- t(rr$Index_cyl[,,1])
+      ests <- Report$ColeIndex_cy
     }
-    snames <- c('stratum1', 'stratum2', 'stratum3')
+    ests <- as.numeric(ests)
+    ses <- rep(NA, len=length(ests))
   } else {
-    ## the versions the gear sees
-    if(log){
-      ## calculate in log space?
-      ses <- t(ss$ln_ColeIndex_cy)
-      ests <- t(rr$ln_ColeIndex_cy)
+    ## SD exists
+    if(!is.null(Opt$SD$unbiased)){
+      rr <- as.list(Opt$SD, "Est. (bias.correct)", report=TRUE)
     } else {
-      ses <- t(ss$ColeIndex_cy)
-      ests <- t(rr$ColeIndex_cy)
+      ## Not available so used uncorrected version
+      rr <- as.list(Opt$SD, what='Estimate', report=TRUE)
     }
-    snames <- c('total', 'bts', 'ats')
+    ## Assuming for now that the SDs aren't bias corrected
+    ss <- as.list(Opt$SD, what='Std. Error', report=TRUE)
+    if(strata){
+      ## the strata versions
+      if(log){
+        ## calculate in log space?
+        ses <- t(ss$ln_Index_cyl[,,1])
+        ests <- t(rr$ln_Index_cyl[,,1])
+      } else {
+        ses <- t(ss$Index_cyl[,,1])
+        ests <- t(rr$Index_cyl[,,1])
+      }
+      snames <- c('stratum1', 'stratum2', 'stratum3')
+    } else {
+      ## the versions the gear sees
+      if(log){
+        ## calculate in log space?
+        ses <- t(ss$ln_ColeIndex_cy)
+        ests <- t(rr$ln_ColeIndex_cy)
+      } else {
+        ses <- t(ss$ColeIndex_cy)
+        ests <- t(rr$ColeIndex_cy)
+      }
+      snames <- c('total', 'bts', 'ats')
+    }
   }
   ## Chop of years of missing ATS if necessary
   yrs <- years[which(min(years):max(years) %in% years)]
@@ -996,10 +1009,12 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
     ##                 "Year"=Year_Set[col(Dens_xt)],
     ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
     ##                 "N_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'N_km'] )
-    Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
-    ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
-    plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
-    if(results$Index$model[1]=='combined'){
+    if(!is.null(results$Opt$SD)){
+      Index = plot_biomass_index( DirName=savedir, TmbData=TmbData, Sdreport=Opt[["SD"]], Year_Set=Year_Set, Years2Include=Years2Include, use_biascorr=TRUE )
+      ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
+      plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
+    }
+      if(results$Index$model[1]=='combined'){
       ## Plot ratio of observed/predicted by grid cell for the three gear types
       MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                         FUN=mean, na.rm=TRUE))
