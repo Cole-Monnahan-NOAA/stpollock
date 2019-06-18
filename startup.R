@@ -782,6 +782,9 @@ calculate.index <- function(Opt, Report, model, space, log, strata){
   ## Chop of years of missing ATS if necessary
   yrs <- years[which(min(years):max(years) %in% years)]
   if(model=='combined'){
+    snames <- c('total', 'bts', 'ats')
+    if(strata)
+      snames <- c('stratum1', 'stratum2', 'stratum3')
     index <- data.frame(model=model, space=space,  year=yrs,
                         strata=rep(snames, each=length(years)),
                         est=as.vector(ests), se=as.vector(ses))

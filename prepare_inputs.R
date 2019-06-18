@@ -341,8 +341,8 @@ if(temporal==4){
 ## Run it once to optimize the random effects and set that to
 ## last.par.best which is the init in tmbstan.
 Obj$par <- par
-Obj$fn(Obj$par)
-Obj$env$last.par.best <- Obj$env$last.par
+## Obj$fn(Obj$par)
+## Obj$env$last.par.best <- Obj$env$last.par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
