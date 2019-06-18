@@ -63,27 +63,41 @@ plot.vastfit(results, plotmaps=TRUE)
 ### stable
 library(snowfall)
 sfInit(parallel=TRUE, cpus=4)
-inputs <- expand.grid(n_x=2^(4:5), fs=c(FALSE, TRUE)[1], model=c('ats', 'bts')[1])
+inputs <- expand.grid(n_x=seq(10, 50, by=10), fs=c(FALSE, TRUE)[1], model=c('ats', 'bts'),
+                      stringsAsFactors=FALSE)
 sfExport('inputs')
 results.list <- sfLapply(1:nrow(inputs), function(ii){
-  fs <- inputs$fs[ii]
-  n_x <- inputs$n_x[ii]
-  model <- inputs$model[ii]
+  fs <<- inputs$fs[ii]
+  n_x <<- inputs$n_x[ii]
+  model <<- inputs$model[ii]
   source("startup.R")
   control <<- list(seed=121, beta2temporal=TRUE, n_x=n_x, finescale=fs,
-                   ## n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                   n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                   n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                   ## n_eps1=0, n_eps2=0, n_omega2=1, n_omega1=0,
                    beta1temporal=TRUE, filteryears=FALSE,
                    kappaoff=0, temporal=2, fixlambda=12,
-                   make_plots=FALSE)
-  savedir <<- paste0(getwd(), '/resolution_tests/test_', n_x, '_', model)
+                   make_plots=FALSE, model=model)
+  savedir <<- paste0(getwd(), '/resolution_tests/test2_', n_x, '_', model)
   if(fs) savedir <<- paste0(savedir, '_finescale')
   source("prepare_inputs.R")
-  Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                  upper=TmbList$Upper,   savedir=savedir,
-                  newtonsteps=0, control=list(trace=10))
-  results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-  results$n_x <- n_x; results$finescale <- fs
-  return(results)
+  result <- tryCatch(
+    Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+                    upper=TmbList$Upper,   savedir=savedir,
+                    newtonsteps=0, control=list(trace=10)),
+    error=function(e) 'xx')
+  if(result=='xx'){
+    return(NULL)
+  } else {
+    results <- process.results(Opt, Obj, Inputs, inputs$model[ii], space, savedir)
+    results$n_x <- n_x; results$finescale <- fs
+    return(results)
+  }
 })
-
+saveRDS('results/res_tests.RDS', object=results.list)
+xx <- do.call(rbind, lapply(results.list, function(x)
+  data.frame(x$est, par2=paste0(1:nrow(x$est),'_', x$est$par),
+             model=x$model, n_x=ifelse(x$model=='bts', x$n_x, x$n_x+3),
+             finescale=x$finescale)))
+library(ggplot2)
+ggplot(xx, aes(n_x, y=est, color=model)) + geom_linerange(aes(ymin=lwr, ymax=upr)) +
+  facet_wrap('par2', scales='free_y') + geom_line()
