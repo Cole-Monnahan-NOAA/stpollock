@@ -11,6 +11,7 @@ finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
+simdata <- ifelse(is.null(control$simdata), FALSE, control$simdata)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
@@ -66,8 +67,12 @@ silent.fn <- function(expr){
   if(silent.console) suppressMessages(expr) else expr
 }
 
-### Step 1: Load in the real data
-source("load_data.R")
+### Step 1: Load in the real data if not doing simulation
+if(!simdata){
+  source("load_data.R")
+} else {
+  message("Using simulated data DF1, DF2, DF3 in global workspace")
+}
 
 ### Step 2: Configure the spatial factors which depend on inputs
 FieldConfig <- matrix(c("Omega1"= n_omega1,
@@ -86,7 +91,6 @@ RhoConfig <- c("Beta1"=ifelse(beta1temporal, temporal, 3),
                "Beta2"=ifelse(beta2temporal, temporal, 3),
                "Epsilon1"=ifelse(n_eps1>0, temporal, 0),
                "Epsilon2"=ifelse(n_eps2>0, temporal, 0))
-
 
 ### Step 3: Setup VAST inputs which are constant for the models
 Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
@@ -153,13 +157,11 @@ if(model=='combined'){
                              Gear='Acoustic_3-surface', AreaSwept_km2=1,
                              Vessel='none')
   c_iz <- rep(0, nrow(Data_Geostat))
-  years <- sort(unique(ats$year))
 } else if(model=='bts'){
   Data_Geostat <- DF1
-  years <- sort(unique(bts$year))
   c_iz <- rep(0, nrow(Data_Geostat))
 }
-years <- sort(unique(bts$year))
+years <- min(Data_Geostat$Year):max(Data_Geostat$Year)
 nyr <- length(years)
 
 ### Derived objects for spatio-temporal estimation
@@ -339,8 +341,8 @@ if(temporal==4){
 ## Run it once to optimize the random effects and set that to
 ## last.par.best which is the init in tmbstan.
 Obj$par <- par
-Obj$fn(Obj$par)
-Obj$env$last.par.best <- Obj$env$last.par
+## Obj$fn(Obj$par)
+## Obj$env$last.par.best <- Obj$env$last.par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output

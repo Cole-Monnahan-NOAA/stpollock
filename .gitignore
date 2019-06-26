@@ -29,3 +29,6 @@ testing
 .Rproj.user
 mcmc_*
 fit_*
+resolution_tests
+simulations
+results

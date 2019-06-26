@@ -1,28 +1,106 @@
+
+## Generate a Poisson-link density that matches VAST structure to test for
+## consistency
+generate.pl.samples <- function(st.list, atrend, nyrs, plot){
+  lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth; beta0 <- st.list$beta0
+
+  ## long format data.frame to hold the true densities
+  D <- data.frame(Lon=lon, Lat=lat, depth=depth)
+  D <- D[rep(seq_len(nrow(D)), nyrs), ]
+  D$Year <- rep(1:nyrs, each=length(lon))
+
+  ## The Poisson-link predictors
+  a1 <- -.15/20; a2 <- .1/20; a3 <- .05/20
+  t <- 1:nyrs-1
+  beta0 <- 0
+  beta1 <- cbind(beta0+t*a1,  beta0+t*a2,  beta0+t*a3)
+  ## matplot(beta1)
+  beta2 <- matrix(5, nyrs, 3)
+  p1 <- p2 <- r1 <- r2 <- den <- matrix(NA, nrow=nrow(D), ncol=3)
+  for(i in 1:nrow(D)){
+    for(ss in 1:3){
+      p1[i,ss] <- beta1[D$Year[i], ss]
+      p2[i,ss] <- beta2[ss] + rnorm(1, mean=0, sd=st.list$sd.process)
+      r1[i,ss] <- 1-exp(-exp(p1[i,ss]))
+      r2[i,ss] <- exp(p1[i,ss]+p2[i,ss])/r1[i,ss]
+      den[i,ss] <- exp(p1[i,ss]+p2[i,ss])#r1[i,ss]*r2[i,ss]
+    }
+  }
+  ## matplot(p1)
+  ## matplot(p2)
+  ## matplot(r1)
+  ## matplot(r2)
+  ## matplot(den)
+  D <- cbind(D, d1=den[,1], d2=den[,2], d3=den[,3])
+  D.long <- melt(D, measure.vars=c('d1', 'd2', 'd3'),
+                 variable.name='strata', value.name='density')
+  if(plot){
+    tmp <- ddply(D.long, .(Year, strata), summarize, mean.den=median(density))
+    g <- ggplot(tmp, aes(Year, mean.den, color=strata)) + geom_line()
+    ggsave(file.path(st.list$plotdir, paste0('pl_annual_density_', st.list$replicate,'.png')), g, width=7, height=5)
+  }
+
+  ## now sample from the truth
+  i=1
+  r1bts <- r1ats1 <- r1ats2 <- dbts <- dats1 <- dats2 <- rep(NA, nrow(D))
+  bts <- ats1 <- ats2 <- rep(NA, nrow(D))
+  rpl <- function(p, mu, sd){
+    ## observed; p is probability of occurence
+    x <- rbinom(n=1, size=1, prob=p)
+    if(x==1){
+      x <- exp(rnorm(1, mean=log(mu), sd=sd)-sd^2/2)
+    }
+    return(x)
+  }
+  ## mean(sapply(1:5000, function(i) rpl(.9999, 100, 1.1)))
+
+  for(i in 1:nrow(D)){
+    r1bts[i] <- 1-exp(-exp(p1[i,1])-exp(p1[i,2]))
+    dbts[i] <- exp(p1[i,1]+p2[i,1])+exp(p1[i,2]+p2[i,2])
+    bts[i] <- rpl(r1bts[i], dbts[i]/r1bts[i], sd=st.list$bt.sd)
+    r1ats1[i] <- r1[i,2]
+    dats1[i] <- exp(p1[i,2]+p2[i,2])
+    ats1[i] <- rpl(r1ats1[i], dats1[i]/r1ats1[i], sd=st.list$at.sd)
+    r1ats2[i] <- r1[i,3]
+    dats2[i] <- exp(p1[i,3]+p2[i,3])
+    ats2[i] <- rpl(r1ats2[i], dats2[i]/r1ats2[i], sd=st.list$at.sd)
+  }
+  D <- cbind(D,  BT=bts, AT1=ats1, AT2=ats2, d1=den[,1], d2=den[,2],
+             d3=den[,3])
+  pars <- list(beta1_tc=beta1, beta2_tc=beta2, sigma_bt=st.list$bt.sd,
+               sigma_at=st.list$at.sd)
+  return(list(D=D, pars=pars))
+}
+
+
 #' Generate spatio-temporal index
 #'
 #' @return A data.frame containing the spatial locations and densities
 #'   associated for each year
-generate.density <- function(st.list, abundance.trend, nyrs, X.space, beta.space){
+generate.density <- function(st.list, atrend, nyrs, plot){
   lon <- st.list$lon; lat <- st.list$lat; depth <- st.list$depth; beta0 <- st.list$beta0
   D <- list()
   for(y in 1:nyrs){
     ## Generate true density, including some real zeroes
-    den <- exp( beta0 + abundance.trend[y] + rnorm(n=length(lon), sd=.5))
+    den <- exp( beta0 + atrend[y] + rnorm(n=length(lon), sd=st.list$sd.process))
     den <- den*rbinom(n=length(den), size=1, prob=.9)
     ## for each year create a 2d spatial grid of densities
     D[[y]] <- data.frame(Year=y, Lon=lon, Lat=lat, depth=depth,
                          density=den)
   }
   D <- do.call(rbind, D)
-  ##  ggplot(D, aes(Lon, Lat, size=sqrt(density))) + geom_point() + facet_wrap('Year')
+  if(plot){
+    g <- ggplot(D, aes(Lon, Lat, size=sqrt(density))) + geom_point() +
+      facet_wrap('Year')
+    ggsave(file.path(st.list$plotdir, paste0('spatial_density_', st.list$replicate,'.png')), g, width=7, height=5)
+  }
   return(D)
 }
 
 #' Distribute the spatial density in the vertical dimension
 #' @param density The output data.frame from generate.density function.
 #' @return The density cbinded with the binned densities
-distribute.density <- function(dat, vertical.trend, X, vbins, obins,
-                               eps=.0001){
+distribute.density <- function(dat, vtrend, st.list, plot, eps=.0001){
 
   max.depth <- max(dat$depth)
   x.all <- 1:max.depth
@@ -34,21 +112,26 @@ distribute.density <- function(dat, vertical.trend, X, vbins, obins,
     x <- 1:dat$depth[i] # the vertical bins
     p <- runif(1, .01,.99)
     y <- p*dnorm(x=x, 0, 3) +
-      (1-p)*dnorm(x=x, mean=vertical.trend[dat$Year[i]], sd=15)
+      (1-p)*dnorm(x=x, mean=vtrend[dat$Year[i]], sd=15)
     ## Truncate really low probabilities to identically 0
     ynorm <- y/sum(y)
     ynorm[ynorm<eps] <- 0
     ynorm <- ynorm/sum(ynorm) # renormalize to be probability
-    ## temp test
-    ynorm <- rep(1, len=dat$depth[i])/dat$depth[i]
     dvert[i,1:length(y)] <- dat$density[i]*ynorm
   }
   ## check we didn't lose density
   if(max(abs(dat$density-apply(dvert, 1, sum)))>.01)
     warning("Lost density when generating vertical distribution")
-  ## quick visual check of distributions
-  ##  matplot(t(dvert[1:50,]), type='l')
   dvert <- as.data.frame(dvert)
+  if(plot){
+    tows <- rep(seq_along(st.list$lon), times=st.list$nyrs)
+    tmp <- reshape2::melt(cbind(year=dat$Year, tow=tows, dvert), id.vars=c('year','tow'))
+    tmp$vbin <- as.numeric(tmp$variable)
+    tmp <- ddply(tmp, .(year, tow), mutate, rel.density=value/sum(value))
+    g <- ggplot(subset(tmp, tow<50), aes(vbin, rel.density, group=tow)) + geom_line() +
+      facet_wrap('year')
+    ggsave(file.path(st.list$plotdir, paste0('vertical_density_', st.list$replicate,'.png')), g, width=7, height=5)
+  }
   names(dvert) <- paste0('d', x.all)
   out <- data.frame(dat, dvert)
   return(out)
@@ -58,25 +141,30 @@ distribute.density <- function(dat, vertical.trend, X, vbins, obins,
 #'
 #' @param density The density output from distribute.density.
 #' @return A data frame of locations and sampled gear types
-sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
+sample.data <- function(dat, st.list, plot){
+  bt.sd <- st.list$bt.sd
+  at.sd <- st.list$at.sd
   ## Bin down the vertical dimension
   X <- dat[,-(1:5)]
+  stopifnot(names(X)[1] == 'd1')
   d1 <- rowSums(X[,1:3])                # ADZ
   d2 <- rowSums(X[,4:16])               # ADZ to EFH
   d3 <- rowSums(X[,-(1:16)])            # EFH to surface
   BT <- exp(rnorm(n=length(d1), mean=log(d1+d2), sd=bt.sd))
   AT1 <- exp(rnorm(n=length(d1), mean=log(d2), sd=at.sd))
   AT2 <- exp(rnorm(n=length(d1), mean=log(d3), sd=at.sd))
-  out <- cbind(dat[,1:5], BT, AT1, AT2, d1, d2, d3)
-  if(FALSE){
-    par(mfrow=c(1,3))
-    plot(log(d1+d2), log(BT))
-    plot(log(d2), log(AT1))
-    plot(log(d3), log(AT2))
-    out.long <- melt(out, measure.vars=c('d1', 'd2', 'd3'))
-    g <- ggplot(out.long, aes(Lon, Lat, size=sqrt(value), col=value==0)) +
-      geom_point() + facet_grid(Year~variable)
-    print(g)
+  out <- cbind(dat[,1:5],  BT, AT1, AT2, d1, d2, d3)
+  if(plot){
+    out.long <- melt(out, measure.vars=c('density','BT', 'AT1', 'AT2','d1', 'd2', 'd3'))
+    ## sum across observations
+    tmp <- ddply(subset(out.long, variable %in% c('density', 'd1', 'd2', 'd3')), .(Year, variable), summarize, abundance=sum(value))
+    g <- ggplot(tmp, aes(Year, abundance, group=variable, color=variable)) +
+      geom_line()
+    ggsave(file.path(st.list$plotdir, paste0('annual_density_', st.list$replicate,'.png')), g, width=7, height=5)
+    tmp <- ddply(subset(out.long, variable %in% c('BT', 'AT1', 'AT2')), .(Year, variable), summarize, abundance=sum(value))
+    g <- ggplot(tmp, aes(Year, abundance, group=variable, color=variable)) +
+      geom_line()
+    ggsave(file.path(st.list$plotdir, paste0('annual_observed_', st.list$replicate,'.png')), g, width=7, height=5)
   }
   return(out)
 }
@@ -86,153 +174,42 @@ sample.data <- function(dat, bt.sd, at.sd, pl.list, obins){
 #' @param data The output from sample.data
 #' @param replicate Replicate number, used for parallel
 #' @return A list of fitted objects for each model type
-fit.models <- function(data, replicate, plot=TRUE){
-
-  ## Setup the VAST inputs
-  Method <- c("Grid", "Mesh", "Spherical_mesh")[2]
-  grid_size_km <- 50
-  n_x <- 100
-  ## Stratification for results
-  strata.limits <- data.frame(STRATA='All_areas')
-  ## Derived objects
-  Region <- "Eastern_Bering_Sea"
-  ## Save settings
-  Extrapolation_List  <-
-    make_extrapolation_info( Region=Region, strata.limits=strata.limits )
-
-  ## Model settings
-  FieldConfig <- c(Omega1=3, Epsilon1=0, Omega2=0, Epsilon2=0)
-  RhoConfig <- c(Beta1=0, Beta2=0, Epsilon1=0, Epsilon2=0)
-  OverdispersionConfig <- c(Delta1=0, Delta2=0)
-  ObsModel <- c(1,1)
-  Options <-  c(SD_site_density=0, SD_site_logdensity=0, Calculate_Range=1,
-                Calculate_evenness=0, Calculate_effective_area=1, Calculate_Cov_SE=0,
-                Calculate_Synchrony=0, Calculate_Coherence=0)
-  Data_Geostat <-
-    reshape2::melt(data, id.vars=c('Lat', 'Lon', 'Year', 'density', 'depth', 'd1', 'd2', 'd3'),
-                   value.name='Catch_KG', variable.name='Gear')
-  Data_Geostat$Vessel <- factor(1)
-  Data_Geostat$AreaSwept_km2 <- 1
-  ## Derived objects for spatio-temporal estimation
-  DateFile <- paste0(getwd(),'/VAST_output_',replicate, '/')
-  Spatial_List  <-  make_spatial_info( grid_size_km=grid_size_km, n_x=n_x,
-                                   Method=Method, Lon=Data_Geostat[,'Lon'],
-                                   Lat=Data_Geostat[,'Lat'],
-                                   Extrapolation_List=Extrapolation_List,
-                                   DirPath=DateFile, Save_Results=FALSE )
-  Data_Geostat$knot_i=Spatial_List$knot_i
-  dir.create(DateFile)
-  Record <- list("Version"=Version,"Method"=Method,"grid_size_km"=grid_size_km,"n_x"=n_x,"FieldConfig"=FieldConfig,"RhoConfig"=RhoConfig,"OverdispersionConfig"=OverdispersionConfig,"ObsModel"=ObsModel,"Region"=Region,"strata.limits"=strata.limits)
-  save( Record, file=file.path(DateFile,"Record.RData"))
-  capture.output( Record, file=paste0(DateFile,"Record.txt"))
-  TmbDir <- DateFile
-  c_iz = matrix( c(1,2, 2,NA, 3,NA), byrow=TRUE, nrow=3,
-                ncol=2)[as.numeric(Data_Geostat[,'Gear']),] - 1
-  ## Add threshold
-  b_i = Data_Geostat[,'Catch_KG']
-  Random = "generate"
-  TmbData <- Data_Fn(Version=Version, FieldConfig=FieldConfig,
-                     OverdispersionConfig=OverdispersionConfig,
-                     RhoConfig=RhoConfig, ObsModel=ObsModel, c_iz=c_iz,
-                     b_i=b_i, a_i=Data_Geostat[,'AreaSwept_km2'],
-                     ## v_i=rep(factor(1:110-1), times=3),
-                     v_i=Data_Geostat$vessel-1,
-                     s_i=Data_Geostat[,'knot_i']-1,
-                     t_i=Data_Geostat[,'Year'], a_xl=Spatial_List$a_xl,
-                     MeshList=Spatial_List$MeshList,
-                     GridList=Spatial_List$GridList,
-                     Method=Spatial_List$Method, Options=Options,
-                     Aniso=FALSE)
-  TmbList0 <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                           Version=Version,  RhoConfig=RhoConfig,
-                           loc_x=Spatial_List$loc_x, Method=Method,
-                           TmbDir='models', Random="generate")
-  ## Extract default values
-  Map <- TmbList0$Map
-  Params <- TmbList0$Parameters
-  ## Fix SigmaM for all surveys to be equal
-  Map$logSigmaM <- factor( cbind( c(1,1,1), NA, NA) )
-  ##  Map$beta1_ct <- factor(rep(1, 30))
-  ## Map$beta2_ct <- factor(rep(1, 30))
-  ## turn off estimation of space
-  ## Map$logkappa1 <- factor(NA); Params$logkappa1 <- 5
-  ## ## turn off estimation of factor analysis
-  ## n_f <- 3; tmp <- diag(1:n_f, nrow=3, ncol=n_f)
-  ## lvec <- tmp[lower.tri(tmp, TRUE)] # init values
-  ## Map$L_omega1_z <- factor(ifelse(lvec==0, NA, lvec))
-  ## Params$L_omega1_z <- lvec
-  TmbList <- Build_TMB_Fn(TmbData=TmbData, RunDir=DateFile,
-                          Version=Version,  RhoConfig=RhoConfig,
-                          loc_x=Spatial_List$loc_x, Method=Method,
-                       TmbDir=TmbDir, Random='generate', Map=Map)
-
-  ## Fit the full VAST model
-  obj.full <- TmbList$Obj; obj.full$env$beSilent()
-  ## Not sure why passing lower and upper throws an error for this case
-  Opt.full <- TMBhelper::Optimize( obj=obj.full, savedir=DateFile, getsd=TRUE,
-                   control=list(trace=10))
-  rep.full <- obj.full$report()
-  ## Manually calculate SE for the total biomass index. Since it's a sum of
-  ## the three the derivatives are all 1 and so the SE is the sqrt of the sum
-  ## of all of the variances and covariances. This feature is not coded
-  ## into VAST yet so have to do it manually. also note that the order of
-  ## the Index_cyl matrix in vector form is Index_11, Index_21, Index_31,
-  ## Index_12,.. etc. This effects the subsetting below
-  est <- data.frame(par=names(Opt.full$SD$value), value=Opt.full$SD$value,
-                    se=Opt.full$SD$sd)
-  tmp <- which(names(Opt.full$SD$value) %in% 'Index_cyl')
-  cov.index <- Opt.full$SD$cov[tmp,tmp]
-  index <- data.frame(year=1:10,
-       value=apply(rep.full$Index_cyl, 2, sum),
-       se=sqrt(sapply(1:10, function(i) {j=1:3+3*(i-1); sum(cov.index[j,j])})))
-  fit.full <- list(index=index, est=est, Opt=Opt.full, Report=rep.full,
-                   ## ParHat=obj.full$env$parList(Opt.full$par),
-                   TmbData=TmbData)
-
-  if(plot){
-    message("Making plots..")
-    plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
-              Data_Geostat=Data_Geostat, PlotDir=DateFile )
-    Enc_prob  <-
-      plot_encounter_diagnostic(Report=rep.full, Data_Geostat=Data_Geostat,
-                                DirName=DateFile)
-    Q  <-  plot_quantile_diagnostic( TmbData=TmbData, Report=rep.full, FileName_PP="Posterior_Predictive",
-                                    FileName_Phist="Posterior_Predictive-Histogram",
-                                    FileName_QQ="Q-Q_plot", FileName_Qhist="Q-Q_hist", DateFile=DateFile)
-
-    ## Spatial residuals
-    MapDetails_List  <- make_map_info( "Region"=Region, "NN_Extrap"=Spatial_List$PolygonList$NN_Extrap, "Extrapolation_List"=Extrapolation_List )
-    ## Decide which years to plot
-    Year_Set  <-  seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-    Years2Include <-  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
-    plot_residuals(Lat_i=Data_Geostat[,'Lat'], Lon_i=Data_Geostat[,'Lon'],
-                   TmbData=TmbData, Report=rep.full, Q=Q, savedir=DateFile,
-                   MappingDetails=MapDetails_List[["MappingDetails"]],
-                   PlotDF=MapDetails_List[["PlotDF"]],
-                   MapSizeRatio=MapDetails_List[["MapSizeRatio"]],
-                   Xlim=MapDetails_List[["Xlim"]], Ylim=MapDetails_List[["Ylim"]],
-                   FileName=DateFile, Year_Set=Year_Set, Years2Include=Years2Include,
-                   Rotate=MapDetails_List[["Rotate"]], Cex=MapDetails_List[["Cex"]],
-                   Legend=MapDetails_List[["Legend"]], zone=MapDetails_List[["Zone"]],
-                   mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8)
-    Index <-
-      plot_biomass_index( DirName=DateFile, TmbData=TmbData,
-                         Sdreport=Opt.full[["SD"]], Year_Set=Year_Set,
-                         Years2Include=Years2Include,
-                         strata_names=strata.limits[,1], use_biascorr=TRUE,
-                         category_names=levels(Data_Geostat[,'Gear']) )
-    Index$Table[,c("Category","Year","Estimate_metric_tons","SD_mt")]
-    Plot_factors( Report=rep.full, ParHat=obj.full$env$parList(), Data=TmbData,
-                 SD=Opt$SD, mapdetails_list=MapDetails_List, Year_Set=Year_Set,
-                 category_names=levels(Data_Geostat[,'Gear']), plotdir=DateFile )
+fit.models <- function(data, replicate, model, space, plot){
+  ## Setup the VAST model
+  ## attach these globally so sourcing works
+  DF1 <<- data.frame(Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$BT, Gear='Trawl', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  DF2 <<- data.frame( Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$AT1, Gear='Acoustic_3-16', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  DF3 <<- data.frame( Lat=data$Lat, Lon=data$Lon, Year=data$Year,
+                    Catch_KG=data$AT2, Gear='Acoustic_16-surface', AreaSwept_km2=1,
+                    Vessel='none', depth=data$depth, depth2=data$depth^2)
+  simulated.data <<- TRUE
+  model <<- model; space <<- space; n_x <<- st.list$n_x
+  if(is.null(n_x)) stop("n_x not defined")
+  savedir <<- paste0(getwd(), '/simulations/fit_', replicate, "_",  model, "_", space, '_', n_x)
+  source('prepare_inputs.R')
+  ## Fit the VAST model
+  Opt <- tryCatch(
+    Optimize(obj=Obj, lower=TmbList$Lower,
+             upper=TmbList$Upper,  savedir=savedir,
+             newtonsteps=1, control=list(trace=0)),
+             error=function(error_message){
+               return(NULL)})
+  ## TMBhelper::Check_Identifiable(Obj)
+  results <- tryCatch(
+    process.results(Opt, Obj, Inputs, model, space, savedir),
+    error=function(error_message){
+      message(cat('Convergence failed:',replicate, model, space))
+      return(NULL)})
+  if(!is.null(results) & plot) {
+      message("Making plots..")
+      tryCatch(plot.vastfit(results), error=function(error_message)
+      message(cat('VAST plots failed:',replicate, model, space)))
   }
-
-  ## Now two independent ST indices with VAST
-
-
-  ## And the combined model from Stan's paper
-  ##  dyn.unload(dynlib(paste0(DateFile, 'VAST_v4_0_0')))
-  return(list(vast.full=fit.full))
+  return(results)
 }
 
 
@@ -240,53 +217,156 @@ fit.models <- function(data, replicate, plot=TRUE){
 #' @param replicate The replicate number for bookkeeping and setting seed.
 #' @param st.list A list of geospatial parameters
 #' @param nyrs The number of years to run
-#' @param abundance.trend The trend in abundance per year
-#' @param vertical.trend A trend in the mean vertical distribution
-#' @param vbins The number of vertical bins used to approximate the
-#'   vertical density. These are scaled automatically to the water column
-#'   height (thus bin widths vary with depth).
-#' @param X A matrix of environmental covariates associated for each
-#'   spatial point
-#' @param bt.sd The variance for the BT sampling process.
-#' @param at.sd The variance for the AT sampling process.
-#' @param pl.list Other Poisson-link parameters?
-#' @param obins The observation bins, assuming 0-3, 3-16, 16-surface
-simulate <- function(replicate, st.list, nyrs, abundance.trend,
-                     vertical.trend, vbins, X, bt.sd, at.sd, pl.list,
-                     obins, ...){
+#' @param atrend The trend in abundance per year
+#' @param vtrend A trend in the mean vertical distribution
+## @param bt.sd The variance for the BT sampling process.
+## @param at.sd The variance for the AT sampling process.
+## @param pl.list Other Poisson-link parameters?
+## @param obins The observation bins, assuming 0-3, 3-16, 16-surface
+## @param vbins The number of vertical bins used to approximate the
+##   vertical density. These are scaled automatically to the water column
+##   height (thus bin widths vary with depth).
+## @param X A matrix of environmental covariates associated for each
+##   spatial point
+simulate <- function(replicate, st.list, atrend,
+                     vtrend, models=c('ats', 'bts', 'combined'),
+                     spaces=c('NS', 'S', 'ST')[1],
+                     plot=TRUE){
   ## load libraries again in case run in parallel
-  library(VAST); library(TMB); library(TMBhelper)
-  ## Check inputs TODO
+  library(VAST); library(TMB); library(TMBhelper); library(ggplot2)
+  library(plyr); library(reshape2)
 
+  st.list$plotdir <- file.path(getwd(), 'simulations', 'plots')
+  st.list$replicate <- replicate
   ## Generate 2D density
   set.seed(replicate)
-  den2d <- generate.density(st.list=st.list, abundance.trend=atrend,
-                            nyrs=nyrs, X.space=NULL, beta.space=NULL)
+  ## den2d <- generate.density(st.list=st.list, atrend=atrend,
+  ##                           nyrs=st.list$nyrs, plot=plot)
+  ## ## Distribution density vertically
+  ## den3d <-
+  ##   distribute.density(dat=den2d, vtrend=vtrend, st.list=st.list, plot=plot)
+  ## ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
+  ## ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
 
-  ## Distribution density vertically
-  vertical.trend <- rep(1,10)#c(4,16,24,16, 18, 18,14, 12,12,12)
-  den3d <- distribute.density(den2d, vertical.trend, X.vert, beta.vert,
-                              obins)
-  ## plot(as.numeric(den3d[1, 6:50]), type='n', ylim=c(0,.5))
-  ## lapply(sample(1:nrow(den3d), size=10), function(i) lines(as.numeric(den3d[i, 6:50])))
+  ## ## Simulate the sampling process for both gear types
+  ## data <- sample.data(dat=den3d, st.list=st.list, plot=plot)
+  tmp <- generate.pl.samples(st.list=st.list, atrend=atrend, nyrs=st.list$nyrs, plot=plot)
+  data <- tmp$D
+  truth <- ddply(data, .(Year), summarize,
+                 strata1=(sum(d1)),
+                 strata2=(sum(d2)),
+                 strata3=(sum(d3)))
+  ## only makes sense to compare the combiend model I think
+  x1 <- data.frame(year=1:st.list$nyrs, par.name='beta1', tmp$pars$beta1_tc)
+  x2 <- data.frame(year=1:st.list$nyrs, par.name='beta2',
+                   tmp$pars$beta2_tc)
+  beta.names <- c('year', 'par.name', 'strata1', 'strata2', 'strata3')
+  names(x1) <- names(x2)  <- beta.names
+  betas <- melt(rbind(x1,x2), id.vars=c('year', 'par.name'),
+                variable.name='strata', value.name='truth')
 
-  ## Simulate the sampling process for both gear types
-
-  bt.sd <- .2
-  at.sd <- .2
-  data <- sample.data(den3d, bt.sd, at.sd, pl.list, obins)
-
-  ## Reorganize data for models
-  out <- fit.models(data, replicate, ...)
-
-
-
-
-  ## Fit the independent VAST models, one for BT and one for AT
-
-  ## and the combined model
-
-  return(out)
-
+  ## Fit combinations of models
+  k <- 1
+  betas.list <- ind.list <- list()
+  for(s in spaces){
+    for(m in models){
+      out <- fit.models(data, replicate, model=m, space=s, plot=plot)
+      if(!is.null(out)){
+        ## Grab the truth values and the predicted densities by strata to
+        ## compare more directly. Have to manually massage the output to
+        ## compare to truth
+        if(m=='ats') t0 <-log(truth$strata2+truth$strata3)
+        if(m=='bts') t0 <-log(truth$strata1+truth$strata2)
+        if(m=='combined'){
+          b1 <- out$Report$beta1_tc
+          b2 <- out$Report$beta2_tc
+          x1 <- data.frame(year=1:st.list$nyrs, par.name='beta1', out$Report$beta1_tc)
+          x2 <- data.frame(year=1:st.list$nyrs, par.name='beta2', out$Report$beta2_tc)
+          names(x1) <- names(x2)  <- beta.names
+          betas2 <- melt(rbind(x1,x2), id.vars=c('year', 'par.name'),
+                         variable.name='strata', value.name='est')
+          stopifnot(identical(betas[,1:3], betas2[,1:3]))
+          betas.list[[k]] <- cbind(rep=replicate, model=m, space=s, betas, est=betas2$est)
+          tmp <- melt(truth,
+                      measure.vars=c('strata1', 'strata2', 'strata3'))
+          t0 <- log(tmp$value)
+        }
+        ind.list[[k]] <-
+          cbind(rep=replicate, out$Index, strata2=out$Index.strata$strata,
+                strata.est=out$Index.strata$est,
+                strata.se=out$Index.strata$se, truth=t0)
+      }
+      k <- k+1
+    }
+  }
+  ## Return them in long format
+  indices <- do.call(rbind, ind.list)
+  indices$group <- with(indices, paste(rep, model, strata, sep='-'))
+  indices$group2 <- with(indices, paste(rep, model, strata2, sep='-'))
+  betas <- do.call(rbind, betas.list)
+  betas$group <- with(betas, paste(rep, model, strata, sep='-'))
+  return(list(indices=indices, betas=betas))
 }
 
+
+
+## Basic simulation
+set.seed(1)
+nyr <- 12
+p3 <- seq(.1, .4, len=nyr/2)
+p3 <- c(p3, rev(p3))
+p2 <- seq(.3, .5, len=nyr/2)
+p2 <- c(p2, rev(p2))
+p1 <- 1-p3-p2
+plot(years, p1, type='n', ylim=c(0,1), xlab=NA, lty=1,
+     lwd=2, ylab='Proportion Abundance')
+yy <- c(years, rev(years))
+polygon(yy, c(rep(0, len=nyr), rev(p1)), col=gray(.2), border=1)
+polygon(yy, c(p1,  rev(p1+p2)), col=gray(.5), border=1)
+polygon(yy, c(p1+p2,  rev(p1+p2+p3)), col=gray(.8), border=1)
+box(col=gray(.5))
+
+atrend <- c(seq(0,1, len=5), seq(1,-1, len=5))
+vtrend <- c(4,16,24,16, 20, 25,14, 12,12,12)
+
+
+## currently depth has no impact but should add that and other covariates later
+Nsamples <- 300
+st.list <-
+  list(lon=runif(Nsamples,-175, -160), lat=runif(Nsamples, 55,62),
+       beta0=5, depth = sample(50:51, size=Nsamples, replace=TRUE),
+       sd.process=.05, nyrs=10,  bt.sd=.01, at.sd=.01, n_x=10)
+
+## ## Run a single replicate in serial for testing
+out <- simulate(replicate=12, st.list=st.list,
+                atrend=atrend, vtrend=vtrend, plot=TRUE)
+## ggplot(out, aes(year, est, color=strata)) + geom_line() + geom_point() +
+##   facet_grid(model~space)
+
+cores <- 6
+reps <- cores*2
+sfStop()
+snowfall::sfInit(parallel=TRUE, cpus=cores, slaveOutfile='simulation_progress.txt')
+snowfall::sfExportAll()
+out.parallel <-
+  ##sapply(1:reps, function(i)
+  snowfall::sfLapply(1:reps, function(i)
+    simulate(replicate=i, st.list=st.list, atrend=atrend,
+             vtrend=vtrend, plot=TRUE))
+sfStop()
+indices <- do.call(rbind, lapply(out.parallel, function(i) i$indices))
+betas <- do.call(rbind, lapply(out.parallel, function(i) i$betas))
+
+ggplot(indices, aes(year, est, group=group, color=model)) + geom_line()+
+  facet_grid(strata~space)
+## have to manipulate this one a bit
+x <- droplevels(subset(indices, model == 'combined'))
+y <- melt(x, id.vars=c('group2', 'year', 'strata2'), measure.vars=c('strata.est', 'truth'))
+y$group3 <- paste0(y$group2, '_', y$variable)
+ggplot(y, aes(year, value, group=group3, color=variable)) + geom_line() +
+  facet_wrap('strata2')
+
+betas2 <- melt(betas, measure.vars=c('truth', 'est'))
+betas2$group2 <- paste0(betas2$group, '_', betas2$variable)
+ggplot(betas2, aes(year, value, group=group2, color=variable)) + geom_line() +
+  facet_grid(par.name~strata, scales='free_y')

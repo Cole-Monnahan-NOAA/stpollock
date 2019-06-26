@@ -44,7 +44,7 @@ source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, warmup=200,
                init='last.par.best', thin=1,
-               control=list(max_treedepth=3))
+               control=list(max_treedepth=15, adapt_delta=.95))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
