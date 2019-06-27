@@ -1,10 +1,9 @@
 ### Fit some resolution tests on the two independent model since they're
 ### stable
 library(snowfall)
-sfInit(parallel=FALSE, cpus=8)
-inputs <- expand.grid(n_x=seq(10, 30, by=10), fs=c(FALSE, TRUE)[2], model=c('ats', 'bts')[1],
+sfInit(parallel=TRUE, cpus=8)
+inputs <- expand.grid(n_x=seq(210, 400, by=10), fs=c(FALSE, TRUE)[2], model=c('ats', 'bts'),
                       stringsAsFactors=FALSE)
-inputs <- inputs[1,]
 sfExport('inputs')
 trash <- sfLapply(1:nrow(inputs), function(ii){
   fs <<- inputs$fs[ii]
@@ -21,11 +20,12 @@ trash <- sfLapply(1:nrow(inputs), function(ii){
   if(fs) savedir <<- paste0(savedir, '_finescale')
   source("prepare_inputs.R")
   result <- tryCatch(
-    Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
+    Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=5, getsd=TRUE,
                     upper=TmbList$Upper,   savedir=savedir,
                     newtonsteps=0, control=list(trace=10)),
     error=function(e) 'xx')
   if(result=='xx'){
+    cat('Failed at', ii, '\n')
     return(NULL)
   } else {
     results <- process.results(Opt, Obj, Inputs, inputs$model[ii], space, savedir)
@@ -35,11 +35,15 @@ trash <- sfLapply(1:nrow(inputs), function(ii){
   }
 })
 
+
+
+
+## After running everything, read the results back in and process them for
+## plotting.
 setwd('resolution_tests')
 dirs <- list.dirs(getwd())[-1]
 results.list <- lapply(dirs, function(x) {
   setwd(x)
-  print(x)
   if(file.exists('Save.RDS'))
     Save <- readRDS('Save.RDS') else Save  <- NULL
   setwd('..')
@@ -55,9 +59,10 @@ pars <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
   data.frame(x$est, par2=paste0(1:nrow(x$est),'_', x$est$par),
              model=x$model, n_x=ifelse(x$model=='bts', x$n_x, x$n_x+3),
              finescale=x$finescale, stringsAsFactors=FALSE)))
-g <- ggplot(pars, aes(n_x, y=est, color=model)) + geom_linerange(aes(ymin=lwr, ymax=upr)) +
-  facet_wrap('par', scales='free_y') + geom_line() + theme_bw()
-ggsave('plots/resolution_pars.png', width=9, height=5)
+g <- ggplot(pars, aes(n_x, y=est, color=model, lty=finescale)) +
+#  geom_linerange(aes(ymin=lwr, ymax=upr), alpha=.5) +
+  facet_wrap('par', scales='free_y') + geom_line(lwd=1) + theme_bw()
+ggsave('plots/resolution_pars.png', g, width=12, height=5)
 
 opts <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
           data.frame(nll=x$Opt$objective,
@@ -68,7 +73,7 @@ opts <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
              model=x$model, n_x=ifelse(x$model=='bts', x$n_x, x$n_x+3),
              finescale=x$finescale, stringsAsFactors=FALSE)))
 opts.long <- gather(opts, variable, value, -n_x, -finescale, -model)
-g <- ggplot(opts.long, aes(n_x, y=value, color=model)) +
+g <- ggplot(opts.long, aes(n_x, y=value, color=model, lty=finescale)) +
   facet_wrap('variable', scales='free_y') + geom_line() + theme_bw()
 ggsave('plots/resolution_opts.png', width=9, height=5)
 
@@ -81,6 +86,6 @@ nlls <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
              finescale=x$finescale, stringsAsFactors=FALSE)))
 nlls <- ddply(subset(nlls, nll>0), .(model, comp), mutate,
               nll0=nll-nll[1])
-g <- ggplot(nlls, aes(n_x, y=nll0, color=model)) +
+g <- ggplot(nlls, aes(n_x, y=nll0, color=model, lty=finescale)) +
   facet_wrap('comp', scales='free_y') + geom_line() + theme_bw()
-ggsave('plots/resolution_nllcomp.png', width=9, height=5)
+ggsave('plots/resolution_nllcomp.png', g, width=9, height=5)
