@@ -99,10 +99,15 @@ grid_size_km <- 50
 OverdispersionConfig <- c("Delta1"=0, "Delta2"=0)
 ObsModel <- c(1,1)
 Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
-              "Calculate_Range"=1, "Calculate_evenness"=0,
-              "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
+              "Calculate_Range"=0, "Calculate_evenness"=0,
+              "Calculate_effective_area"=0, "Calculate_Cov_SE"=0,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0,
-              'Calculate_proportion'=1)
+              'Calculate_proportion'=0)
+## Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
+##               "Calculate_Range"=1, "Calculate_evenness"=0,
+##               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
+##               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0,
+##               'Calculate_proportion'=1)
 ## Stratification for results
 strata.limits <- data.frame('STRATA'="All_areas")
 Region <- "Eastern_Bering_Sea"

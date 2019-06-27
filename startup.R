@@ -283,10 +283,14 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   random.summary <- cbind(par=rownames(random.summary), random.summary)
   write.csv(file=paste0(savedir,'/random.estimates.csv'), x=random.summary, row.names=FALSE)
   index.gear.tmp <- index.strata.tmp <- D_gcy.list <- list()
-  R1_gcy.list <- R2_gcy.list <- list()
+  ##  R1_gcy.list <- R2_gcy.list <- list()
   covcor_omega1.list <- covcor_omega2.list <- covcor_epsilon1.list <- list()
   message("Looping through and calculating report...")
+  tmp <- Obj$report(df[1,])
+  ## Merge these into 4d arrays, last dimension is posterior draw number
+  D_gcyn <- array(NA, dim=c(dim(tmp$D_gcy), nrow(df)))
   for(i in 1:nrow(df)){
+    if(i %% 20 ==0) print(i)
     tmp <- Obj$report(df[i,])
     index.strata.tmp[[i]] <-
       data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$Index_cy)),
@@ -294,20 +298,19 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
     index.gear.tmp[[i]] <-
       data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
-    D_gcy.list[[i]] <- tmp$D_gcy
-    R1_gcy.list[[i]] <- tmp$R1_gcy
-    R2_gcy.list[[i]] <- tmp$R2_gcy
+    D_gcyn[,,,i] <- tmp$D_gcy
+    ## R1_gcy.list[[i]] <- tmp$R1_gcy
+    ## R2_gcy.list[[i]] <- tmp$R2_gcy
     covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
     covcor_omega2.list[[i]] <- tmp$lowercov_uppercor_omega2
     covcor_epsilon1.list[[i]] <- tmp$lowercov_uppercor_epsilon1
+    rm(tmp); gc()
   }
-  ## Merge these into 4d arrays, last dimension is posterior draw number
-  D_gcyn <- array(do.call(c, D_gcy.list), dim=c(dim(tmp$D_gcy), nrow(df)))
-  stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
-  R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
-  stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
-  R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
-  stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
+  ## stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
+  ## R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
+  ## stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
+  ## R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
+  ## stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
   ## Organize the corcov matrices
   covcor_omega1 <- covcor_omega2 <- covcor_epsilon1 <- NULL
   if(length(covcor_omega1.list)>0)
@@ -360,7 +363,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
-              R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
+              ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
   return(out)
