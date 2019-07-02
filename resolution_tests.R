@@ -61,8 +61,24 @@ pars <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
              finescale=x$finescale, stringsAsFactors=FALSE)))
 g <- ggplot(pars, aes(n_x, y=est, color=model, lty=finescale)) +
 #  geom_linerange(aes(ymin=lwr, ymax=upr), alpha=.5) +
-  facet_wrap('par', scales='free_y') + geom_line(lwd=1) + theme_bw()
+  facet_wrap('par', scales='free_y') + geom_line(lwd=1) + theme_bw() +
+  geom_vline(xintercept=50)
 ggsave('plots/resolution_pars.png', g, width=12, height=5)
+
+indices <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
+  data.frame(x$Index.strata, n_x=ifelse(x$finescale, x$n_x, x$n_x+5),
+             finescale=x$finescale, stringsAsFactors=FALSE)))
+g <- ggplot(subset(indices, model=='ats'), aes(n_x, y=est, color=finescale)) +
+  geom_linerange(aes(ymin=lwr, ymax=upr), alpha=.5) +
+  facet_wrap('year', scales='free_y') + geom_line(lwd=1) + theme_bw() +
+  geom_vline(xintercept=50) + ylab('log index')
+ggsave('plots/resolution_indices_ats.png', g, width=12, height=5)
+g <- ggplot(subset(indices, model=='bts'), aes(n_x, y=est, color=finescale)) +
+  geom_linerange(aes(ymin=lwr, ymax=upr), alpha=.5) +
+  facet_wrap('year', scales='free_y') + geom_line(lwd=1) + theme_bw() +
+  geom_vline(xintercept=50) + ylab('log index')
+ggsave('plots/resolution_indices_bts.png', g, width=12, height=5)
+
 
 opts <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
           data.frame(nll=x$Opt$objective,
@@ -74,7 +90,8 @@ opts <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
              finescale=x$finescale, stringsAsFactors=FALSE)))
 opts.long <- gather(opts, variable, value, -n_x, -finescale, -model)
 g <- ggplot(opts.long, aes(n_x, y=value, color=model, lty=finescale)) +
-  facet_wrap('variable', scales='free_y') + geom_line() + theme_bw()
+  facet_wrap('variable', scales='free_y') + geom_line() + theme_bw() +
+  geom_vline(xintercept=50)
 ggsave('plots/resolution_opts.png', width=9, height=5)
 
 nlls <- do.call(rbind, lapply(results.list, function(x) if(!is.null(x))
