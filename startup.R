@@ -267,8 +267,18 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
 calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   df <- as.matrix(fit)
   df <- df[,-ncol(df)] # drop lp__ column
-  strata <- c('0-3m', '3-16m', '16-surface')
-  gear <- c('Total', 'BTS', 'ATS')
+  if(model=='combined'){
+    strata <- c('0-3m', '3-16m', '16-surface')
+    gear <- c('Total', 'BTS', 'ATS')
+  } else if(model=='ats'){
+    strata <- '3-surface'
+    gear <- 'ATS'
+  } else if(model=='bts'){
+    strata <- '0-16m'
+    gear <- 'BTS'
+  } else {
+    stop("invalid model")
+  }
   ## Save text file of results
   fixed <- (df[, -Obj$env$random])
   fixed.summary <- do.call(rbind, apply(fixed, 2, function(x)
@@ -290,13 +300,13 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   ## Merge these into 4d arrays, last dimension is posterior draw number
   D_gcyn <- array(NA, dim=c(dim(tmp$D_gcy), nrow(df)))
   for(i in 1:nrow(df)){
-    if(i %% 20 ==0) print(i)
+    if(i %% 50 ==0) print(i)
     tmp <- Obj$report(df[i,])
     index.strata.tmp[[i]] <-
-      data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$Index_cy)),
+      data.frame(year=rep(years, each=length(strata)), iter=i, density=log(as.numeric(tmp$Index_cy)),
                  stratum=strata)
     index.gear.tmp[[i]] <-
-      data.frame(year=rep(years, each=3), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
+      data.frame(year=rep(years, each=length(gear)), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
     D_gcyn[,,,i] <- tmp$D_gcy
     ## R1_gcy.list[[i]] <- tmp$R1_gcy
@@ -342,19 +352,25 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
                            upr=quantile(density, probs=.975),
                            est=median(density))
   }
-  ## Massage to get the catchability by gear type
-  tmp <- dcast(index.gear, year+iter~gear, value.var='density')
-  ## Availability is in natural space
-  availability <- within(tmp, {BTS=exp(BTS)/exp(Total);
-    ATS=exp(ATS)/exp(Total)})
-  availability <- melt(availability, id.vars=c('year', 'iter'),
-                       measure.vars=c('ATS', 'BTS'),
-                       variable.name='gear', value.name='availability')
-  availability2 <- ddply(availability, .(year, gear), summarize,
-                         lwr=quantile(availability, probs=.025),
-                         upr=quantile(availability, probs=.975),
-                         est=median(availability))
-  index.gear2$space <- index.strata$space <- availability2$space <- space
+  ## Availability is in natural space and only makes sense for combined
+  ## model
+  if(model=='combined'){
+    ## Massage to get the catchability by gear type
+    tmp <- dcast(index.gear, year+iter~gear, value.var='density')
+    availability <- within(tmp, {BTS=exp(BTS)/exp(Total);
+      ATS=exp(ATS)/exp(Total)})
+    availability <- melt(availability, id.vars=c('year', 'iter'),
+                         measure.vars=c('ATS', 'BTS'),
+                         variable.name='gear', value.name='availability')
+    availability2 <- ddply(availability, .(year, gear), summarize,
+                           lwr=quantile(availability, probs=.025),
+                           upr=quantile(availability, probs=.975),
+                           est=median(availability))
+    availability2$space <- space
+  } else {
+    availability <- availability2 <- NULL
+  }
+  index.gear2$space <- index.strata$space <- space
   index.gear2$combinedoff <- index.strata$combinedoff <-
     availability2$combinedoff <- combinedoff
   index.gear2$fixlambda <- index.strata$fixlambda <-
@@ -419,6 +435,7 @@ plot.availability.map.mcmc <- function(index){
     warning("D_gcyn missing from index so skipping availability maps")
   } else {
     D_gcyn <- index$D_gcyn
+    rm(index); gc(); gc() ## try to reduce memory usage
     Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                                 Extrapolation_List=Extrapolation_List)
     Mapdetails$Legend$x <- Mapdetails$Legend$x-70
@@ -480,11 +497,11 @@ plot.density.map.mcmc <- function(index){
     Mapdetails$Legend$y <- Mapdetails$Legend$y-45
     mdl <- Mapdetails
     Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-    Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+    Years2Include = 1:length(Year_Set)#  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
     ## For each strata calculate the mean log density
     MatStrata <- apply(log(D_gcyn), 1:3, mean)
     zlimtmp <- range(MatStrata)
-    for(ii in 1:3){
+    for(ii in 1:dim(MatStrata)[2]){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatStrata[,ii,],
                  PlotDF=mdl$PlotDF,
@@ -499,7 +516,7 @@ plot.density.map.mcmc <- function(index){
     ## Repeat with CVs
     MatStrata <- apply(D_gcyn, 1:3, function(x) sd(x)/mean(x))
     zlimtmp <- c(0, max(MatStrata))
-    for(ii in 1:3){
+    for(ii in 1:dim(MatStrata)[2]){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatStrata[,ii,],
                  PlotDF=mdl$PlotDF,
@@ -566,7 +583,8 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.index.mcmc(index, savedir)
   plot.slow.mcmc(fit, savedir, n)
   plot.pairs.mcmc(fit, savedir)
-  plot.availability.map.mcmc(index)
+  if(model=='combined')
+    plot.availability.map.mcmc(index)
   plot.density.map.mcmc(index)
   plot.covcor.mcmc(index)
   ## Massage the output to get the beta's into a time format for ggplot
@@ -649,21 +667,23 @@ plot.index.mcmc <- function(index, savedir){
     geom_line(lwd=1.5, alpha=.5) + theme_bw() + # facet_wrap('stratum')+
     ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
-  g <- ggplot(index$availability, aes(year, y=est, color=gear, group=gear, fill=gear)) +
-    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-    geom_line(lwd=1.5, alpha=.5) + theme_bw() +# facet_wrap('gear')+
-    ylab('Availability to gear') + ylim(0,1)
-  ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
-  ## Do relative densities by strata and year for median
-  tmp <- dcast(index$index.strata, year~stratum, value.var='est')
-  tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
-  index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
-                           value.name='pct.density')
-  index.strata.pct$stratum <- factor(index.strata.pct$stratum,
-                                     levels=rev(levels(index$index.strata$stratum)) )
-  g <- ggplot(index.strata.pct, aes(year, pct.density, fill=stratum)) +
-    geom_area()
-  ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
+  if(model=='combined'){
+    g <- ggplot(index$availability, aes(year, y=est, color=gear, group=gear, fill=gear)) +
+      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+      geom_line(lwd=1.5, alpha=.5) + theme_bw() +# facet_wrap('gear')+
+      ylab('Availability to gear') + ylim(0,1)
+    ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
+    ## Do relative densities by strata and year for median
+    tmp <- dcast(index$index.strata, year~stratum, value.var='est')
+    tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
+    index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
+                             value.name='pct.density')
+    index.strata.pct$stratum <- factor(index.strata.pct$stratum,
+                                       levels=rev(levels(index$index.strata$stratum)) )
+    g <- ggplot(index.strata.pct, aes(year, pct.density, fill=stratum)) +
+      geom_area()
+    ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
+  }
 }
 
 plot.slow.mcmc <- function(fit, savedir, n=8){
