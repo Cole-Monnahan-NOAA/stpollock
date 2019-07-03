@@ -2,11 +2,10 @@
 chains <- 6
 options(mc.cores = chains)
 source('startup.R')
-model <- 'combined'
 
 
-## Base case for paper
-control <- list(seed=121, beta2temporal=TRUE, n_x=100,
+## Base case for paper: combined
+control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
                 kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
@@ -19,38 +18,63 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
-## Try to get finescale working with mcmc
-control <- list(seed=121, beta2temporal=TRUE, n_x=50,
-                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
-                beta1temporal=TRUE, filteryears=FALSE, finescale=TRUE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
-savedir <- paste0(getwd(), '/mcmc_basecase_finescale')
-source("prepare_inputs.R")
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, warmup=200,
-               init='last.par.best', thin=1,
-               control=list(max_treedepth=3))
-saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-plot.mcmc(Obj, savedir, fit)
-
-
-## Try to get kappas estimated
-control <- list(seed=121, beta2temporal=TRUE, n_x=50,
-                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+## Base case for paper: ATS
+control <- list(seed=121, beta2temporal=TRUE, n_x=100,
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1, model='ats',
                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=0, temporal=2, fixlambda=2, make_plots=FALSE)
-savedir <- paste0(getwd(), '/mcmc_basecase_kappas')
+                kappaoff=12, temporal=2,  make_plots=TRUE)
+savedir <- paste0(getwd(), '/mcmc_basecase_100_ats')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, warmup=200,
                init='last.par.best', thin=1,
-               control=list(max_treedepth=15, adapt_delta=.95))
+               control=list(max_treedepth=12))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+## Base case for paper: BTS
+control <- list(seed=121, beta2temporal=TRUE, n_x=100,
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1, model='bts',
+                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+                kappaoff=12, temporal=2, fixlambda=12, make_plots=TRUE)
+savedir <- paste0(getwd(), '/mcmc_basecase_100_bts')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=800, open_progress=FALSE, warmup=200,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 
+## ## Try to get finescale working with mcmc
+## control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+##                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+##                 beta1temporal=TRUE, filteryears=FALSE, finescale=TRUE,
+##                 kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE)
+## savedir <- paste0(getwd(), '/mcmc_basecase_50_finescale')
+## source("prepare_inputs.R")
+## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+##                iter=800, open_progress=FALSE, warmup=200,
+##                init='last.par.best', thin=2,
+##                control=list(max_treedepth=12))
+## saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+## plot.mcmc(Obj, savedir, fit)
 
 
+## ## Try to get kappas estimated
+## control <- list(seed=121, beta2temporal=TRUE, n_x=50,
+##                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+##                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+##                 kappaoff=0, temporal=2, fixlambda=2, make_plots=FALSE)
+## savedir <- paste0(getwd(), '/mcmc_basecase_kappas')
+## source("prepare_inputs.R")
+## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+##                iter=800, open_progress=FALSE, warmup=200,
+##                init='last.par.best', thin=1,
+##                control=list(max_treedepth=15, adapt_delta=.95))
+## saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+## plot.mcmc(Obj, savedir, fit)
 
 ## ## Base model: IID ST w/ kappas off and filtered years but no temporal
 ## ## smoothing on anything.
