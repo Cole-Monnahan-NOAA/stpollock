@@ -156,11 +156,9 @@ if(model=='combined'){
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
-  Data_Geostat <- data.frame(X=ats$X, Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                             Catch_KG=ats$strata2+ats$strata3, depth=ats$depth,
-                             depth2=ats$depth2,
-                             Gear='Acoustic_3-surface', AreaSwept_km2=1,
-                             Vessel='none')
+  Data_Geostat <- DF2
+  Data_Geostat$Gear='Acoustic_3-surface'
+  Data_Geostat$Catch_KG <- DF2$Catch_KG+DF3$Catch_KG
   c_iz <- rep(0, nrow(Data_Geostat))
 } else if(model=='bts'){
   Data_Geostat <- DF1
@@ -346,8 +344,8 @@ if(temporal==4){
 ## Run it once to optimize the random effects and set that to
 ## last.par.best which is the init in tmbstan.
 Obj$par <- par
-## Obj$fn(Obj$par)
-## Obj$env$last.par.best <- Obj$env$last.par
+Obj$fn(Obj$par)
+Obj$env$last.par.best <- Obj$env$last.par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output

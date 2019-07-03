@@ -2,6 +2,10 @@
 
 rm(list=ls())
 source("startup.R")
+chains <- 4
+options(mc.cores = chains)
+
+
 ## We condition the OM on the fitted base case model
 load('fit_basecase_100/Save.RData')
 load('fit_basecase_100/Record.RData')
@@ -83,19 +87,19 @@ matplot(t(apply(index.sim, 1, function(x) cumsum(x/sum(x)))), type='l', ylim=c(0
 ## Now when I call a new vector it'll have expected values in the missing
 ## years and thus be sampled from them.
 
-
+Data_Geostat0 <- Data_Geostat
 ### Loop through replicates of the simulation
-## for(i in 1:3){
-i <- 1
+for(i in 2:5){
 ## Simulate the sampling process.
 set.seed(i)
 encounters <- rbinom(length(sim$R1_i), size=1, prob=sim$R1_i)
 ## Carefully index to get the right SigmaObs by gear type
-sigma.obs <- sim$SigmaM[,1][as.numeric(Data_Geostat$Gear)]
+sigma.obs <- sim$SigmaM[,1][as.numeric(Data_Geostat0$Gear)]
 logcatches <- rnorm(length(sim$R2_i), log(sim$R2_i)-sigma.obs^2/2, sigma.obs)
 catches <- exp(logcatches)*encounters
 
 ## Rebuild the Obj with the new simulated data
+Data_Geostat <- Data_Geostat0
 Data_Geostat$Catch_KG <- catches
 DF1 <- subset(Data_Geostat, Gear=='Trawl')
 DF2 <- subset(Data_Geostat, Gear=='Acoustic_3-16')
@@ -112,24 +116,12 @@ control$simdata <- TRUE
 savedir <- paste0(getwd(), '/simulations/simfit_', i, '_combined')
 source("prepare_inputs.R")
 saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-chains <- 4
-options(mc.cores = chains)
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=800, open_progress=FALSE, warmup=200,
                init='last.par.best', thin=1,
                control=list(max_treedepth=12))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
-## Obj$par <- mle # cheat by starting at MLE
-## options(warn=2) ## if hits NaN exit immediately to save time
-## tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=getsd,
-##                 upper=TmbList$Upper,   savedir=savedir,
-##                 newtonsteps=0, control=list(trace=1)), error=function(e) 'XX')
-## options(warn=0)
-## if(is.list(Opt)){
-##   results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-##   plot.vastfit(results, plotmaps=TRUE)
-## }
 
 ## Repeat with just the BTS
 control$model <- 'bts'; control$make_plots <- FALSE
@@ -142,13 +134,6 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-## tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=getsd,
-##                 upper=TmbList$Upper,   savedir=savedir,
-##                 newtonsteps=0, control=list(trace=1)), error='XX')
-## if(is.list(Opt)){
-##   results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-##   plot.vastfit(results, plotmaps=TRUE)
-## }
 
 ## Repeat with just the ATS
 control$model <- 'ats'
@@ -161,42 +146,50 @@ fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-## tryCatch(Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=getsd,
-##                 upper=TmbList$Upper,   savedir=savedir,
-##                 newtonsteps=0, control=list(trace=1)), error='XX')
-## if(is.list(Opt)){
-##   results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-##   plot.vastfit(results, plotmaps=TRUE)
-## }
-
+} ## end of loop over the replicates
 
 
 ## Process and compare the fits to the simulated truth
 index.sim <- sim$ln_ColeIndex_cy
 index <- t(sim$Index_cyl[,,1])
 matplot(log(index))
-fitc <- readRDS
-load('simulations/simfit_1_combined/Save.RData')
-indexc <- t(Save$Report$Index_cyl[,,1])
-load('simulations/simfit_1_bts/Save.RData')
-indexb <- Save$Report$Index_cyl[,,1]
-load('simulations/simfit_1_ats/Save.RData')
-indexa <- Save$Report$Index_cyl[,,1]
+## load('simulations/simfit_1_combined/Save.RData')
+## indexc <- t(Save$Report$Index_cyl[,,1])
+## load('simulations/simfit_1_bts/Save.RData')
+## indexb <- Save$Report$Index_cyl[,,1]
+## load('simulations/simfit_1_ats/Save.RData')
+## indexa <- Save$Report$Index_cyl[,,1]
 
+library(magrittr)
+library(tidyr)
+library(dplyr)
+indexc <- readRDS('simulations/simfit_1_combined/index.mcmc.RDS')
+indexb <- readRDS('simulations/simfit_1_bts/index.mcmc.RDS')
+indexa <- readRDS('simulations/simfit_1_ats/index.mcmc.RDS')
 bts.sim <- log(rowSums(index[, 1:2]))
-bts.est <- log(indexb)
-bts.est2 <- log(rowSums(indexc[,1:2]))
+bts.est <- indexb$index.strata$est
+bts.est2 <- indexc$index.gear %>% filter(gear=='BTS') %>% select(est) %>% .$est
 ats.sim <- log(rowSums(index[, 2:3]))
-ats.est <- log(indexa)
-ats.est2 <- log(rowSums(indexc[,2:3]))
+ats.est <- indexa$index.strata$est
+ats.est2 <- indexc$index.gear %>% filter(gear=='ATS') %>% select(est) %>% .$est
+total.sim <- log(rowSums(index))
+total.bts <- bts.est
+total.ats <- ats.est
 
 bts.errors <- rbind(data.frame(year=years, gear='bts', model='combined', relerror=(bts.est2-bts.sim)/bts.sim),
       data.frame(year=years, gear='bts', model='independent', relerror=(bts.est-bts.sim)/bts.sim))
 ats.errors <- rbind(data.frame(year=years, gear='ats', model='combined', relerror=(ats.est2-ats.sim)/ats.sim),
       data.frame(year=years, gear='ats', model='independent', relerror=(ats.est-ats.sim)/ats.sim))
 
+total.errors <-
+  rbind(data.frame(year=years, gear='total', model='ats', relerror=(total.ats-total.sim)/total.sim),
+        data.frame(year=years, gear='total', model='bts', relerror=(total.bts-total.sim)/total.sim))
+
 all.errors <- rbind(bts.errors, ats.errors)
 ggplot(all.errors, aes(year, relerror)) + geom_line()+ geom_point() +
+  facet_grid(gear~model) + geom_abline(intercept=0, slope=0)
+
+ggplot(total.errors, aes(year, relerror)) + geom_line()+ geom_point() +
   facet_grid(gear~model) + geom_abline(intercept=0, slope=0)
 
 
