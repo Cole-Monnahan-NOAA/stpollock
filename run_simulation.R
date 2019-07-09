@@ -149,10 +149,6 @@ saveRDS(sim, paste0(savedir, '/simreport.RDS'))
 } ## end of loop over the replicates
 
 
-## Process and compare the fits to the simulated truth
-index.sim <- sim$ln_ColeIndex_cy
-index <- t(sim$Index_cyl[,,1])
-matplot(log(index))
 ## load('simulations/simfit_1_combined/Save.RData')
 ## indexc <- t(Save$Report$Index_cyl[,,1])
 ## load('simulations/simfit_1_bts/Save.RData')
@@ -163,9 +159,17 @@ matplot(log(index))
 library(magrittr)
 library(tidyr)
 library(dplyr)
-indexc <- readRDS('simulations/simfit_1_combined/index.mcmc.RDS')
-indexb <- readRDS('simulations/simfit_1_bts/index.mcmc.RDS')
-indexa <- readRDS('simulations/simfit_1_ats/index.mcmc.RDS')
+years <- 2007:2018
+## Process and compare the fits to the simulated truth
+sim <- readRDS('simulations/simfit_1_combined/simreport.RDS')
+index.sim <- sim$ln_ColeIndex_cy
+index <- t(sim$Index_cyl[,,1])
+matplot(log(index))
+all.errors <- total.errors <- list()
+for(i in 1:5){
+indexc <- readRDS(paste0('simulations/simfit_',i,'_combined/index.mcmc.RDS'))
+indexb <- readRDS(paste0('simulations/simfit_', i, '_bts/index.mcmc.RDS'))
+indexa <- readRDS(paste0('simulations/simfit_', i,'_ats/index.mcmc.RDS'))
 bts.sim <- log(rowSums(index[, 1:2]))
 bts.est <- indexb$index.strata$est
 bts.est2 <- indexc$index.gear %>% filter(gear=='BTS') %>% select(est) %>% .$est
@@ -173,23 +177,28 @@ ats.sim <- log(rowSums(index[, 2:3]))
 ats.est <- indexa$index.strata$est
 ats.est2 <- indexc$index.gear %>% filter(gear=='ATS') %>% select(est) %>% .$est
 total.sim <- log(rowSums(index))
-total.bts <- bts.est
+total.bts <- bts.est # estimates of total biomass for the two gears
 total.ats <- ats.est
+total.combined <- indexc$index.gear %>% filter(gear=='Total') %>%
+ pull(est)
+bts.errors <- rbind(data.frame(rep=i, year=years, gear='bts', model='combined', relerror=(bts.est2-bts.sim)/bts.sim),
+      data.frame(rep=i, year=years, gear='bts', model='independent', relerror=(bts.est-bts.sim)/bts.sim))
+ats.errors <- rbind(data.frame(rep=i, year=years, gear='ats', model='combined', relerror=(ats.est2-ats.sim)/ats.sim),
+      data.frame(rep=i, year=years, gear='ats', model='independent', relerror=(ats.est-ats.sim)/ats.sim))
+all.errors[[i]] <- rbind(bts.errors, ats.errors)
+total.errors[[i]] <-
+  rbind(data.frame(rep=i, year=years, gear='total', model='ats', relerror=(total.ats-total.sim)/total.sim),
+        data.frame(rep=i, year=years, gear='total', model='bts', relerror=(total.bts-total.sim)/total.sim),
+        data.frame(rep=i, year=years, gear='total', model='combined', relerror=(total.combined-total.sim)/total.sim))
+}
+all.errors <- do.call(rbind, all.errors)
+total.errors <- do.call(rbind, total.errors)
 
-bts.errors <- rbind(data.frame(year=years, gear='bts', model='combined', relerror=(bts.est2-bts.sim)/bts.sim),
-      data.frame(year=years, gear='bts', model='independent', relerror=(bts.est-bts.sim)/bts.sim))
-ats.errors <- rbind(data.frame(year=years, gear='ats', model='combined', relerror=(ats.est2-ats.sim)/ats.sim),
-      data.frame(year=years, gear='ats', model='independent', relerror=(ats.est-ats.sim)/ats.sim))
-
-total.errors <-
-  rbind(data.frame(year=years, gear='total', model='ats', relerror=(total.ats-total.sim)/total.sim),
-        data.frame(year=years, gear='total', model='bts', relerror=(total.bts-total.sim)/total.sim))
-
-all.errors <- rbind(bts.errors, ats.errors)
-ggplot(all.errors, aes(year, relerror)) + geom_line()+ geom_point() +
-  facet_grid(gear~model) + geom_abline(intercept=0, slope=0)
-
-ggplot(total.errors, aes(year, relerror)) + geom_line()+ geom_point() +
-  facet_grid(gear~model) + geom_abline(intercept=0, slope=0)
-
-
+g <- ggplot(all.errors, aes(year, relerror, group=rep)) + geom_line() +
+  facet_grid('model') + geom_abline(intercept=0, slope=0, col='red') +
+  ylab('Relative Error of Log of Individual Gears') + theme_bw()
+ggsave('plots/simulation_gear_errors.png', g, width=8, height=4)
+g <- ggplot(total.errors, aes(year, relerror, group=rep)) + geom_line()+
+  facet_wrap('model') + geom_abline(intercept=0, slope=0, col='red') +
+  ylab('Relative Error of Log of Total Biomass') + theme_bw()
+ggsave('plots/simulation_total_errors.png', g, width=8, height=4)
