@@ -1,7 +1,8 @@
 
 
 bts <- read.csv('data/bts.csv')
-ats <- read.csv('data/ats.csv')
+ats <- read.csv('data/ats_.5_16.csv')
+
 
 ## ## The hard part is getting the coordinates to plot between. I do this by
 ## ## plotting the annual data on a map and then use the locator() function to
