@@ -1461,10 +1461,12 @@ Type objective_function<Type>::operator() ()
   prior -= dnorm(lambda2_k, Type(0.0), Type(.5), true).sum();
   for(int ccc=0; ccc<n_c; ccc++){ // loop over categories 
     for(int ppp=0; ppp<n_p; ppp++){ // loop over covariates
-      prior-=dnorm(gamma1_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
-      prior-=dnorm(gamma2_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
+      prior-=dnorm(gamma1_ctp(ccc,1,ppp), Type(0.0), Type(2.0), true);
+      prior-=dnorm(gamma2_ctp(ccc,1,ppp), Type(0.0), Type(2.0), true);
     }
   }
+  prior-=dnorm(ln_H_input(0), Type(0.0), Type(2.0), true);
+  prior-=dnorm(ln_H_input(1), Type(0.0), Type(2.0), true);
   // for(int ii=0; ii<beta1_ft.rows();ii++){
   //   for(int jj=0; jj<beta1_ft.cols();jj++){
   //     prior -= dnorm(beta1_ft(ii,jj), Type(0.0), Type(5), true);
