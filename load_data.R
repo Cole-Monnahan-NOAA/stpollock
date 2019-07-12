@@ -23,14 +23,34 @@ ats <- read.csv('data/ats_.5_16.csv')
 ## locs[[2016]] <- locate.year(2016)
 ## locs[[2018]] <- locate.year(2018)
 ## ats.zeroes <- do.call(rbind, locs)
+### Also need to get depths for these fake tows so use the NOAA bath data set
+## library(marmap)
+## tmpmap <- getNOAA.bathy(lon1 = min(ats.zeroes$lon)-1, lon2 = max(ats.zeroes$lon)+1,
+##                         lat1 = min(ats.zeroes$lat)-1, lat2 = max(ats.zeroes$lat)+1,
+##                         resolution = 1)
+## ats.zeroes$surface <- -1*get.depth(tmpmap, x=ats.zeroes$lon, y=ats.zeroes$lat, locator=FALSE)$depth
+## ## a couple of these look to be on an island and thus are negative so just
+## ## ## drop them
+## ats.zeroes <- ats.zeroes[which(ats.zeroes$surface>20),]
+## plot(tmpmap, image=TRUE, land=TRUE)
+## ats0 <- subset(ats, lon>= -179)
+## ats0$depthbath <- -1*get.depth(tmpmap, x=ats0$lon, y=ats0$lat, locator=FALSE)$depth
+## plot(log(ats0$depth), (ats0$depthbath-ats0$depth))
+## ggplot(ats0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
+## bts0 <- subset(bts, lon>= -179)
+## bts0$depthbath <- -1*get.depth(tmpmap, x=bts0$lon, y=bts0$lat, locator=FALSE)$depth
+## plot(log(bts0$depth), (bts0$depthbath-bts0$depth)/bts0$depth)
+## ggplot(bts0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
+
 ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
-ats <- rbind(ats.zeroes, ats)
 ## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
 ##   facet_wrap('year') + theme_bw()
 ## ggsave('plots/ats.zeroes.png', g, width=10, height=7)
-
+ats <- rbind(ats.zeroes, ats)
 ## The ats data is really high resolution so truncating this for now to
 ## make things faster and fix the mesh which is overly weighted to the ats
 ## data otherwise
@@ -41,11 +61,11 @@ if(filterdata){
 
 ## Normalize the covariates. Does it make sense to do that here with depths
 ## in different strata??
-norm <- function(x) (x-mean(x, na.rm=TRUE))/sd(x, na.rm=TRUE)
+## norm <- function(x) (x-mean(x, na.rm=TRUE))/sd(x, na.rm=TRUE)
 ## bts$depth <- norm(bts$depth)
-bts$depth2 <- bts$depth^2
+## bts$depth2 <- bts$depth^2
 ats$depth <- ats$surface# norm(ats$surface)
-ats$depth2 <- ats$depth^2
+## ats$depth2 <- ats$depth^2
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
 
 
@@ -69,13 +89,13 @@ if(filteryears){
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
-                   Vessel='none', depth=bts$depth, depth2=bts$depth2, X=bts$X)
+                   Vessel='none', depth=bts$depth, X=bts$X)
 DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
+                   Vessel='none', depth=ats$depth, X=ats$X)
 DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
-                   Vessel='none', depth=ats$depth, depth2=ats$depth2, X=ats$X)
+                   Vessel='none', depth=ats$depth, X=ats$X)
 
 ## ## Simulate a fake process
 ## f <- function(mu, sd, p){
