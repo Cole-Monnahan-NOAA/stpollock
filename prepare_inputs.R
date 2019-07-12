@@ -7,6 +7,7 @@
 
 ## Setup default configuration if not specified in input control list
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
+aniso <- ifelse(is.null(control$aniso), FALSE, control$aniso)
 ## default is to estimate both lambdas
 fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
@@ -23,6 +24,11 @@ kappaoff <- ifelse(is.null(control$kappaoff), 12, control$kappaoff)
 seed <- ifelse(is.null(control$seed), 9999, control$seed)
 n_x <- ifelse(is.null(control$n_x), 50, control$n_x)
 model <- ifelse(is.null(control$model), 'combined', control$model)
+## We set kappa based on prior information and then do a sensitivity test
+## on it via kappascale (1/2 and 2 times the value). This is b/c kappa is
+## very hard to estimate with MCMC as currently parameterized.
+kappascale <- ifelse(is.null(control$kappascale), 1, control$kappascale)
+logkappainput <- log(sqrt(8)/ (kappascale*100) ) ## assumed values for kappas
 
 set.seed(seed)
 
@@ -157,7 +163,7 @@ if(model=='combined'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
   Data_Geostat <- DF2
-  Data_Geostat$Gear='Acoustic_3-surface'
+  Data_Geostat$Gear <- factor('Acoustic_3-surface')
   Data_Geostat$Catch_KG <- DF2$Catch_KG+DF3$Catch_KG
   c_iz <- rep(0, nrow(Data_Geostat))
 } else if(model=='bts'){
@@ -196,9 +202,13 @@ silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Spatial_List = Spatial_List, FUN = mean,
                                    na.omit = "time-average")))
 ## Normalize depth and then add depth^2
-XX$Cov_xtp <- NULL#(XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
+message("Adding standardized depth and depth^2 as covariates...")
+XX$Cov_xtp <- (XX$Cov_xtp- mean(XX$Cov_xtp))/sd(XX$Cov_xtp)
+XX$Cov_xtp <- XX$Cov_xtp*0
 ## new  <- XX$Cov_xtp[,,1]^2
 ## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
+## hist(XX$Cov_xtp[,,1])
+## hist(XX$Cov_xtp[,,2])
 
 ## Build data and object for first time
 message('Building first TMB object..')
@@ -215,13 +225,14 @@ silent.fn(TmbData <- make_data(Version=Version, FieldConfig=FieldConfig,
                                GridList=Spatial_List$GridList,
                                Q_ik=Q_ik,
                                X_gtp=XX$Cov_xtp,
+                               X_itp=array(0, dim=c(nrow(Data_Geostat), dim(XX$Cov_xtp)[2:3])),
                                spatial_list=Spatial_List,
                                Method=Spatial_List$Method, Options=Options,
-                               Aniso=FALSE))
+                               Aniso=aniso))
 silent.fn(TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
                                  Version=Version,  RhoConfig=RhoConfig,
                                  loc_x=Spatial_List$loc_x, Method=Method,
-                                 TmbDir='models', Random="generate"))
+                                 TmbDir='models', Random="generate", build_model=FALSE))
 
 ## Tweak the Map based on inputs
 message("Updating input Map and Params...")
@@ -251,7 +262,8 @@ if(model=='combined'){
   Params$Beta_mean1_c <- 1
   Params$Beta_mean2_c <- 3.3
 }
-Params$logkappa1 <- Params$logkappa2 <- -5
+
+Params$logkappa1 <- Params$logkappa2 <- logkappainput
 if(kappaoff==1){
   message("mapping off kappa1")
   Map$logkappa1 <- factor(NA)
@@ -261,6 +273,26 @@ if(kappaoff==1){
 } else if(kappaoff==12){
   message("mapping off kappa1 and kappa2")
   Map$logkappa1 <- Map$logkappa2 <- factor(NA)
+}
+
+if(model=='combined'){
+  tmp <- array(NA, dim=dim(Params$gamma1_ctp))
+  ## Effect on depth is constant across years but for each stratum
+  for(i in 1:3) tmp[i,,1] <- i
+  if(dim(tmp)[3]==2){
+    ## Effect on depth^2 is constant across years but for each stratum
+    for(i in 1:3) tmp[i,,2] <- i+3
+  }
+  Map$gamma1_ctp <-  Map$gamma2_ctp <- as.factor(tmp)
+} else {
+  tmp <- array(NA, dim=dim(Params$gamma1_ctp))
+  ## Effect on depth is constant across years but for each stratum
+  tmp[1,,1] <- 1
+  if(dim(tmp)[3]==2){
+    ## Effect on depth^2 is constant across years but for each stratum
+    tmp[1,,2] <- 2
+  }
+  Map$gamma1_ctp <-  Map$gamma2_ctp <- as.factor(tmp)
 }
 
 if(space=='ST' & model=='combined'){
