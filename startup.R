@@ -1006,7 +1006,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
                    oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
   }
   if(plotmaps){
-    plot_anisotropy( FileName=paste0(savedir,"Aniso.png"), Report=Report,
+    plot_anisotropy( FileName=paste0(savedir,"/Aniso.png"), Report=Report,
                     TmbData=TmbData )
     ## Some built-in maps
     tmp <- c(1,2,3, 11, 12)
