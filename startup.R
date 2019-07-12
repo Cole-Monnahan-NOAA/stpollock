@@ -631,7 +631,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
       facet_wrap('variable', scale='free') + theme_bw()
     ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=3.5)
   } else {
-    warning("not plot setup for 2 lambdas")
+    if(model=='combined') warning("not plot setup for 2 lambdas")
   }
   ## This is currently broken and probably not helpful anyway
   ## p <- pars.all[grep('Omegainput', x=pars.all)]
