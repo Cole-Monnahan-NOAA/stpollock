@@ -31,7 +31,6 @@ mcmc_*
 fit_*
 resolution_tests
 simulations
-results
 breakpoint_tests/breakpoints*
 sensitivities/fit_*
 sensitivities/kappascale_*

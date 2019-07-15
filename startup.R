@@ -15,6 +15,8 @@ library(mapdata)
 library(abind)
 library(tmbstan)
 library(shinystan)
+library(magrittr)
+library(dplyr)
 Version <- "VAST_v8_0_0"
 
 dir.create('simulations', showWarnings=FALSE)
