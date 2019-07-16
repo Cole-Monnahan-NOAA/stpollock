@@ -29,7 +29,7 @@ depthoff <- ifelse(is.null(control$depthoff), FALSE, control$depthoff)
 ## on it via kappascale (1/2 and 2 times the value). This is b/c kappa is
 ## very hard to estimate with MCMC as currently parameterized.
 kappascale <- ifelse(is.null(control$kappascale), 1, control$kappascale)
-logkappainput <- log(sqrt(8)/ (kappascale*100) ) ## assumed values for kappas
+logkappainput <- log(sqrt(8)/ (kappascale*400) ) ## assumed values for kappas
 
 set.seed(seed)
 
