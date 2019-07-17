@@ -48,20 +48,31 @@ for(model in c('ats', 'bts')){
   }
 }
 saveRDS(results.list, file='results/sensitivity_aniso.RDS')
-## The indices
+
+### Make quick plots of these sensitivities
+##The indices
+results.list <- readRDS('results/sensitivity_aniso.RDS')
 out <- do.call(rbind, lapply(results.list, function(x) data.frame(range=factor(100*x$kappascale), x$Index)))
 g <- ggplot(out, aes(year, est, color=range)) + geom_line() +
   facet_wrap('model', ncol=1) + theme_bw() +
-  geom_ribbon(aes(ymin=lwr, ymax=upr, fill=range), alpha=.3)
+  geom_ribbon(aes(ymin=lwr, ymax=upr, fill=range), alpha=.3) + ylab('log index')
 ggsave('plots/sensitivity_aniso_indices.png', g, width=7, height=5)
 ## Aniso estimates
 out <- do.call(rbind, lapply(results.list, function(x)
   data.frame(range=100*x$kappascale, x$est, model=x$model))) %>%
-  filter(par=='ln_H_input') %>% cbind(par2=c(1,2))
+  filter(par=='ln_H_input') %>% cbind(par2=c('ln_H_1','ln_H_2'))
 g <- ggplot(out, aes(range, est)) + geom_line() +
   facet_grid(par2~model, scales='free_y') + theme_bw()+
   geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.3)
-ggsave('plots/sensitivity_aniso_estimates.png', g, width=7, height=5)
+ggsave('plots/sensitivity_aniso_H_estimates.png', g, width=7, height=5)
+## spatial variance estimates
+out <- do.call(rbind, lapply(results.list, function(x)
+  data.frame(range=100*x$kappascale, x$est, model=x$model))) %>%
+  filter(grepl('L_eps|L_om', as.character(par)))
+g <- ggplot(out, aes(range, est, group=par, color=par)) + geom_line() +
+  facet_grid(.~model, scales='free_y') + theme_bw()
+##  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.3)
+ggsave('plots/sensitivity_aniso_L_estimates.png', g, width=7, height=5)
 plot.aniso <- function(i, Range){
   Report <- results.list[[i]]$Report
   ## Stol this from plot_anisotropy so could plot all 4 together
@@ -91,4 +102,7 @@ for(i in 1:7) plot.aniso(i, Range=c(-6316, 6316))
 legend("top", legend = c("Encounter probability",
                          "Positive catch rates"), fill = c("green", "black"), bty = "n")
 dev.off()
-
+## Save a table of these
+out <- do.call(rbind, lapply(results.list, function(x)
+  data.frame(range=100*x$kappascale, x$est, model=x$model)))
+write.csv(out, file='results/table.sensitivity.aniso.csv')
