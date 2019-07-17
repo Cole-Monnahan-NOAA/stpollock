@@ -197,6 +197,7 @@ silent.fn(Spatial_List  <-
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
 
 ## Standardize the raw depth
+Data_Geostat$depth <- log(Data_Geostat$depth)
 Data_Geostat$depth <- (Data_Geostat$depth-mean(Data_Geostat$depth))/sd(Data_Geostat$depth)
 silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Lat_e = Data_Geostat$Lat,
