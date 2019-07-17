@@ -96,7 +96,7 @@ plot.aniso <- function(i, Range){
 }
 png('plots/sensitivity_aniso_ellipses.png', width=9, height=5, units='in', res=500)
 par(mfrow=c(2,4), mar=c(3,3,2.5,.5))
-for(i in 1:7) plot.aniso(i, Range=c(-6316, 6316))
+for(i in 1:8) plot.aniso(i, Range=c(-6316, 6316))
 ## mtext(side = 1, outer = FALSE, line = 2, text = "Eastings (km.)")
 ## mtext(side = 2, outer = FALSE, line = 2, text = "Northings (km.)")
 legend("top", legend = c("Encounter probability",
