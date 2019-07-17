@@ -1,19 +1,19 @@
 ## A series of sensitivity analyses to run
-chains <- 1
+chains <- 6
 options(mc.cores = chains)
 setwd('..')
 source('startup.R')
 
 ### The effect of fixing logkappa. Run the models with half and double the
 ### spatial range used (50km and 200km)
-control <- list(beta2temporal=TRUE, n_x=100,
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE,
-                kappaoff=12, temporal=2)
 for(model in c('bts', 'ats', 'combined')){
   for(kappascale in c(.5,1,2)){
-    control$model <- model
-    control$kappascale <- kappascale
+    control <- list(beta2temporal=TRUE, n_x=100,
+                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                beta1temporal=TRUE, model=model, kappascale=kappascale,
+                kappaoff=12, temporal=2)
+    if(model=='combined')
+      control[c('n_eps1', 'n_eps2', 'n_omega1', 'n_omega2')] <- "IID"
     savedir <- paste0(getwd(), '/sensitivities/kappascale_', kappascale,'_', model)
     source("prepare_inputs.R")
     fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
@@ -38,7 +38,7 @@ for(model in c('ats', 'bts')){
     source("prepare_inputs.R")
     Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
                     upper=TmbList$Upper,   savedir=savedir,
-                    newtonsteps=1, control=list(trace=0))
+                    newtonsteps=0, control=list(trace=1))
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     plot.vastfit(results, plotmaps=TRUE)
     results$kappascale <- kappascale
