@@ -18,6 +18,7 @@ library(shinystan)
 library(magrittr)
 library(dplyr)
 Version <- "VAST_v8_0_0"
+compile('models/VAST_v8_0_0.cpp')
 
 dir.create('simulations', showWarnings=FALSE)
 dir.create('plots', showWarnings=FALSE)
