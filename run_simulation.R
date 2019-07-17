@@ -89,7 +89,7 @@ matplot(t(apply(index.sim, 1, function(x) cumsum(x/sum(x)))), type='l', ylim=c(0
 
 Data_Geostat0 <- Data_Geostat
 ### Loop through replicates of the simulation
-for(i in 2:5){
+for(i in 6:10){
 ## Simulate the sampling process.
 set.seed(i)
 encounters <- rbinom(length(sim$R1_i), size=1, prob=sim$R1_i)
@@ -166,7 +166,7 @@ index.sim <- sim$ln_ColeIndex_cy
 index <- t(sim$Index_cyl[,,1])
 matplot(log(index))
 all.errors <- total.errors <- list()
-for(i in 1:5){
+for(i in 1:7){
 indexc <- readRDS(paste0('simulations/simfit_',i,'_combined/index.mcmc.RDS'))
 indexb <- readRDS(paste0('simulations/simfit_', i, '_bts/index.mcmc.RDS'))
 indexa <- readRDS(paste0('simulations/simfit_', i,'_ats/index.mcmc.RDS'))

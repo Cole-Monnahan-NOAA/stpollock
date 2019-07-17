@@ -59,6 +59,8 @@ if(filterdata){
   ats <- ats[seq(1, nrow(ats), len=1*nrow(bts)),]
 }
 
+message('Dropping ATS data with depth>300')
+ats <- subset(ats, surface<=300)
 ## Normalize the covariates. Does it make sense to do that here with depths
 ## in different strata??
 ## norm <- function(x) (x-mean(x, na.rm=TRUE))/sd(x, na.rm=TRUE)
