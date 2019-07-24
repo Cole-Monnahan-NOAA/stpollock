@@ -26,6 +26,21 @@ dir.create('simulations/plots', showWarnings=FALSE)
 
 ## source("simulator.R")
 
+## This generic function uses the Obj on the global space to generate
+## random inits by jittering the defaults.
+prior.fn <- function(){
+  par.all <- Obj$env$last.par
+  fixed <- par.all[-Obj$env$random]
+  random <- par.all[Obj$env$random]
+  fixed[fixed==0] <- 1
+  fixed <- fixed*runif(length(fixed), min=.5, max=1.5)
+  random <- rnorm(length(random),0,.1)
+  par.all[-Obj$env$random] <- fixed
+  par.all[Obj$env$random] <- random
+  par.all
+}
+
+
 plot.change <- function(Report){
   ## Look at trend in % of population <3m.
   Dtmp <- Report$D_gcy
