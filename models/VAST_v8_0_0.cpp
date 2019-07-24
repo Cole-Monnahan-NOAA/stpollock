@@ -1465,8 +1465,9 @@ Type objective_function<Type>::operator() ()
       prior-=dnorm(gamma2_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
     }
   }
-  prior-=dnorm(ln_H_input(0), Type(0.0), Type(0.75), true);
-  prior-=dnorm(ln_H_input(1), Type(-1.0), Type(0.75), true);
+  //// turn off since not using aniso option
+  // prior-=dnorm(ln_H_input(0), Type(0.0), Type(0.75), true);
+  // prior-=dnorm(ln_H_input(1), Type(-1.0), Type(0.25), true);
   // for(int ii=0; ii<beta1_ft.rows();ii++){
   //   for(int jj=0; jj<beta1_ft.cols();jj++){
   //     prior -= dnorm(beta1_ft(ii,jj), Type(0.0), Type(5), true);
