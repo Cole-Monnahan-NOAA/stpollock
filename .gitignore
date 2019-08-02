@@ -27,7 +27,7 @@ simulation_progress.txt
 convergence_progress.txt
 testing
 .Rproj.user
-mcmc_*
+mcmcfit_*
 fit_*
 resolution_tests
 simulations
