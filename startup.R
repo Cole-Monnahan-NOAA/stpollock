@@ -17,6 +17,7 @@ library(tmbstan)
 library(shinystan)
 library(magrittr)
 library(dplyr)
+library(tidyr)
 Version <- "VAST_v8_0_0"
 compile('models/VAST_v8_0_0.cpp')
 
@@ -301,7 +302,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   fixed <- (df[, -Obj$env$random])
   fixed.summary <- do.call(rbind, apply(fixed, 2, function(x)
     round(data.frame(median=median(x), mean=mean(x), sd=sd(x), min=min(x),
-                     max=max(x)),3)))
+                     max=max(x), lwr=quantile(x, .025), upr=quantile(x,.975)),4)))
   fixed.summary <- cbind(par=rownames(fixed.summary), fixed.summary)
   write.csv(file=paste0(savedir,'/fixed.estimates.csv'), x=fixed.summary, row.names=FALSE)
   random <- (df[, Obj$env$random])
@@ -641,13 +642,16 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
       geom_line(lwd=2) + geom_point()+ theme_bw() + ylab("value")
     ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=5)
   } else if(length(p)==1){
-    ## just a constant
-    df <- as.data.frame(fit)[,p, drop=FALSE]
-    df$exp_lambda1_k <- exp(df[,1])
-    df2 <- melt(df, id.vars=NULL)
-    g <- ggplot(df2, aes(value))  + geom_histogram(bins=20) +
-      facet_wrap('variable', scale='free') + theme_bw()
-    ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=3.5)
+    ## just a constant but could be 1 or 2 parameters for the two LPs
+    p <- pars.all[grep('lambda', x=pars.all)]
+    df <- as.data.frame(fit)[,p, drop=FALSE] %>% gather(parameter, value)
+    df2 <- df
+    df2$parameter <- paste0('exp_', df2$parameter)
+    df2$value <- exp(df2$value)
+    df3 <- rbind(df, df2)
+    g <- ggplot(df3, aes(value))  + geom_histogram(bins=20) +
+      facet_wrap('parameter', scale='free') + theme_bw()
+    ggsave(file.path(savedir, 'lambdas_mcmc.png'), g, width=7, height=5)
   } else {
     if(model=='combined') warning("not plot setup for 2 lambdas")
   }
@@ -766,7 +770,7 @@ plot.pairs.mcmc <- function(fit, savedir){
   pairs(fit, pars=p, gap=0)
   dev.off()
   p <- pars.all[grep('lambda|Beta_mean|L_beta', x=pars.all)]
-  if(length(p)<14 & length(p) >0){
+  if(length(p)<15 & length(p) >0){
     png(paste0(savedir, '/pairs_scale.png'), width=7, height=5, res=500, units='in')
     pairs(fit, pars=p, gap=0)
     dev.off()

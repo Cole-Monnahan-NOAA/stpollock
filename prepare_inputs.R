@@ -8,8 +8,8 @@
 ## Setup default configuration if not specified in input control list
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 aniso <- ifelse(is.null(control$aniso), FALSE, control$aniso)
-## default is to estimate both lambdas
-fixlambda <- ifelse(is.null(control$fixlambda), 0, control$fixlambda)
+## default is to estimate only lambda1
+fixlambda <- ifelse(is.null(control$fixlambda), 2, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
 simdata <- ifelse(is.null(control$simdata), FALSE, control$simdata)
@@ -396,8 +396,10 @@ if(temporal==4){
   TmbList$Upper[grep('rho', names(TmbList$Upper))] <- 1.0
   TmbList$Lower[grep('rho', names(TmbList$Lower))]  <- -1.0
 }
-## Run it once to optimize the random effects and set that to
-## last.par.best which is the init in tmbstan.
+## Run it once to optimize the random effects, this is necessary b/c I
+## messed with the inits and bounds and I need to set the Obj variables
+## accordingly. Would be nice to ditch this since kind of slow.
+message("Optimizing random effects once..")
 Obj$par <- par
 Obj$fn(Obj$par)
 Obj$env$last.par.best <- Obj$env$last.par
