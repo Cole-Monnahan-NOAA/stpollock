@@ -318,6 +318,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   tmp <- Obj$report(df[1,])
   ## Merge these into 4d arrays, last dimension is posterior draw number
   D_gcyn <- array(NA, dim=c(dim(tmp$D_gcy), nrow(df)))
+  R1_in <- R2_in <- array(NA, dim=c(length(tmp$R1_i), nrow(df)))
   for(i in 1:nrow(df)){
     if(i %% 50 ==0) print(i)
     tmp <- Obj$report(df[i,])
@@ -328,6 +329,8 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
       data.frame(year=rep(years, each=length(gear)), iter=i, density=log(as.numeric(tmp$ColeIndex_cy)),
                  gear=gear)
     D_gcyn[,,,i] <- tmp$D_gcy
+    R1_in[,i] <- tmp$R1_i
+    R2_in[,i] <- tmp$R2_i
     ## R1_gcy.list[[i]] <- tmp$R1_gcy
     ## R2_gcy.list[[i]] <- tmp$R2_gcy
     covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
@@ -398,10 +401,54 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
+              R1_in=R1_in, R2_in=R2_in,
               ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
   return(out)
+}
+
+
+plot.posterior.predictive <- function(fit, index, nn=50){
+  ## Get some from each gear type and 0's and >0's
+  x <- (1:nrow(Data_Geostat))
+  bts.0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
+  bts.1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
+  ats2.0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG==0), size=nn)
+  ats2.1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG>0), size=nn)
+  ats3.0 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG==0), size=nn)
+  ats3.1 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG>0), size=nn)
+  ind <- c(bts.0, bts.1, ats2.0, ats2.1, ats3.0, ats3.1)
+  dat <- Data_Geostat[ind, c("Gear", "Catch_KG")]
+  R1 <- index$R1_in[ind,]
+  R2 <- index$R2_in[ind,]
+  ## Observation variances depend on the gear and sample
+  sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]'])
+  sigma.ats <- exp(as.data.frame(fit)[,'logSigmaM[2]'])
+  ## Genreate posterior predictive for each row of dat
+  ppred <- array(NA, dim=c(nrow(R1), ncol(R1)))
+  for(i in 1:nrow(R1)){
+    sig <- ifelse(dat$Gear[i]=='Trawl', sigma.bts[i], sigma.ats[i])
+    ppred[i,] <- exp(rnorm(n=ncol(R1), mean=log(R2[i,])-sig^2/2, sd=sig))*
+      rbinom(n=ncol(R1), size=1, prob=R1[i,])
+    ## convert to 0/1 for non encounters for easier plotting later
+    if(dat$Catch_KG[i]==0)
+      ppred[i,] <- ifelse(ppred[i,]==0, 0, 1)
+  }
+  ppred2 <- cbind(rep=1:nn, dat, ppred) %>%
+    gather(key=sample, value=catch, -rep, -Gear, -Catch_KG)
+  savedir <- index$savedir
+  g <- ppred2 %>% filter(Catch_KG==0) %>% group_by(rep, Gear) %>%
+    summarize(pct.zero=mean(catch==1))  %>%
+    ggplot(aes(pct.zero))  + geom_histogram(bins=30) +
+    facet_grid(Gear~.) + xlab("Mean probability of encounter") +
+    ggtitle("Posterior predictive distribution for non-encounters")
+  ggsave(file.path(savedir, 'posterior_predictive_zeros.png'), g, width=9, height=5)
+  g <- ggplot(subset(ppred2, Catch_KG>0), aes(x=factor(rep), y=log(catch)))  + geom_boxplot()+
+    facet_grid(Gear~.) + geom_point(aes(x=factor(rep), y=log(Catch_KG)),
+                                    col='red', size=2) + xlab("Data number")
+  ggtitle("Posterior predictive distribution for encounters")
+  ggsave(file.path(savedir, 'posterior_predictive_pos.png'), g, width=9, height=5)
 }
 
 plot.covcor.mcmc <- function(index){
@@ -604,6 +651,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.pairs.mcmc(fit, savedir)
   if(model=='combined')
     plot.availability.map.mcmc(index)
+  plot.posterior.predictive(fit, index)
   plot.density.map.mcmc(index)
   plot.covcor.mcmc(index)
   ## Massage the output to get the beta's into a time format for ggplot
@@ -731,7 +779,7 @@ plot.slow.mcmc <- function(fit, savedir, n=8){
   png(paste0(savedir, '/pairs_slow_fixed.png'), width=7, height=5, res=500, units='in')
   pairs(fit, pars=pars.slow.fixed, gap=0)
   dev.off()
-  if(length(pars.slow.random)>2){
+  if(length(na.omit(pars.slow.random))>2){
     png(paste0(savedir, '/pairs_slow_random.png'), width=7, height=5, res=500, units='in')
     pairs(fit, pars=pars.slow.random, gap=0)
     dev.off()
