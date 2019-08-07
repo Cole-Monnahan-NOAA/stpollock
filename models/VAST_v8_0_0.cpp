@@ -1465,6 +1465,10 @@ Type objective_function<Type>::operator() ()
       prior-=dnorm(gamma2_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
     }
   }
+  // These give approximately U(0,1) on R1 and R2 is between roughtly -10
+  // and 20 which is wide but reasonable.
+  prior-=dnorm(Beta_mean1_c, Type(-0.366), Type(1.5), true).sum();
+  prior-=dnorm(Beta_mean2_c, Type(5.0), Type(5.0), true).sum();
   //// turn off since not using aniso option
   // prior-=dnorm(ln_H_input(0), Type(0.0), Type(0.75), true);
   // prior-=dnorm(ln_H_input(1), Type(-1.0), Type(0.25), true);
