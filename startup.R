@@ -704,7 +704,13 @@ plot.pearson.mcmc <- function(index){
                 aes(Lon, Lat, size=abs(PR2), color=PR2<0)) +
       geom_point(alpha=.5) + facet_wrap('Year') + theme_bw() +
       ggtitle('Average Pearson resid', zz)
-    ggsave(paste0(savedir, '/pearson_', zz, '.png'), g, width=9, height=7)
+    ggsave(paste0(savedir, '/pearson_pos_', zz, '.png'), g, width=9, height=7)
+    ## Make sesne to look at binary ones?
+    g <- ggplot(subset(dat, Gear==zz & !is.na(PR1)),
+                aes(Lon, Lat, size=abs(PR1), color=PR1<0)) +
+      geom_point(alpha=.5) + facet_wrap('Year') + theme_bw() +
+      ggtitle('Average Pearson resid', zz)
+    ggsave(paste0(savedir, '/pearson_enc_', zz, '.png'), g, width=9, height=7)
 
   }
 }
