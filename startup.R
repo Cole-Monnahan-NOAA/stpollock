@@ -37,7 +37,7 @@ prior.fn <- function(){
   fixed <- fixed*runif(length(fixed), min=.5, max=1.5)
   random <- rnorm(length(random),0,.1)
   par.all[-Obj$env$random] <- fixed
-  par.all[Obj$env$random] <- random
+  par.all[Obj$env$random] <- 0*random
   par.all
 }
 

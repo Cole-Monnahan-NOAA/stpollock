@@ -399,10 +399,10 @@ if(temporal==4){
 ## Run it once to optimize the random effects, this is necessary b/c I
 ## messed with the inits and bounds and I need to set the Obj variables
 ## accordingly. Would be nice to ditch this since kind of slow.
-message("Optimizing random effects once..")
+##message("Optimizing random effects once..")
+#Obj$fn(Obj$par)
 Obj$par <- par
-Obj$fn(Obj$par)
-Obj$env$last.par.best <- Obj$env$last.par
+Obj$env$last.par.best[-Obj$env$random] <- par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
