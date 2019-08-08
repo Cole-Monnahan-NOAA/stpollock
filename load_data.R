@@ -47,6 +47,7 @@ ats <- read.csv('data/ats_.5_16.csv')
 ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
+ats.zeroes$time <- ats.zeroes$date <- NA
 ## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
 ##   facet_wrap('year') + theme_bw()
 ## ggsave('plots/ats.zeroes.png', g, width=10, height=7)
