@@ -319,6 +319,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   ## Merge these into 4d arrays, last dimension is posterior draw number
   D_gcyn <- array(NA, dim=c(dim(tmp$D_gcy), nrow(df)))
   R1_in <- R2_in <- array(NA, dim=c(length(tmp$R1_i), nrow(df)))
+  PR1_in <- PR2_in <- R1_in
   for(i in 1:nrow(df)){
     if(i %% 50 ==0) print(i)
     tmp <- Obj$report(df[i,])
@@ -336,8 +337,27 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
     covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
     covcor_omega2.list[[i]] <- tmp$lowercov_uppercor_omega2
     covcor_epsilon1.list[[i]] <- tmp$lowercov_uppercor_epsilon1
+    ## Calculate Pearson residuals
+    for(ii in 1:nrow(PR1_in)){
+      ## bernoulli for presence
+      mui <- tmp$R1_i[ii]
+      obs <- as.numeric(Data_Geostat$Catch_KG[ii]>0)
+      PR1_in[ii,i] <- (obs-mui)/sqrt(mui*(1-mui)/1)
+      ## log-normal for catch rate; NA for 0 observations
+      obs <- Data_Geostat$Catch_KG[ii]
+      if(obs>0){
+        ## make sure to use the right variance as this depends on gear type
+        gr <- as.numeric(Data_Geostat$Gear[ii])
+        PR2_in[ii,i] <- (log(obs)-log(tmp$R2_i[ii])+tmp$SigmaM[gr]^2/2)/tmp$SigmaM[gr]
+      }
+    }
     rm(tmp); gc()
   }
+  ## For now taking the mean of the Pearson residuals across posterior
+  ## draws
+  PR1 <- apply(PR1_in, 1, mean, na.rm=TRUE)
+  PR2 <- apply(PR2_in, 1, mean, na.rm=TRUE)
+  PR2[is.nan(PR2)] <- NA
   ## stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
   ## R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
   ## stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
@@ -402,6 +422,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
               R1_in=R1_in, R2_in=R2_in,
+              PR1=PR1, PR2=PR2,
               ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
@@ -411,44 +432,76 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
 
 plot.posterior.predictive <- function(fit, index, nn=50){
   ## Get some from each gear type and 0's and >0's
+  message('Calculating posterior predictive...')
   x <- (1:nrow(Data_Geostat))
-  bts.0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
-  bts.1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
-  ats2.0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG==0), size=nn)
-  ats2.1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG>0), size=nn)
-  ats3.0 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG==0), size=nn)
-  ats3.1 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG>0), size=nn)
-  ind <- c(bts.0, bts.1, ats2.0, ats2.1, ats3.0, ats3.1)
-  dat <- Data_Geostat[ind, c("Gear", "Catch_KG")]
-  R1 <- index$R1_in[ind,]
-  R2 <- index$R2_in[ind,]
+  if(model=='combined'){
+    bts.0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
+    bts.1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
+    ats2.0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG==0), size=nn)
+    ats2.1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG>0), size=nn)
+    ats3.0 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG==0), size=nn)
+    ats3.1 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG>0), size=nn)
+    ind <- c(bts.0, bts.1, ats2.0, ats2.1, ats3.0, ats3.1)
+  } else if (model=='ats'){
+    ats0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-surface' & Data_Geostat$Catch_KG==0), size=nn)
+    ats1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-surface' & Data_Geostat$Catch_KG>0), size=nn)
+    ind <- c(ats0, ats1)
+  } else if(model=='bts'){
+    bts0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
+    bts1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
+    ind <- c(bts0, bts1)
+  } else { stop("wrong model type") }
+  dat <- Data_Geostat[, c("Gear", "Catch_KG")]
+  R1 <- index$R1_in
+  R2 <- index$R2_in
   ## Observation variances depend on the gear and sample
-  sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]'])
-  sigma.ats <- exp(as.data.frame(fit)[,'logSigmaM[2]'])
+  if(model=='combined'){
+    sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]'])
+    sigma.ats <- exp(as.data.frame(fit)[,'logSigmaM[2]'])
+  } else {
+    sigma <- exp(as.data.frame(fit)[,'logSigmaM'])
+  }
   ## Genreate posterior predictive for each row of dat
   ppred <- array(NA, dim=c(nrow(R1), ncol(R1)))
   for(i in 1:nrow(R1)){
-    sig <- ifelse(dat$Gear[i]=='Trawl', sigma.bts[i], sigma.ats[i])
+    ## Careful to use the right variance here
+    if(model=='combined'){
+      sig <- ifelse(dat$Gear[i]=='Trawl', sigma.bts, sigma.ats)
+    } else {
+      sig <- sigma
+    }
     ppred[i,] <- exp(rnorm(n=ncol(R1), mean=log(R2[i,])-sig^2/2, sd=sig))*
       rbinom(n=ncol(R1), size=1, prob=R1[i,])
     ## convert to 0/1 for non encounters for easier plotting later
     if(dat$Catch_KG[i]==0)
       ppred[i,] <- ifelse(ppred[i,]==0, 0, 1)
   }
-  ppred2 <- cbind(rep=1:nn, dat, ppred) %>%
-    gather(key=sample, value=catch, -rep, -Gear, -Catch_KG)
+  message('Plotting posterior predictive...')
+  ## Make plots of positive catches. Using % below as metric for each one.
+  Data_Geostat$pct.below <- sapply(1:nrow(dat), function(i) mean(ppred[i,]<dat[i,'Catch_KG']))
+  for(zz in levels(Data_Geostat$Gear)){
+    g <- ggplot(subset(Data_Geostat, Catch_KG>0 & Gear==zz),
+                aes(x=Lon, y=Lat, color=pct.below>.5)) +
+      geom_point() + facet_wrap('Year') + theme_bw() +
+      ## geom_tufteboxplot(median.type='line', hoffset=0, width=3)+
+      ## facet_grid(Gear~year) +
+      ## geom_point(aes(x=factor(rep), y=log(Catch_KG)), col='red', size=2) +
+      ## xlab("Data number") + theme_bw() +
+      ggtitle("Posterior predictive distribution for encounters", zz)
+    ggsave(paste0(savedir, '/ppred_pos_', zz,'.png'), g, width=9, height=5)
+  }
+  ## Make some for the non-encounters. Better way to do this?
+  ppred2 <- cbind(rep=1:nrow(dat), dat, year=Data_Geostat$Year, ppred) %>%
+    gather(key=sample, value=catch, -rep, -Gear, -Catch_KG, -year)
   savedir <- index$savedir
-  g <- ppred2 %>% filter(Catch_KG==0) %>% group_by(rep, Gear) %>%
-    summarize(pct.zero=mean(catch==1))  %>%
-    ggplot(aes(pct.zero))  + geom_histogram(bins=30) +
-    facet_grid(Gear~.) + xlab("Mean probability of encounter") +
-    ggtitle("Posterior predictive distribution for non-encounters")
-  ggsave(file.path(savedir, 'posterior_predictive_zeros.png'), g, width=9, height=5)
-  g <- ggplot(subset(ppred2, Catch_KG>0), aes(x=factor(rep), y=log(catch)))  + geom_boxplot()+
-    facet_grid(Gear~.) + geom_point(aes(x=factor(rep), y=log(Catch_KG)),
-                                    col='red', size=2) + xlab("Data number")
-  ggtitle("Posterior predictive distribution for encounters")
-  ggsave(file.path(savedir, 'posterior_predictive_pos.png'), g, width=9, height=5)
+  tmp <- ppred2 %>% filter(Catch_KG==0) %>% group_by(rep, Gear, year) %>%
+    summarize(pct.zero=mean(catch==1))
+  for(zz in levels(tmp$Gear)){
+    g <- ggplot(subset(tmp, Gear==zz), aes(pct.zero))  + geom_histogram(bins=30) +
+      facet_wrap('year') + xlab("Mean probability of encounter") +
+      ggtitle("Posterior predictive distribution for non-encounters", zz)
+    ggsave(paste0(savedir, '/ppred_zeros_', zz,'.png'), g, width=9, height=5)
+  }
 }
 
 plot.covcor.mcmc <- function(index){
@@ -643,6 +696,18 @@ plot.R1.map.mcmc <- function(index){
   }
 }
 
+## Plot average pearson residuals by space
+plot.pearson.mcmc <- function(index){
+  dat <- cbind(Data_Geostat, PR1=index$PR1, PR2=index$PR2)
+  for(zz in levels(dat$Gear)){
+    g <- ggplot(subset(dat, Gear==zz & !is.na(PR2)),
+                aes(Lon, Lat, size=abs(PR2), color=PR2<0)) +
+      geom_point(alpha=.5) + facet_wrap('Year') + theme_bw() +
+      ggtitle('Average Pearson resid', zz)
+    ggsave(paste0(savedir, '/pearson_', zz, '.png'), g, width=9, height=7)
+
+  }
+}
 
 plot.mcmc <- function(Obj, savedir, fit, n=8){
   index <- calculate.index.mcmc(Obj, fit)
@@ -652,6 +717,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   if(model=='combined')
     plot.availability.map.mcmc(index)
   plot.posterior.predictive(fit, index)
+  plot.pearson.mcmc(index)
   plot.density.map.mcmc(index)
   plot.covcor.mcmc(index)
   ## Massage the output to get the beta's into a time format for ggplot
