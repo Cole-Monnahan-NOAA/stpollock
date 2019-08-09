@@ -17,7 +17,7 @@ combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
 silent  <- ifelse(is.null(control$silent ), TRUE, control$silent )
-temporal <- ifelse(is.null(control$temporal), 2, control$temporal)
+temporal <- ifelse(is.null(control$temporal), 4, control$temporal)
 beta1temporal <- ifelse(is.null(control$beta1temporal), TRUE, control$beta1temporal)
 beta2temporal <- ifelse(is.null(control$beta2temporal), TRUE, control$beta2temporal)
 kappaoff <- ifelse(is.null(control$kappaoff), 12, control$kappaoff)
@@ -402,7 +402,7 @@ if(temporal==4){
 ##message("Optimizing random effects once..")
 #Obj$fn(Obj$par)
 Obj$par <- par
-Obj$env$last.par.best[-Obj$env$random] <- par
+Obj$env$last.par[-Obj$env$random] <- par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
