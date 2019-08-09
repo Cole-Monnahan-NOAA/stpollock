@@ -1,5 +1,5 @@
 ## A series of sensitivity analyses to run
-chains <- 6
+chains <- 4
 options(mc.cores = chains)
 setwd('..')
 source('startup.R')
@@ -11,48 +11,24 @@ warmup <- 200
 
 ### The effect of fixing logkappa. Run the models with half and double the
 ### spatial range used (50km and 200km)
-for(model in c('bts', 'ats', 'combined')){
-  for(kappascale in c(.5,1,2)){
+for(model in c('bts', 'ats', 'combined')[-3]){
+  for(kappascale in c(.5,1, 2)){
     control <- list(beta2temporal=TRUE, n_x=100,
                 n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, model=model, kappascale=kappascale,
-                kappaoff=12, temporal=2)
+                model=model, kappascale=kappascale,
+                kappaoff=12)
     if(model=='combined')
       control[c('n_eps1', 'n_eps2', 'n_omega1', 'n_omega2')] <- "IID"
     savedir <- paste0(getwd(), '/sensitivities/mcmcfit_kappascale_', kappascale,'_', model)
     source("prepare_inputs.R")
     fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-                   iter=800, open_progress=FALSE, warmup=200,
-                   init='last.par.best', thin=1,
-                   control=list(max_treedepth=12))
+                   iter=iter, open_progress=FALSE, warmup=warmup,
+                   init=prior.fn, thin=1,
+                   control=list(max_treedepth=td, adapt_delta=ad))
     saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
     plot.mcmc(Obj, savedir, fit)
   }
 }
-## Also do it for the independent models with MLE
-results.list <- list()
-k <- 1
-for(model in c('ats', 'bts')){
-  for(kappascale in c(.5, 1, 2, 4)){
-    control <- list(seed=121, beta2temporal=TRUE, n_x=100, model=model,
-                    n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                    beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                    kappaoff=12, temporal=2, fixlambda=2, make_plots=FALSE,
-                    kappascale=kappascale, aniso=TRUE)
-    savedir <- paste0(getwd(), '/sensitivities/fit_aniso_test_', model, '_', kappascale)
-    source("prepare_inputs.R")
-    Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                    upper=TmbList$Upper,   savedir=savedir,
-                    newtonsteps=0, control=list(trace=1))
-    results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-    plot.vastfit(results, plotmaps=TRUE)
-    results$kappascale <- kappascale
-    results$logkappainput <- logkappainput
-    results.list[[k]] <- results
-    k <- k+1
-  }
-}
-saveRDS(results.list, file='results/sensitivity_aniso.RDS')
 
 ### Make quick plots of these sensitivities
 ##The indices
