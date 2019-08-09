@@ -1469,6 +1469,20 @@ Type objective_function<Type>::operator() ()
   // and 20 which is wide but reasonable.
   prior-=dnorm(Beta_mean1_c, Type(-0.366), Type(1.5), true).sum();
   prior-=dnorm(Beta_mean2_c, Type(5.0), Type(5.0), true).sum();
+  // Priors on correlation, per Stan's recommendation to use a dbeta(2,2)
+  // to keep it off the boundary a bit better
+  for(int ccc=0; ccc<Beta_rho1_f.size(); ccc++){
+    prior-=dbeta((Beta_rho1_f(ccc)+Type(1.0))/Type(2.0), Type(2.0), Type(2.0), true);
+  }
+  for(int ccc=0; ccc<Beta_rho2_f.size(); ccc++){
+    prior-=dbeta((Beta_rho2_f(ccc)+Type(1.0))/Type(2.0), Type(2.0), Type(2.0), true);
+  }
+  for(int ccc=0; ccc<Epsilon_rho1_f.size(); ccc++){
+    prior-=dbeta((Epsilon_rho1_f(ccc)+Type(1.0))/Type(2.0), Type(2.0), Type(2.0), true);
+  }
+  for(int ccc=0; ccc<Epsilon_rho2_f.size(); ccc++){
+    prior-=dbeta((Epsilon_rho2_f(ccc)+Type(1.0))/Type(2.0), Type(2.0), Type(2.0), true);
+  }
   //// turn off since not using aniso option
   // prior-=dnorm(ln_H_input(0), Type(0.0), Type(0.75), true);
   // prior-=dnorm(ln_H_input(1), Type(-1.0), Type(0.25), true);
