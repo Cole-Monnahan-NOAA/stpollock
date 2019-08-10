@@ -21,6 +21,10 @@ library(tidyr)
 Version <- "VAST_v8_0_0"
 compile('models/VAST_v8_0_0.cpp')
 
+strata.labels.combined <- c('<0.5m', '0.5-16m', '>16m')
+strata.labels.ats <- '>0.5m'
+strata.labels.bts <- '<16m'
+
 dir.create('simulations', showWarnings=FALSE)
 dir.create('plots', showWarnings=FALSE)
 dir.create('simulations/plots', showWarnings=FALSE)
@@ -320,9 +324,12 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   D_gcyn <- array(NA, dim=c(dim(tmp$D_gcy), nrow(df)))
   R1_in <- R2_in <- array(NA, dim=c(length(tmp$R1_i), nrow(df)))
   PR1_in <- PR2_in <- R1_in
+  beta1_tcn <- beta2_tcn <- array(NA, dim=c(dim(tmp$beta1_tc), nrow(df)))
   for(i in 1:nrow(df)){
     if(i %% 50 ==0) print(i)
     tmp <- Obj$report(df[i,])
+    beta1_tcn[,,i] <- tmp$beta1_tc
+    beta2_tcn[,,i] <- tmp$beta2_tc
     index.strata.tmp[[i]] <-
       data.frame(year=rep(years, each=length(strata)), iter=i, density=log(as.numeric(tmp$Index_cy)),
                  stratum=strata)
@@ -423,6 +430,7 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
               availability=availability2, scenario=scenario,
               R1_in=R1_in, R2_in=R2_in,
               PR1=PR1, PR2=PR2,
+              beta1=beta1_tcn, beta2=beta2_tcn,
               ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
@@ -715,9 +723,49 @@ plot.pearson.mcmc <- function(index){
   }
 }
 
+
+plot.betas.mcmc <- function(index, savedir){
+  if(model !='combined'){
+    dimnames(index$beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(index$beta1)[3])
+    df1 <- cbind(beta='beta1', melt(index$beta1))
+    dimnames(index$beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(index$beta2)[3])
+    df2 <- cbind(beta='beta2', melt(index$beta2))
+  } else {
+    dimnames(index$beta1) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(index$beta1)[3])
+    df1 <- cbind(beta='beta1', melt(index$beta1))
+    dimnames(index$beta2) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(index$beta2)[3])
+    df2 <- cbind(beta='beta2', melt(index$beta2))
+  }
+  df <- rbind(df1, df2) %>%
+    ddply(.(stratum, beta, year), summarize,
+          lwr=quantile(value, .025),
+          upr=quantile(value, .975),
+          med=median(value))
+  g <-  ggplot(df, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~beta)+
+    geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+    geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
+  ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
+  ##   df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
+  ##                         function(x) x[[1]])
+  ##   df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
+  ##   temp <- data.frame(stratum=c('0-3m', '3-16m', '16+'), year=rep(1:12, each=3), index=1:36)
+  ##   df <- merge(df, temp, by='index')
+  ##   df2 <- ddply(df, .(stratum, par.type, year), summarize,
+  ##                lwr=quantile(value, .025),
+  ##                upr=quantile(value, .975),
+  ##                med=median(value))
+  ##   g <-  ggplot(df2, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~par.type)+
+  ##     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
+  ##     geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
+  ##   ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
+  ## }
+}
+
+
 plot.mcmc <- function(Obj, savedir, fit, n=8){
   index <- calculate.index.mcmc(Obj, fit)
   plot.index.mcmc(index, savedir)
+  plot.betas.mcmc(index, savedir)
   plot.slow.mcmc(fit, savedir, n)
   plot.pairs.mcmc(fit, savedir)
   if(model=='combined')
@@ -728,23 +776,6 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.covcor.mcmc(index)
   ## Massage the output to get the beta's into a time format for ggplot
   pars.all <- names(fit)
-  p <- pars.all[grep('beta1_ft|beta2_ft', x=pars.all)]
-  if(length(p)>0){
-    df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
-    df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
-                          function(x) x[[1]])
-    df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
-    temp <- data.frame(stratum=c('0-3m', '3-16m', '16+'), year=rep(1:12, each=3), index=1:36)
-    df <- merge(df, temp, by='index')
-    df2 <- ddply(df, .(stratum, par.type, year), summarize,
-                 lwr=quantile(value, .025),
-                 upr=quantile(value, .975),
-                 med=median(value))
-    g <-  ggplot(df2, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~par.type)+
-      geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
-      geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
-    ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
-  }
   p <- pars.all[grep('lambda1', x=pars.all)]
   if(length(p)>2){
     df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
