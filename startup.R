@@ -485,18 +485,21 @@ plot.posterior.predictive <- function(fit, index, nn=50){
       ppred[i,] <- ifelse(ppred[i,]==0, 0, 1)
   }
   message('Plotting posterior predictive...')
-  ## Make plots of positive catches. Using % below as metric for each one.
-  Data_Geostat$pct.below <- sapply(1:nrow(dat), function(i) mean(ppred[i,]<dat[i,'Catch_KG']))
+  ## Make plots of positive catches. Using percentile as metric
+  Data_Geostat$percentile <- sapply(1:nrow(dat), function(i)
+    mean(ppred[i,]<dat[i,'Catch_KG']))
   for(zz in levels(Data_Geostat$Gear)){
     g <- ggplot(subset(Data_Geostat, Catch_KG>0 & Gear==zz),
-                aes(x=Lon, y=Lat, color=pct.below>.5)) +
-      geom_point() + facet_wrap('Year') + theme_bw() +
+                aes(x=Lon, y=Lat, color=percentile)) +
+      scale_color_gradient2(midpoint=.5, low="blue", mid="white",
+                            high="red", space ="Lab" )+
+      geom_jitter(height=.1, width=.1) + facet_wrap('Year') + theme_bw() +
       ## geom_tufteboxplot(median.type='line', hoffset=0, width=3)+
       ## facet_grid(Gear~year) +
       ## geom_point(aes(x=factor(rep), y=log(Catch_KG)), col='red', size=2) +
       ## xlab("Data number") + theme_bw() +
       ggtitle("Posterior predictive distribution for encounters", zz)
-    ggsave(paste0(savedir, '/ppred_pos_', zz,'.png'), g, width=9, height=5)
+    ggsave(paste0(savedir, '/ppred_pos_', zz,'.png'), g, width=9, height=7)
   }
   ## Make some for the non-encounters. Better way to do this?
   ppred2 <- cbind(rep=1:nrow(dat), dat, year=Data_Geostat$Year, ppred) %>%
