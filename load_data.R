@@ -91,13 +91,13 @@ if(filteryears){
 }
 
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
-                   Catch_KG=bts$density, Gear='Trawl', AreaSwept_km2=1,
+                   Catch_KG=bts$density, Gear='BT', AreaSwept_km2=1,
                    Vessel='none', depth=bts$depth, X=bts$X)
 DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                   Catch_KG=ats$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
+                   Catch_KG=ats$strata2, Gear='AT2', AreaSwept_km2=1,
                    Vessel='none', depth=ats$depth, X=ats$X)
 DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
-                   Catch_KG=ats$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
+                   Catch_KG=ats$strata3, Gear='AT3', AreaSwept_km2=1,
                    Vessel='none', depth=ats$depth, X=ats$X)
 
 ## ## Simulate a fake process
@@ -121,10 +121,10 @@ DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
 ##                   Gear='Trawl', AreaSwept_km2=1,
 ##                   Vessel='none', depth=fake$depth, depth2=fake$depth2)
 ## DF2 <- data.frame(Lat=fake$lat, Lon=fake$lon, Year=fake$year,
-##                   Catch_KG=fake$strata2, Gear='Acoustic_3-16', AreaSwept_km2=1,
+##                   Catch_KG=fake$strata2, Gear='AT2', AreaSwept_km2=1,
 ##                   Vessel='none', depth=fake$depth, depth2=fake$depth2)
 ## DF3 <- data.frame( Lat=fake$lat, Lon=fake$lon, Year=fake$year,
-##                    Catch_KG=fake$strata3, Gear='Acoustic_16-surface', AreaSwept_km2=1,
+##                    Catch_KG=fake$strata3, Gear='AT3', AreaSwept_km2=1,
 ##                    Vessel='none', depth=fake$depth, depth2=fake$depth2)
 
 ## DF1$Catch_KG[sample(1:1000, size=80)] <- 0

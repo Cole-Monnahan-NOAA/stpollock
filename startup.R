@@ -25,6 +25,7 @@ strata.labels.combined <- c('<0.5m', '0.5-16m', '>16m')
 strata.labels.ats <- '>0.5m'
 strata.labels.bts <- '<16m'
 
+
 dir.create('simulations', showWarnings=FALSE)
 dir.create('plots', showWarnings=FALSE)
 dir.create('simulations/plots', showWarnings=FALSE)
@@ -49,11 +50,11 @@ prior.fn <- function(){
 plot.change <- function(Report){
   ## Look at trend in % of population <3m.
   Dtmp <- Report$D_gcy
-  dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+  dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
   Dtmp.wide <- melt(Dtmp)
   pct <- ddply(Dtmp.wide, .(cell, year), mutate, pct=value/sum(value))
   ## g <- ggplot(pct, aes(year, pct, fill=stratum)) + geom_area() + facet_wrap('cell')
-  pct2 <- subset(pct, stratum=='0-3m')
+  pct2 <- subset(pct, stratum==strata.labels.combined[1])
   MatDat <- ddply(pct2, .(cell), function(x) {
     fit <- lm(pct~year, data=x)
     out <- data.frame(slope=coef(fit)[2], pvalue=summary(fit)$coefficients[2,4] )
@@ -79,18 +80,18 @@ plot.change <- function(Report){
   ## Look at correlation among strata in each grid cell
   Dtmp <- Report$Epsilon1_gct
   if(!is.null(Dtmp)){
-    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
     Dtmp.wide <- melt(Dtmp)
     Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
-    names(Dtmp.long)[3:5] <- c('stratum1', 'stratum2', 'stratum3')
+    names(Dtmp.long)[3:5] <- strata.labels.combined
     g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
       geom_point()+ facet_wrap('cell') +
       theme(strip.background = element_blank(), strip.text.x = element_blank())
     ggsave(file.path(savedir, 'eps1_correlations_pairwise.png'), g, width=12, height=9)
     cors <- ddply(Dtmp.wide, .(cell), function(x){
-      s1=subset(x, stratum=='0-3m')$value
-      s2=subset(x, stratum=='3-16m')$value
-      s3=subset(x, stratum=='16+')$value
+      s1=subset(x, stratum==strata.labels.combined[1])$value
+      s2=subset(x, stratum==strata.labels.combined[2])$value
+      s3=subset(x, stratum==strata.labels.combined[3])$value
       data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
     })
     cors.wide <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
@@ -125,18 +126,18 @@ plot.change <- function(Report){
   ## Repeat for eps2
   Dtmp <- Report$Epsilon2_gct
   if(!is.null(Dtmp)){
-    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=c('0-3m', '3-16m', '16+'), year=years)
+    dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
     Dtmp.wide <- melt(Dtmp)
     Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
-    names(Dtmp.long)[3:5] <- c('stratum1', 'stratum2', 'stratum3')
+    names(Dtmp.long)[3:5] <- strata.labels.combined
     g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
       geom_point()+ facet_wrap('cell') +
       theme(strip.background = element_blank(), strip.text.x = element_blank())
     ggsave(file.path(savedir, 'eps2_correlations_pairwise.png'), g, width=12, height=9)
     cors <- ddply(Dtmp.wide, .(cell), function(x){
-      s1=subset(x, stratum=='0-3m')$value
-      s2=subset(x, stratum=='3-16m')$value
-      s3=subset(x, stratum=='16+')$value
+      s1=subset(x, stratum==strata.labels.combined[1])$value
+      s2=subset(x, stratum==strata.labels.combined[2])$value
+      s3=subset(x, stratum==strata.labels.combined[3])$value
       data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
     })
     cors.wide2 <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
@@ -200,11 +201,11 @@ get.index.tmp <- function(case){
     tmp[,'BTS'] <- log(exp(tmp$stratum1)+exp(tmp$stratum2))
     tmp[,'ATS1'] <- tmp$stratum2
     tmp[,'ATS2'] <- tmp$stratum3
-    index.model <- melt(tmp[, c('year', 'BTS', 'ATS1', 'ATS2')],
+    index.model <- melt(tmp[, c('year', 'BT', 'AT2', 'AT3')],
                         id.vars='year', value.name='logdensity', variable.name='gear')
   } else {
     ## strata here are actually gears b/c not summing
-    levels(index.model$strata) <- c("BTS", 'ATS1', 'ATS2')
+    levels(index.model$strata) <- c("BT", 'AT2', 'AT3')
     index.model$gear <- index.model$strata
     index.model$logdensity <- index.model$est
   }
@@ -287,18 +288,18 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   return(Save)
 }
 
-calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
+get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   df <- as.matrix(fit)
   df <- df[,-ncol(df)] # drop lp__ column
   if(model=='combined'){
-    strata <- c('0-3m', '3-16m', '16-surface')
-    gear <- c('Total', 'BTS', 'ATS')
+    strata <- strata.labels.combined
+    gear <- c('Total', 'BT', 'AT')
   } else if(model=='ats'){
-    strata <- '3-surface'
-    gear <- 'ATS'
+    strata <- strata.labels.ats
+    gear <- 'AT'
   } else if(model=='bts'){
-    strata <- '0-16m'
-    gear <- 'BTS'
+    strata <- strata.labels.bts
+    gear <- 'BT'
   } else {
     stop("invalid model")
   }
@@ -406,10 +407,10 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
   if(model=='combined'){
     ## Massage to get the catchability by gear type
     tmp <- dcast(index.gear, year+iter~gear, value.var='density')
-    availability <- within(tmp, {BTS=exp(BTS)/exp(Total);
-      ATS=exp(ATS)/exp(Total)})
+    availability <- within(tmp, {BT=exp(BT)/exp(Total);
+      AT=exp(AT)/exp(Total)})
     availability <- melt(availability, id.vars=c('year', 'iter'),
-                         measure.vars=c('ATS', 'BTS'),
+                         measure.vars=c('AT', 'BT'),
                          variable.name='gear', value.name='availability')
     availability2 <- ddply(availability, .(year, gear), summarize,
                            lwr=quantile(availability, probs=.025),
@@ -433,35 +434,18 @@ calculate.index.mcmc <- function(Obj, fit){## Get parameters and drop log-poster
               beta1=beta1_tcn, beta2=beta2_tcn,
               ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
-  saveRDS(out, file.path(savedir, 'index.mcmc.RDS'))
+  saveRDS(out, file.path(savedir, 'results.mcmc.RDS'))
   return(out)
 }
 
 
-plot.posterior.predictive <- function(fit, index, nn=50){
+plot.posterior.predictive <- function(fit, results){
   ## Get some from each gear type and 0's and >0's
   message('Calculating posterior predictive...')
   x <- (1:nrow(Data_Geostat))
-  if(model=='combined'){
-    bts.0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
-    bts.1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
-    ats2.0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG==0), size=nn)
-    ats2.1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-16' & Data_Geostat$Catch_KG>0), size=nn)
-    ats3.0 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG==0), size=nn)
-    ats3.1 <- sample(which(Data_Geostat$Gear=='Acoustic_16-surface' & Data_Geostat$Catch_KG>0), size=nn)
-    ind <- c(bts.0, bts.1, ats2.0, ats2.1, ats3.0, ats3.1)
-  } else if (model=='ats'){
-    ats0 <- sample(which(Data_Geostat$Gear=='Acoustic_3-surface' & Data_Geostat$Catch_KG==0), size=nn)
-    ats1 <- sample(which(Data_Geostat$Gear=='Acoustic_3-surface' & Data_Geostat$Catch_KG>0), size=nn)
-    ind <- c(ats0, ats1)
-  } else if(model=='bts'){
-    bts0 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG==0), size=nn)
-    bts1 <- sample(which(Data_Geostat$Gear=='Trawl' & Data_Geostat$Catch_KG>0), size=nn)
-    ind <- c(bts0, bts1)
-  } else { stop("wrong model type") }
   dat <- Data_Geostat[, c("Gear", "Catch_KG")]
-  R1 <- index$R1_in
-  R2 <- index$R2_in
+  R1 <- results$R1_in
+  R2 <- results$R2_in
   ## Observation variances depend on the gear and sample
   if(model=='combined'){
     sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]'])
@@ -474,7 +458,7 @@ plot.posterior.predictive <- function(fit, index, nn=50){
   for(i in 1:nrow(R1)){
     ## Careful to use the right variance here
     if(model=='combined'){
-      sig <- ifelse(dat$Gear[i]=='Trawl', sigma.bts, sigma.ats)
+      sig <- ifelse(dat$Gear[i]=='BT', sigma.bts, sigma.ats)
     } else {
       sig <- sigma
     }
@@ -504,7 +488,7 @@ plot.posterior.predictive <- function(fit, index, nn=50){
   ## Make some for the non-encounters. Better way to do this?
   ppred2 <- cbind(rep=1:nrow(dat), dat, year=Data_Geostat$Year, ppred) %>%
     gather(key=sample, value=catch, -rep, -Gear, -Catch_KG, -year)
-  savedir <- index$savedir
+  savedir <- results$savedir
   tmp <- ppred2 %>% filter(Catch_KG==0) %>% group_by(rep, Gear, year) %>%
     summarize(pct.zero=mean(catch==1))
   for(zz in levels(tmp$Gear)){
@@ -515,22 +499,22 @@ plot.posterior.predictive <- function(fit, index, nn=50){
   }
 }
 
-plot.covcor.mcmc <- function(index){
+plot.covcor.mcmc <- function(results){
   ## Plot each one separately
-  savedir <- index$savedir
-  if(!is.null(index$covcor$covcor_omega1)){
+  savedir <- results$savedir
+  if(!is.null(results$covcor$covcor_omega1)){
     png(paste0(savedir, '/covcor_omega1.png'), width=7, height=5, res=500, units='in')
-    plot.covcor(index$covcor$covcor_omega1, 'omega1')
+    plot.covcor(results$covcor$covcor_omega1, 'omega1')
     dev.off()
   }
-  if(!is.null(index$covcor$covcor_omega2)){
+  if(!is.null(results$covcor$covcor_omega2)){
     png(paste0(savedir, '/covcor_omega2.png'), width=7, height=5, res=500, units='in')
-    plot.covcor(index$covcor$covcor_omega2, 'omega2')
+    plot.covcor(results$covcor$covcor_omega2, 'omega2')
     dev.off()
   }
-  if(!is.null(index$covcor$covcor_epsilon1)){
+  if(!is.null(results$covcor$covcor_epsilon1)){
     png(paste0(savedir, '/covcor_epsilon1.png'), width=7, height=5, res=500, units='in')
-    plot.covcor(index$covcor$covcor_epsilon1, 'epsilon1')
+    plot.covcor(results$covcor$covcor_epsilon1, 'epsilon1')
     dev.off()
   }
 }
@@ -559,13 +543,13 @@ plot.covcor <- function(covcor, Llab){
 }
 
 
-plot.availability.map.mcmc <- function(index){
-  savedir <- index$savedir
-  if(is.null(index$D_gcyn)){
+plot.availability.map.mcmc <- function(results){
+  savedir <- results$savedir
+  if(is.null(results$D_gcyn)){
     warning("D_gcyn missing from index so skipping availability maps")
   } else {
-    D_gcyn <- index$D_gcyn
-    rm(index); gc(); gc() ## try to reduce memory usage
+    D_gcyn <- results$D_gcyn
+    rm(results); gc(); gc() ## try to reduce memory usage
     Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                                 Extrapolation_List=Extrapolation_List)
     Mapdetails$Legend$x <- Mapdetails$Legend$x-70
@@ -584,8 +568,8 @@ plot.availability.map.mcmc <- function(index){
     MatATSCV <- apply(MatATS, 1:2, function(x) sd(x)/mean(x))
     MatBTS <- apply(MatBTS, 1:2, mean)
     MatATS <- apply(MatATS, 1:2, mean)
-    MatList <- list(BTS=MatBTS, ATS=MatATS)
-    for(ii in c("ATS", 'BTS')){
+    MatList <- list(BT=MatBTS, AT=MatATS)
+    for(ii in c("AT", 'BT')){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatList[[ii]],
                  PlotDF=mdl$PlotDF,
@@ -598,9 +582,9 @@ plot.availability.map.mcmc <- function(index){
                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
     ## Repeat with CVs
-    MatList <- list(BTS=MatBTSCV, ATS=MatATSCV)
+    MatList <- list(BT=MatBTSCV, AT=MatATSCV)
     zlimtmp <- c(0, max(unlist(MatList)))
-    for(ii in c("ATS", 'BTS')){
+    for(ii in c("AT", 'BT')){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatList[[ii]],
                  PlotDF=mdl$PlotDF,
@@ -615,12 +599,12 @@ plot.availability.map.mcmc <- function(index){
   }
 }
 
-plot.density.map.mcmc <- function(index){
-  savedir <- index$savedir
-  if(is.null(index$D_gcyn)){
+plot.density.map.mcmc <- function(results){
+  savedir <- results$savedir
+  if(is.null(results$D_gcyn)){
     warning("D_gcyn missing from index so skipping density maps")
   } else {
-    D_gcyn <- index$D_gcyn
+    D_gcyn <- results$D_gcyn
     Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                                 Extrapolation_List=Extrapolation_List)
     Mapdetails$Legend$x <- Mapdetails$Legend$x-70
@@ -662,11 +646,11 @@ plot.density.map.mcmc <- function(index){
 }
 
 
-plot.R1.map.mcmc <- function(index){
-  if(is.null(index$R1_gcyn)){
+plot.R1.map.mcmc <- function(results){
+  if(is.null(results$R1_gcyn)){
     warning("R1_gcyn missing from index so skipping density maps")
   } else {
-    R1_gcyn <- index$R1_gcyn
+    R1_gcyn <- results$R1_gcyn
     Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
                                 Extrapolation_List=Extrapolation_List)
     Mapdetails$Legend$x <- Mapdetails$Legend$x-70
@@ -708,8 +692,8 @@ plot.R1.map.mcmc <- function(index){
 }
 
 ## Plot average pearson residuals by space
-plot.pearson.mcmc <- function(index){
-  dat <- cbind(Data_Geostat, PR1=index$PR1, PR2=index$PR2)
+plot.pearson.mcmc <- function(results){
+  dat <- cbind(Data_Geostat, PR1=results$PR1, PR2=results$PR2)
   for(zz in levels(dat$Gear)){
     g <- ggplot(subset(dat, Gear==zz & !is.na(PR2)),
                 aes(Lon, Lat, size=abs(PR2), color=PR2<0)) +
@@ -727,17 +711,17 @@ plot.pearson.mcmc <- function(index){
 }
 
 
-plot.betas.mcmc <- function(index, savedir){
+plot.betas.mcmc <- function(results, savedir){
   if(model !='combined'){
-    dimnames(index$beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(index$beta1)[3])
-    df1 <- cbind(beta='beta1', melt(index$beta1))
-    dimnames(index$beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(index$beta2)[3])
-    df2 <- cbind(beta='beta2', melt(index$beta2))
+    dimnames(results$beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(results$beta1)[3])
+    df1 <- cbind(beta='beta1', melt(results$beta1))
+    dimnames(results$beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(results$beta2)[3])
+    df2 <- cbind(beta='beta2', melt(results$beta2))
   } else {
-    dimnames(index$beta1) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(index$beta1)[3])
-    df1 <- cbind(beta='beta1', melt(index$beta1))
-    dimnames(index$beta2) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(index$beta2)[3])
-    df2 <- cbind(beta='beta2', melt(index$beta2))
+    dimnames(results$beta1) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(results$beta1)[3])
+    df1 <- cbind(beta='beta1', melt(results$beta1))
+    dimnames(results$beta2) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(results$beta2)[3])
+    df2 <- cbind(beta='beta2', melt(results$beta2))
   }
   df <- rbind(df1, df2) %>%
     ddply(.(stratum, beta, year), summarize,
@@ -751,7 +735,7 @@ plot.betas.mcmc <- function(index, savedir){
   ##   df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
   ##                         function(x) x[[1]])
   ##   df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
-  ##   temp <- data.frame(stratum=c('0-3m', '3-16m', '16+'), year=rep(1:12, each=3), index=1:36)
+  ##   temp <- data.frame(stratum=strata.labels.combined, year=rep(1:12, each=3), index=1:36)
   ##   df <- merge(df, temp, by='index')
   ##   df2 <- ddply(df, .(stratum, par.type, year), summarize,
   ##                lwr=quantile(value, .025),
@@ -766,17 +750,17 @@ plot.betas.mcmc <- function(index, savedir){
 
 
 plot.mcmc <- function(Obj, savedir, fit, n=8){
-  index <- calculate.index.mcmc(Obj, fit)
-  plot.index.mcmc(index, savedir)
-  plot.betas.mcmc(index, savedir)
+  results <- get.results.mcmc(Obj, fit)
+  plot.index.mcmc(results, savedir)
+  plot.betas.mcmc(results, savedir)
   plot.slow.mcmc(fit, savedir, n)
   plot.pairs.mcmc(fit, savedir)
   if(model=='combined')
-    plot.availability.map.mcmc(index)
-  plot.posterior.predictive(fit, index)
-  plot.pearson.mcmc(index)
-  plot.density.map.mcmc(index)
-  plot.covcor.mcmc(index)
+    plot.availability.map.mcmc(results)
+  plot.posterior.predictive(fit, results)
+  plot.pearson.mcmc(results)
+  plot.density.map.mcmc(results)
+  plot.covcor.mcmc(results)
   ## Massage the output to get the beta's into a time format for ggplot
   pars.all <- names(fit)
   p <- pars.all[grep('lambda1', x=pars.all)]
@@ -831,31 +815,31 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
 
 
 
-plot.index.mcmc <- function(index, savedir){
-  if(is.null(index)){ message("index is NULL so skipping plots"); return()}
-  g <- ggplot(index$index.gear, aes(year, y=est, color=gear, group=gear, fill=gear)) +
+plot.index.mcmc <- function(results, savedir){
+  if(is.null(results)){ message("index is NULL so skipping plots"); return()}
+  g <- ggplot(results$index.gear, aes(year, y=est, color=gear, group=gear, fill=gear)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line(lwd=1.5, alpha=.5)+ theme_bw() +
     ylab('log abundance')
   ggsave(file.path(savedir, 'index_gear_mcmc.png'), g, width=7, height=5)
-  g <- ggplot(index$index.strata, aes(year, y=est, color=stratum,  group=stratum, fill=stratum)) +
+  g <- ggplot(results$index.strata, aes(year, y=est, color=stratum,  group=stratum, fill=stratum)) +
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line(lwd=1.5, alpha=.5) + theme_bw() + # facet_wrap('stratum')+
     ylab('log abundance')
   ggsave(file.path(savedir, 'index_strata_mcmc.png'), g, width=7, height=5)
   if(model=='combined'){
-    g <- ggplot(index$availability, aes(year, y=est, color=gear, group=gear, fill=gear)) +
+    g <- ggplot(results$availability, aes(year, y=est, color=gear, group=gear, fill=gear)) +
       geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
       geom_line(lwd=1.5, alpha=.5) + theme_bw() +# facet_wrap('gear')+
       ylab('Availability to gear') + ylim(0,1)
     ggsave(file.path(savedir, 'availability_mcmc.png'), g, width=7, height=5)
     ## Do relative densities by strata and year for median
-    tmp <- dcast(index$index.strata, year~stratum, value.var='est')
+    tmp <- dcast(results$index.strata, year~stratum, value.var='est')
     tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
     index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
                              value.name='pct.density')
     index.strata.pct$stratum <- factor(index.strata.pct$stratum,
-                                       levels=rev(levels(index$index.strata$stratum)) )
+                                       levels=rev(levels(results$index.strata$stratum)) )
     g <- ggplot(index.strata.pct, aes(year, pct.density, fill=stratum)) +
       geom_area()
     ggsave(file.path(savedir, 'pct_strata_mcmc.png'), g, width=7, height=5)
@@ -1055,7 +1039,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   beta1 <- data.frame(beta='beta1_ft',year=years,t(results$ParHatList$beta1_ft))
   beta2 <- data.frame(beta='beta2_ft',year=years,t(results$ParHatList$beta2_ft))
   if(results$model=='combined'){
-    names(beta1)[3:5] <- names(beta2)[3:5] <- c('0-3m', '3-16m', '16+')
+    names(beta1)[3:5] <- names(beta2)[3:5] <- strata.labels.combined
   } else {
     names(beta1)[3] <- names(beta2)[3] <- results$model
   }
@@ -1326,25 +1310,25 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
 ## }
 
 ## Q1_xy <- list()
-## #### First get the Pearon resids for Trawl
+## #### First get the Pearon resids for BT
 ## ## Sum across P1 for the first two strata then calculate R1 manually. I
 ## ## don't think there's another way to do this.
 ## exp_rate_xy <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
-## temp <- observed.catches.by.geartype('Trawl')
+## temp <- observed.catches.by.geartype('BT')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:
 ## Q1_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
 ## #### Now ATS1
 ## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
-## temp <- observed.catches.by.geartype('Acoustic_3-16')
+## temp <- observed.catches.by.geartype('AT2')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:
 ## Q1_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
 ## #### Now ATS2
 ## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
-## temp <- observed.catches.by.geartype('Acoustic_16-surface')
+## temp <- observed.catches.by.geartype('AT3')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:
@@ -1372,28 +1356,28 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
 
 
 ## Q2_xy <- list()
-## #### First get the Pearon resids for Trawl
+## #### First get the Pearon resids for BT
 ## ## Sum across P1 for the first two strata then calculate R1 manually. I
 ## ## don't think there's another way to do this.
 ## r1temp <- 1-exp(-exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)))
 ## ## For R2=exp(p1+p2)/r1
 ## exp_rate_xy <-
 ##   exp(apply(Report$P1_xcy[,-3,], c(1,3), sum)+apply(Report$P2_xcy[,-3,], c(1,3), sum))/r1temp
-## temp <- observed.catches.by.geartype('Trawl')
+## temp <- observed.catches.by.geartype('BT')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:
 ## Q2_xy[[1]] <- (obs_num_xy-exp_num_xy)/sqrt(exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
 ## #### Now ATS1
 ## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
-## temp <- observed.catches.by.geartype('Acoustic_3-16')
+## temp <- observed.catches.by.geartype('AT2')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:
 ## Q2_xy[[2]] <- (obs_num_xy - exp_num_xy) / sqrt(  exp_num_xy*(temp$total_num_xy-exp_num_xy)/temp$total_num_xy )
 ## #### Now ATS2
 ## exp_rate_xy <- 1-exp(-exp(Report$P1_xcy[,2,]))
-## temp <- observed.catches.by.geartype('Acoustic_16-surface')
+## temp <- observed.catches.by.geartype('AT3')
 ## exp_num_xy  <-  exp_rate_xy * temp$total_num_xy
 ## obs_num_xy  <-  temp$obs_rate_xy * temp$total_num_xy
 ## ## Now calculate Pearson residuals using binomial form:

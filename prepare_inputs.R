@@ -156,16 +156,16 @@ if(model=='combined'){
     yearf <- factor(Data_Geostat$Year)
     Q_ik <- model.matrix(~yearf, contrasts=list(yearf='contr.sum'))
     ## Zero out non-BTS rows so they are unaffected by the lambdas
-    Q_ik[which(Data_Geostat$Gear!='Trawl'),] <- 0
+    Q_ik[which(Data_Geostat$Gear!='BT'),] <- 0
   } else {
     ## Constant over time
-    Q_ik <- matrix(ifelse(Data_Geostat$Gear=='Trawl', 1, 0), ncol=1)
+    Q_ik <- matrix(ifelse(Data_Geostat$Gear=='BT', 1, 0), ncol=1)
   }
 } else if(model=='ats'){
   ## For this one sum across the two strata to create a single one, akin to
   ## what they'd do without the BTS
   Data_Geostat <- DF2
-  Data_Geostat$Gear <- factor('Acoustic_3-surface')
+  Data_Geostat$Gear <- factor('AT')
   Data_Geostat$Catch_KG <- DF2$Catch_KG+DF3$Catch_KG
   c_iz <- rep(0, nrow(Data_Geostat))
 } else if(model=='bts'){
