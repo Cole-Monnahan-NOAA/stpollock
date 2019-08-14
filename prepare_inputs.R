@@ -366,6 +366,8 @@ if(model=='combined'){
   ## The beta's are just standard deviations in this case so >0
   TmbList$Lower[grep('L_beta1_z', names(TmbList$Lower))] <- 0
   TmbList$Lower[grep('L_beta2_z', names(TmbList$Lower))] <- 0
+  TmbList$Upper[grep('L_beta1_z', names(TmbList$Upper))] <- 10
+  TmbList$Upper[grep('L_beta2_z', names(TmbList$Upper))] <- 10
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   par[grep('L_omega1_z', names(par))[which.diag(3,n_omega1)]]  <-
