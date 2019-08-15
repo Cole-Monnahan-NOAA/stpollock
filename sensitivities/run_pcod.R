@@ -1,13 +1,13 @@
-library(VAST)
-library(ggplot2)
-library(TMB)
+setwd('..')
+source("startup.R")
 
 ### Try running pcod as a comparable species for prior on logkappa
+## devtools::install_github('James-Thorson/FishData')
 dat <- FishData::download_catch_rates( survey="EBSBTS", species_set="Gadus macrocephalus" )
 dat <- filter(dat, Year>2006)
 ggplot(dat, aes(Long, Lat, color=Wt==0)) + geom_point() + facet_wrap('Year')
-dir.create('pcod')
-setwd('pcod')
+dir.create('sensivities/pcod')
+setwd('sensitivities/pcod')
 settings  <-  make_settings( n_x=100, Region="eastern_bering_sea", purpose="index",
   strata.limits=data.frame(STRATA='All_areas'), bias.correct=FALSE )
 settings$RhoConfig[1:4] <- 2
@@ -17,7 +17,6 @@ fit = fit_model(settings=settings, Lat_i=dat$Lat,
  c_i=rep(0,nrow(dat)),
  b_i=dat$Wt, a_i=rep(1, nrow(dat)))#, "v_i"=dat[,'Vessel'] )
 # Plot results
-plot( fit )
 
 
 table <- with(fit$parameter_estimates$SD, data.frame(par=names(par.fixed),

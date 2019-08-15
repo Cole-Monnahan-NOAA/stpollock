@@ -1,5 +1,5 @@
-### This file is meant to be sourced given some global options, resulting
 ### in inputs ready for use in VAST. There are two main options: model type
+### This file is meant to be sourced given some global options, resulting
 ### (ATS only, BTS only, or combined) and then three versions of spatial
 ### complexity (no space [NS], space [S], spatiotemporal [ST]). These
 ### values trigger different configurations in the code below
@@ -7,7 +7,17 @@
 
 ## Setup default configuration if not specified in input control list
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
+## The initial values come from pcod. If aniso=TRUE it will just move off
+## them which is probably not wanted.
+H_pcod <- ifelse(is.null(control$H_pcod), FALSE, control$H_pcod)
+## Whether to estimate it. Need to turn this on also if H_pcod is used
+## otherwise it won't have an affect. It is mapped off below if so. THus
+## this won't work to estimate aniso and start from H_pcod inits.
 aniso <- ifelse(is.null(control$aniso), FALSE, control$aniso)
+if(H_pcod & !aniso) {
+  warning("aniso needs to be on for H_pcod to have an effect, it will be mapped off")
+  aniso <- TRUE
+}
 ## default is to estimate only lambda1
 fixlambda <- ifelse(is.null(control$fixlambda), 2, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
@@ -256,6 +266,15 @@ silent.fn(TmbList0 <- make_model(TmbData=TmbData, RunDir=savedir,
 message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
+## These come from pcod
+
+if(H_pcod){
+  message("Using pcod anisotropy parameters and mapping off ln_H_input")
+  Params$ln_H_input[1] <- 0.3235
+  Params$ln_H_input[2] <- -1.209
+  Map$ln_H_input <- factor(c(NA, NA))
+}
+
 if(model=='combined'){
   Params$Beta_mean1_c <- c(1.67, -3.1, -3.5)
   Params$Beta_mean2_c <- c(2.8, 3.5,4.2)
