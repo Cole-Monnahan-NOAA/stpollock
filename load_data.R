@@ -1,7 +1,7 @@
 
 
 bts <- read.csv('data/bts.csv')
-ats <- read.csv('data/ats_.5_16.csv')
+ats <- read.csv('data/ats.csv')
 
 
 ## ## The hard part is getting the coordinates to plot between. I do this by
@@ -45,9 +45,19 @@ ats <- read.csv('data/ats_.5_16.csv')
 ##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
 
 ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
+
+message("Converting to kg/km^2 units")
+## Convert to kg/km^2 from kg/nm^2
+ats <- mutate(ats, strata2=(stratum1+stratum2)/1.852^2,
+              strata3=stratum3/1.852^2) %>% select(-stratum1, -stratum2, -stratum3)
+## Convert to kg/km^2 from kg/ha
+bts$density <- bts$density/(0.01)
+
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
-ats.zeroes$time <- ats.zeroes$date <- NA
+ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <-
+  ats.zeroes$surface <- NA
+ats.zeroes$strata1 <- NULL
 ## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
 ##   facet_wrap('year') + theme_bw()
 ## ggsave('plots/ats.zeroes.png', g, width=10, height=7)
@@ -59,6 +69,7 @@ if(filterdata){
   warning("still subsetting the ATS")
   ats <- ats[seq(1, nrow(ats), len=1*nrow(bts)),]
 }
+
 
 message('Dropping ATS data with depth>300')
 ats <- subset(ats, surface<=300)
