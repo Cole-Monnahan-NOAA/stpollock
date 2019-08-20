@@ -55,8 +55,7 @@ bts$density <- bts$density/(0.01)
 
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
-ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <-
-  ats.zeroes$surface <- NA
+ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
 ats.zeroes$strata1 <- NULL
 ## g <- ggplot(ats, aes(lon, lat, col=X==-999)) + geom_point(size=.5) +
 ##   facet_wrap('year') + theme_bw()
