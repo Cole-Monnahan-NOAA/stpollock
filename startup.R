@@ -728,7 +728,8 @@ plot.betas.mcmc <- function(results, savedir){
           lwr=quantile(value, .025),
           upr=quantile(value, .975),
           med=median(value))
-  g <-  ggplot(df, aes(year, med, fill=stratum, color=stratum)) +  facet_grid(stratum~beta)+
+  g <-  ggplot(df, aes(year, med, fill=stratum, color=stratum)) +
+  facet_grid(beta~stratum, scales='free_y')+
     geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
     geom_line(lwd=1.5) + geom_point()+ theme_bw() + ylab("value")
   ggsave(file.path(savedir, 'betas_mcmc.png'), g, width=7, height=5)
