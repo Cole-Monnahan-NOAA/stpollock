@@ -482,7 +482,7 @@ plot.posterior.predictive <- function(fit, results){
       ## facet_grid(Gear~year) +
       ## geom_point(aes(x=factor(rep), y=log(Catch_KG)), col='red', size=2) +
       ## xlab("Data number") + theme_bw() +
-      ggtitle("Posterior predictive distribution for encounters", zz)
+      ggtitle("Posterior predictive distribution for positive catches:", zz)
     ggsave(paste0(savedir, '/ppred_pos_', zz,'.png'), g, width=9, height=7)
   }
   ## Make some for the non-encounters. Better way to do this?
@@ -494,7 +494,7 @@ plot.posterior.predictive <- function(fit, results){
   for(zz in levels(tmp$Gear)){
     g <- ggplot(subset(tmp, Gear==zz), aes(pct.zero))  + geom_histogram(bins=30) +
       facet_wrap('year') + xlab("Mean probability of encounter") +
-      ggtitle("Posterior predictive distribution for non-encounters", zz)
+      ggtitle("Posterior predictive distribution for non-encounters:", zz)
     ggsave(paste0(savedir, '/ppred_zeros_', zz,'.png'), g, width=9, height=5)
   }
 }

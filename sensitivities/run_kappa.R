@@ -46,7 +46,7 @@ g1 <- out %>% filter(model !='combined') %>%
   ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
   facet_wrap('model', ncol=1, scales='free') + ylab('log index')+ theme_bw()
-ggsave('sensitivities//sensitivity_kappascale_independent.png', g1, width=7, height=6)
+ggsave('sensitivities/sensitivity_kappascale_independent.png', g1, width=7, height=6)
 
 
 ## Look at strata in the combined model
