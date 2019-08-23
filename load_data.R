@@ -100,6 +100,17 @@ if(filteryears){
   ats$year <- as.numeric(as.factor(ats$year))
 }
 
+## Try replicating the first years
+if(replicateyears){
+  message("replicating early years")
+  ats2 <- subset(ats, year<=2010) %>% mutate(year=year-4)
+  ats3 <- mutate(ats2, year=year-4)
+  ats <- rbind(ats, ats2, ats3)
+  bts2 <- subset(bts, year<=2010) %>% mutate(year=year-4)
+  bts3 <- mutate(bts2, year=year-4)
+  bts <- rbind(bts, bts2, bts3)
+}
+
 DF1 <- data.frame( Lat=bts$lat, Lon=bts$lon, Year=bts$year,
                    Catch_KG=bts$density, Gear='BT', AreaSwept_km2=1,
                    Vessel='none', depth=bts$depth, X=bts$X)

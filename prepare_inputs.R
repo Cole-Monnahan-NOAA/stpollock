@@ -22,6 +22,7 @@ if(H_pcod & !aniso) {
 fixlambda <- ifelse(is.null(control$fixlambda), 2, control$fixlambda)
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
+replicateyears <- ifelse(is.null(control$replicateyears), FALSE, control$replicateyears)
 simdata <- ifelse(is.null(control$simdata), FALSE, control$simdata)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
@@ -267,6 +268,8 @@ message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 ## These come from pcod
+
+
 
 if(H_pcod){
   message("Using pcod anisotropy parameters and mapping off ln_H_input")
