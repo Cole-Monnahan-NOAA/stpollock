@@ -96,10 +96,10 @@ if(!simdata){
 ### Step 2: Configure the spatial factors which depend on inputs
 FieldConfig <- matrix(c("Omega1"= n_omega1,
                         "Epsilon1"=n_eps1,
-                        "Beta1"="IID",
+                        "Beta1"=0,
                         "Omega2"=n_omega2,
                         "Epsilon2"=n_eps2,
-                        "Beta2"="IID"), ncol=2 )
+                        "Beta2"=0), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
 ### walk; 3: constant among years as fixed effect; 4: each year as random
@@ -121,7 +121,8 @@ Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
               "Calculate_Range"=0, "Calculate_evenness"=0,
               "Calculate_effective_area"=0, "Calculate_Cov_SE"=0,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0,
-              'Calculate_proportion'=0)
+              'Calculate_proportion'=0,
+              "simulate_random_effects"=FALSE)
 ## Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
 ##               "Calculate_Range"=1, "Calculate_evenness"=0,
 ##               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
@@ -426,7 +427,7 @@ if(temporal==4){
 ##message("Optimizing random effects once..")
 #Obj$fn(Obj$par)
 Obj$par <- par
-Obj$env$last.par[-Obj$env$random] <- par
+if(!is.null(Obj$env$random)) Obj$env$last.par[-Obj$env$random] <- par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output

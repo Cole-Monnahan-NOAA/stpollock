@@ -6,6 +6,66 @@ chains <- 4
 options(mc.cores = chains)
 
 
+
+
+## Build a base OM model from which to simulate data.
+control <- list(beta2temporal=TRUE, n_x=100, model='combined',
+                n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
+                kappaoff=12, temporal=0, fixlambda=2)
+control$simdata <- FALSE
+savedir <- paste0(getwd(), '/simulations/simfit_OM')
+source("prepare_inputs.R")
+par.names <- names(par)
+par.truth <- par*NA ## make sure everything is changed
+
+nyrs <- length(unique(Data_Geostat$Year))
+beta1 <- cbind(seq(1,-.5, len=nyrs), seq(0, 1.5, len=nyrs),seq(.5,2, len=nyrs))
+beta2 <- cbind(seq(0,.5, len=nyrs), seq(.5, 3, len=nyrs), seq(0, 1, len=nyrs))
+par.truth[grep('beta1_ft', par.names)] <-  -1000#as.vector(t(beta1))
+par.truth[grep('beta2_ft', par.names)] <-  -1000#as.vector(t(beta2))
+par.truth[grep('gamma1_ctp', par.names)] <- 0
+par.truth[grep('gamma2_ctp', par.names)] <- 0
+par.truth[grep('lambda1_k', par.names)] <- 0
+par.truth[grep('logSigmaM', par.names)] <- c(.005,.06)
+
+
+i <- 1
+savedir <- paste0(getwd(), '/simulations/simfit_EM_', i)
+dir.create(savedir, showWarnings=FALSE)
+Obj$fn(par.truth)
+
+simdat <- Obj$simulate(complete=TRUE)
+
+plot(simdat$R1_i)
+plot(log(simdat$R2_i))
+
+## Rebuild the Obj with the new simulated data
+Data_Geostat$Catch_KG <- simdat$b_i
+DF1 <- subset(Data_Geostat, Gear=='BT')
+DF2 <- subset(Data_Geostat, Gear=='AT2')
+DF3 <- subset(Data_Geostat, Gear=='AT3')
+DF1$knot_i <- DF2$knot_i <- DF3$knot_i <- NULL
+## control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
+##                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+##                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
+##                 kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
+control$make_plot <- TRUE
+control$simdata <- TRUE
+source("prepare_inputs.R")
+TmbList <- make_model(TmbData=simdat, RunDir=savedir,
+                      Version=Version,  RhoConfig=RhoConfig,
+                      loc_x=Spatial_List$loc_x, Method=Method,
+                      TmbDir='models', Random="generate", build_model=TRUE)
+TmbList$Obj$env$beSilent()
+Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
+         control=list(trace=10), newtonsteps=1, loopnum=5)
+fit <- tmbstan(TmbList$Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=800, open_progress=FALSE, warmup=700,
+               init='last.par.best', thin=1,
+               control=list(max_treedepth=6))
+
+
 ## We condition the OM on the fitted base case model
 load('fit_basecase_100/Save.RData')
 load('fit_basecase_100/Record.RData')
