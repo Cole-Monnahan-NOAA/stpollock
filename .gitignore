@@ -34,4 +34,7 @@ simulations
 sensitivities/pcod
 breakpoint_tests/breakpoints*
 sensitivities/fit_*
-sensitivities/kappascale_*
+sensitivities/anisopcodfits
+sensitivities/kappascale
+sensitivities/spatialconfig
+sensitivities/temporal
