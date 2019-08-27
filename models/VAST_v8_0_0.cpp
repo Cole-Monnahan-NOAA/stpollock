@@ -96,9 +96,10 @@ matrix<Type> covariation_by_category_nll( int n_f, int n_j, int n_c, matrix<Type
       int f = c;
       jnll_pointer -= dnorm( eta_jf(j,f), eta_mean_jf(j,f), Type(1.0), true );
       // Simulate new values when using obj.simulate()
-      if(isDouble<Type>::value && of->do_simulate) {
-        eta_jf(j,f) = rnorm( eta_mean_jf(j,f), Type(1.0) );
-      }
+      // // Cole turned this off to allow fixed effect betas during simulation
+      // if(isDouble<Type>::value && of->do_simulate) {
+      //   eta_jf(j,f) = rnorm( eta_mean_jf(j,f), Type(1.0) );
+      // }
       // Rescale
       eta_jc(j,c) = eta_jf(j,f) * L_z(f);
     }}
