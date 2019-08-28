@@ -4,11 +4,12 @@ rm(list=ls())
 source("startup.R")
 chains <- 4
 options(mc.cores = chains)
-nsim <- 50
+nsim <- 20
 
 ## Build a base OM model from which to simulate data.
 control <- list(beta2temporal=TRUE, n_x=100, model='combined',
                 n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                ## n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1='IID',
                 beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
                 kappaoff=12, temporal=0, fixlambda=2)
 control$simdata <- FALSE
@@ -39,9 +40,9 @@ beta2.flat <- cbind(seq(2,2, len=nyrs),
 ## and second to what they are actually trying to estimate. The
 ## second is more of a self check.
 index.combined.total.list <- index.combined.self.list <-
-index.ats.total.list <- index.ats.self.list <-
-index.bts.total.list <- index.bts.self.list <-
-  pars.ats.list <- pars.bts.list <- pars.combined.list <- list()
+  index.ats.total.list <- index.ats.self.list <-
+    index.bts.total.list <- index.bts.self.list <-
+      pars.ats.list <- pars.bts.list <- pars.combined.list <- list()
 kk <- 1
 ## Start of looping. Out loop is over trend in the OM, inner loop
 ## is replicates of the OM with process error.
@@ -58,7 +59,7 @@ for(trend in rev(c('flat', 'trend'))){
   par.truth[grep('gamma1_ctp', par.names)] <- -.1
   par.truth[grep('gamma2_ctp', par.names)] <- -.1
   par.truth[grep('lambda1_k', par.names)] <- -.05
-  par.truth[grep('logSigmaM', par.names)] <- c(1, 1)
+  par.truth[grep('logSigmaM', par.names)] <- c(.4, .8)
   ## matplot(t(rep.truth$Index_cyl[,,1]))
   for(iii in 1:nsim){
     Data_Geostat <- dat0
@@ -99,14 +100,13 @@ for(trend in rev(c('flat', 'trend'))){
     savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_simfit_combined")
     source("prepare_inputs.R")
     Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, startpar=par.truth,
-                   lower=TmbList$Lower, control=list(trace=10),
+                   lower=TmbList$Lower, control=list(trace=0),
                    newtonsteps=1, loopnum=5, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
     ##                iter=800, open_progress=FALSE, warmup=700,
     ##                init='last.par.best', thin=1,
     ##                control=list(max_treedepth=5))
-    ## plot.vastfit(results, plotmaps=TRUE)
     index.combined.self.list[[kk]] <-
       data.frame(rep=iii, trend=trend, results$Index.strata,
                  maxgrad=Opt$max_gradient,
@@ -165,6 +165,7 @@ for(trend in rev(c('flat', 'trend'))){
     kk <- kk+1
   }
 }
+### Process results and save them to file
 index.combined.self <- do.call(rbind, index.combined.self.list)
 index.combined.total <- do.call(rbind, index.combined.total.list)
 index.bts.self <- do.call(rbind, index.bts.self.list)
@@ -174,29 +175,41 @@ index.ats.total <- do.call(rbind, index.ats.total.list)
 index.total <- rbind(index.ats.total, index.bts.total, filter(index.combined.total, strata=='total'))
 index.self <-  rbind(index.ats.self, index.bts.self, filter(index.combined.self))
 pars.combined <- do.call(rbind, pars.combined.list)
+saveRDS(list(index.combined.self=index.combined.self,
+             index.combined.total=index.combined.total,
+             index.total=index.total, index.self=index.self),
+        file='results/simulation.RDS')
 
-
+### Quick plots of these results
 ## Look at the simulated truth
-ggplot(filter(index.self, model=='combined'), aes(year, y=truth, group=rep)) +
-  geom_line() + facet_grid(trend~strata)
+g <- ggplot(filter(index.self, model=='combined'), aes(year, y=truth, group=rep)) +
+  geom_line() + facet_grid(trend~strata) + theme_bw()
+ggsave('plots/simulation_OM.png', g, width=7, height=5)
 ## Performance relative to total
-ggplot(index.total, aes(year, (est-truth)/truth, group=rep, color=log(maxgrad))) + geom_line() +
-  facet_grid(trend~strata)
-
-filter(index.self, model!='combined') %>%
+g <- ggplot(index.total, aes(year, (est-truth)/truth, group=rep, color=log(maxgrad))) + geom_line() +
+  facet_grid(trend~strata) + theme_bw() +
+  geom_hline(yintercept=0, col=2) +
+ggsave('plots/simulation_RE_total.png', g, width=7, height=5)
+g <- filter(index.self, model!='combined') %>%
   ggplot(aes(year, (est-truth)/truth, group=interaction(rep,strata), color=log(maxgrad))) +
-  geom_line() +  geom_hline(yintercept=0, col=2) + facet_grid(trend~model)
-filter(index.self, model=='combined') %>%
+  geom_line() +  geom_hline(yintercept=0, col=2) +
+  geom_hline(yintercept=0, col=2) +
+  facet_grid(trend~model) + theme_bw()
+ggsave('plots/simulation_RE_self.png', g, width=7, height=5)
+g <- filter(index.self, model=='combined') %>%
   ggplot(aes(year, (est-truth)/truth, group=interaction(rep,strata), color=log(maxgrad))) +
-  geom_line() +  geom_hline(yintercept=0, col=2) + facet_grid(trend~strata)
-
-filter(pars.combined, !grepl('beta', par)) %>%
-  ggplot(aes(factor(par.num), (est-truth))) +
-  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
-  facet_grid(trend~par, scales='free_x')
-
-filter(pars.combined, grepl('beta', par)) %>%
+  geom_line() +  geom_hline(yintercept=0, col=2) +
+  facet_grid(trend~strata) + theme_bw()
+ggsave('plots/simulation_RE_self_combined.png', g, width=7, height=5)
+g <- filter(pars.combined, !grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth)/truth)) +
   geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
-  facet_grid(trend~par, scales='free_x')
+  facet_grid(trend~par, scales='free_x') + theme_bw() +  geom_hline(yintercept=0, col=2)
+ggsave('plots/simulation_RE_notbetas.png', g, width=7, height=5)
+g <- filter(pars.combined, grepl('beta', par)) %>%
+  ggplot(aes(factor(par.num), (est-truth)/truth)) +
+  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
+  facet_grid(trend~par, scales='free_x') + theme_bw() +
+  geom_hline(yintercept=0, col=2)
+ggsave('plots/simulation_RE_betas.png', g, width=7, height=5)
 
