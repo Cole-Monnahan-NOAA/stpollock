@@ -923,9 +923,17 @@ calculate.index <- function(Opt, Report, model, space, log, strata){
   if(is.null(Opt$SD)){
     ## If no sdeport need to exit with just the MLEs
     if(log){
-      ests <- Report$ln_ColeIndex_cy
+      if(strata){
+        ests <- t(log(Report$Index_cyl[,,1]))
+      } else {
+        ests <- t(Report$ln_ColeIndex_cy)
+      }
     } else {
-      ests <- Report$ColeIndex_cy
+      if(strata){
+        ests <- t(Report$Index_cyl)
+      } else {
+        ests <- t(Report$ColeIndex_cy)
+      }
     }
     ests <- as.numeric(ests)
     ses <- rep(NA, len=length(ests))
