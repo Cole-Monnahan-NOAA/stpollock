@@ -24,6 +24,7 @@ filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
 replicateyears <- ifelse(is.null(control$replicateyears), FALSE, control$replicateyears)
 simdata <- ifelse(is.null(control$simdata), FALSE, control$simdata)
+simulation <- ifelse(is.null(control$simulation), FALSE, control$simulation)
 combinedoff <- ifelse(is.null(control$combinedoff), FALSE, control$combinedoff)
 make_plots <- ifelse(is.null(control$make_plots), FALSE, control$make_plots)
 silent.console <- ifelse(is.null(control$silent.console), TRUE, control$silent.console)
@@ -96,10 +97,10 @@ if(!simdata){
 ### Step 2: Configure the spatial factors which depend on inputs
 FieldConfig <- matrix(c("Omega1"= n_omega1,
                         "Epsilon1"=n_eps1,
-                        "Beta1"="IID",
+                        "Beta1"='IID',
                         "Omega2"=n_omega2,
                         "Epsilon2"=n_eps2,
-                        "Beta2"="IID"), ncol=2 )
+                        "Beta2"='IID'), ncol=2 )
 ### Rho config= 0: each year as fixed effect; 1: each year as random
 ### following IID distribution; 2: each year as random following a random
 ### walk; 3: constant among years as fixed effect; 4: each year as random
@@ -121,7 +122,8 @@ Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
               "Calculate_Range"=0, "Calculate_evenness"=0,
               "Calculate_effective_area"=0, "Calculate_Cov_SE"=0,
               'Calculate_Synchrony'=0, 'Calculate_Coherence'=0,
-              'Calculate_proportion'=0)
+              'Calculate_proportion'=0,
+              "simulate_random_effects"=FALSE)
 ## Options <-  c("SD_site_density"=0, "SD_site_logdensity"=0,
 ##               "Calculate_Range"=1, "Calculate_evenness"=0,
 ##               "Calculate_effective_area"=1, "Calculate_Cov_SE"=1,
@@ -207,9 +209,11 @@ silent.fn(Spatial_List  <-
 ##                               Save_Results=FALSE ))
 Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
 
-## Standardize the raw depth
-Data_Geostat$depth <- log(Data_Geostat$depth)
-Data_Geostat$depth <- (Data_Geostat$depth-mean(Data_Geostat$depth))/sd(Data_Geostat$depth)
+## Standardize the raw depth if not done yet
+if(!simdata){
+  Data_Geostat$depth <- log(Data_Geostat$depth)
+  Data_Geostat$depth <- (Data_Geostat$depth-mean(Data_Geostat$depth))/sd(Data_Geostat$depth)
+}
 silent.fn(XX <- (FishStatsUtils::format_covariates(
                                    Lat_e = Data_Geostat$Lat,
                                    Lon_e = Data_Geostat$Lon,
@@ -268,9 +272,6 @@ message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 ## These come from pcod
-
-
-
 if(H_pcod){
   message("Using pcod anisotropy parameters and mapping off ln_H_input")
   Params$ln_H_input[1] <- 0.3235
@@ -278,7 +279,7 @@ if(H_pcod){
   Map$ln_H_input <- factor(c(NA, NA))
 }
 
-if(model=='combined'){
+if(model=='combined' & !simulation){
   Params$Beta_mean1_c <- c(1.67, -3.1, -3.5)
   Params$Beta_mean2_c <- c(2.8, 3.5,4.2)
 }
@@ -295,10 +296,10 @@ if(model=='combined'){
   Params$logSigmaM[1:3] <- c(1,1,1)
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
-} else if(model=='ats'){
+} else if(model=='ats' & !simulation){
   Params$Beta_mean1_c <- -2
   Params$Beta_mean2_c <- 5
-} else {
+} else if(model=='bts' & !simulation) {
   Params$Beta_mean1_c <- 1
   Params$Beta_mean2_c <- 3.3
 }
@@ -344,8 +345,10 @@ if(space=='ST' & model=='combined'){
   ## Assume rho is the same for strata but only turn on for AR1
   if(length(Params$Beta_rho1_f)!=3) stop('problem with beta_rho1')
   if(length(Params$Beta_rho2_f)!=3) stop('problem with beta_rho2')
-  if(beta1temporal & temporal==4) Map$Beta_rho1_f <- factor(c(1,1,1))
-  if(beta2temporal & temporal==4) Map$Beta_rho2_f <- factor(c(1,1,1))
+  if(beta1temporal & temporal==4 & !simulation)
+    Map$Beta_rho1_f <- factor(c(1,1,1))
+  if(beta2temporal & temporal==4 & !simulation)
+    Map$Beta_rho2_f <- factor(c(1,1,1))
 }
 
 ## Rebuild with the new mapping stuff
@@ -426,7 +429,7 @@ if(temporal==4){
 ##message("Optimizing random effects once..")
 #Obj$fn(Obj$par)
 Obj$par <- par
-Obj$env$last.par[-Obj$env$random] <- par
+if(!is.null(Obj$env$random)) Obj$env$last.par[-Obj$env$random] <- par
 
 ## bundle together some of the inputs that will be needed later for
 ## plotting and such that aren't included in the standard VAST output
