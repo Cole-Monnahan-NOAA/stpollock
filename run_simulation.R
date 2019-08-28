@@ -4,9 +4,7 @@ rm(list=ls())
 source("startup.R")
 chains <- 4
 options(mc.cores = chains)
-
-
-
+nsim <- 50
 
 ## Build a base OM model from which to simulate data.
 control <- list(beta2temporal=TRUE, n_x=100, model='combined',
@@ -14,251 +12,191 @@ control <- list(beta2temporal=TRUE, n_x=100, model='combined',
                 beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
                 kappaoff=12, temporal=0, fixlambda=2)
 control$simdata <- FALSE
+control$simulation <- TRUE
 savedir <- paste0(getwd(), '/simulations/simfit_OM')
 source("prepare_inputs.R")
+Obj.OM <- Obj
 par.names <- names(par)
-par.truth <- par*NA ## make sure everything is changed
-
+par.truth0 <- par*NA ## make sure everything is changed
+dat0 <- Data_Geostat ## save a copy of original data since gets overwritten
 nyrs <- length(unique(Data_Geostat$Year))
-beta1 <- cbind(seq(1,-.5, len=nyrs), seq(0, 1.5, len=nyrs),seq(.5,2, len=nyrs))
-beta2 <- cbind(seq(0,.5, len=nyrs), seq(.5, 3, len=nyrs), seq(0, 1, len=nyrs))
-par.truth[grep('beta1_ft', par.names)] <-  -1000#as.vector(t(beta1))
-par.truth[grep('beta2_ft', par.names)] <-  -1000#as.vector(t(beta2))
-par.truth[grep('gamma1_ctp', par.names)] <- 0
-par.truth[grep('gamma2_ctp', par.names)] <- 0
-par.truth[grep('lambda1_k', par.names)] <- 0
-par.truth[grep('logSigmaM', par.names)] <- c(.005,.06)
+beta1.trend <- cbind(seq(.2,-2, len=nyrs),
+               seq(-2, -1, len=nyrs),
+               seq(-.5,.1, len=nyrs))
+beta2.trend <- cbind(seq(2,2.5, len=nyrs),
+               seq(.5, 2, len=nyrs),
+               seq(0, 1, len=nyrs))
+beta1.flat <- cbind(seq(.2,.2, len=nyrs),
+               seq(-1, -1, len=nyrs),
+               seq(.1,.1, len=nyrs))
+beta2.flat <- cbind(seq(2,2, len=nyrs),
+               seq(.5, .5, len=nyrs),
+               seq(1, 1, len=nyrs))
 
 
-i <- 1
-savedir <- paste0(getwd(), '/simulations/simfit_EM_', i)
-dir.create(savedir, showWarnings=FALSE)
-Obj$fn(par.truth)
-
-simdat <- Obj$simulate(complete=TRUE)
-
-plot(simdat$R1_i)
-plot(log(simdat$R2_i))
-
-## Rebuild the Obj with the new simulated data
-Data_Geostat$Catch_KG <- simdat$b_i
-DF1 <- subset(Data_Geostat, Gear=='BT')
-DF2 <- subset(Data_Geostat, Gear=='AT2')
-DF3 <- subset(Data_Geostat, Gear=='AT3')
-DF1$knot_i <- DF2$knot_i <- DF3$knot_i <- NULL
-## control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
-##                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
-##                 beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-##                 kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-control$make_plot <- TRUE
-control$simdata <- TRUE
-source("prepare_inputs.R")
-TmbList <- make_model(TmbData=simdat, RunDir=savedir,
-                      Version=Version,  RhoConfig=RhoConfig,
-                      loc_x=Spatial_List$loc_x, Method=Method,
-                      TmbDir='models', Random="generate", build_model=TRUE)
-TmbList$Obj$env$beSilent()
-Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
-         control=list(trace=10), newtonsteps=1, loopnum=5)
-fit <- tmbstan(TmbList$Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, warmup=700,
-               init='last.par.best', thin=1,
-               control=list(max_treedepth=6))
-
-
-## We condition the OM on the fitted base case model
-load('fit_basecase_100/Save.RData')
-load('fit_basecase_100/Record.RData')
-## Rebuild the Obj with the MLEs
-mle <- Save$est$est
-par.names <- as.character(Save$est$par)
-control <- Record$control; control$make_plots <- FALSE
-savedir <- paste0(getwd(), '/simulations/simfit_OM')
-source("prepare_inputs.R")
-Obj$par <- mle
-Obj$fn(mle) -  Save$Opt$objective ## check MLE fit
-## Obj$gr(mle) ## check that the gradients are 0
-pars.all <- Obj$env$last.par ## the full parameter vector
-
-## Build a simulated OM by changing the betas and zero-centering the
-## spatial and spatiotemporal effects
-Omegainput1_sf <- (pars.all[grep('Omegainput1_sf', names(pars.all))])
-tmp <- matrix(Omegainput1_sf, ncol=3, byrow=FALSE)
-tmp <- apply(tmp, 2, function(x) x-mean(x))
-Omegainput1_sf_centered <- as.numeric(tmp)
-pars.all[grep('Omegainput1_sf', names(pars.all))] <-
-  Omegainput1_sf_centered
-Omegainput2_sf <- (pars.all[grep('Omegainput2_sf', names(pars.all))])
-tmp <- matrix(Omegainput2_sf, ncol=3, byrow=FALSE)
-tmp <- apply(tmp, 2, function(x) x-mean(x))
-Omegainput2_sf_centered <- as.numeric(tmp)
-pars.all[grep('Omegainput2_sf', names(pars.all))] <-
-  Omegainput2_sf_centered
-Epsiloninput1_sft <- (pars.all[grep('Epsiloninput1_sft', names(pars.all))])
-tmp <- array(Epsiloninput1_sft, dim=c(116, 3, 12))
-tmp <- apply(tmp, c(2,3), function(x) x-mean(x))
-Epsiloninput1_sft_centered <- as.vector(tmp)
-pars.all[grep('Epsiloninput1_sft', names(pars.all))] <-
-  Epsiloninput1_sft_centered
-Epsiloninput2_sft <- (pars.all[grep('Epsiloninput2_sft', names(pars.all))])
-tmp <- array(Epsiloninput2_sft, dim=c(116, 3, 12))
-tmp <- apply(tmp, c(2,3), function(x) x-mean(x))
-Epsiloninput2_sft_centered <- as.vector(tmp)
-pars.all[grep('Epsiloninput2_sft', names(pars.all))] <-
-  Epsiloninput2_sft_centered
-## now the random effects should be centered so the betas drive the trends
-## completely (right?)
-
-beta1_ft <- (pars.all[grep('beta1_ft', names(pars.all))])
-beta1_ft <- matrix(beta1_ft, ncol=3, byrow=TRUE)
-beta1 <- cbind(c(seq(1,-2.5, len=12)),
-               c(seq(0, 3.5, len=12)),
-               c(seq(.5,3, len=12)))
-pars.all[grep('beta1_ft', names(pars.all))] <- as.vector(t(beta1))
-## beta2_ft <- (pars.all[grep('beta2_ft', names(pars.all))])
-## beta2_ft <- matrix(beta2_ft, ncol=3, byrow=TRUE)
-## beta2 <- cbind(seq(0,.5, len=12), seq(.5, 3, len=12), seq(0, 1, len=12))
-## pars.all[grep('beta2_ft', names(pars.all))] <- as.vector(t(beta2))
-## par(mfrow=c(2,2))
-## matplot(beta1)
-## matplot(beta1_ft)
-## matplot(beta2)
-## matplot(beta2_ft)
-
-## ## Put data into the ATS for missing years so it's sampled in the
-## ## simulation !!! this actually breaks it b/c the mesh construction is
-## ## different so the random effects are in the wrong order
-## source('load_data.R')
-## tmp2 <- subset(Data_Geostat, Gear == 'Acoustic_3-16' & Year %in% c(2010, 2012, 2014, 2016))
-## tmp2$Year <- tmp2$Year+1
-## DF2 <- rbind(DF2, tmp2)
-## tmp3 <- subset(Data_Geostat, Gear == 'Acoustic_16-surface' & Year %in% c(2010, 2012, 2014, 2016))
-## tmp3$Year <- tmp3$Year+1
-## DF3 <- rbind(DF3, tmp3)
-## ## Have to rebuild the object since the data changed
-## control$simdata <- TRUE
-## source("prepare_inputs.R")
-## table(Data_Geostat$Gear) ## check the simdata was used
-sim <- Obj$report(pars.all)
-index.sim <- t(sim$Index_cyl[,,1])
-par(mfrow=c(1,2))
-matplot(log(cbind(index.sim, rowSums(index.sim))), ylab='log index')
-matplot(t(apply(index.sim, 1, function(x) cumsum(x/sum(x)))), type='l', ylim=c(0,1))
-## Now when I call a new vector it'll have expected values in the missing
-## years and thus be sampled from them.
-
-Data_Geostat0 <- Data_Geostat
-### Loop through replicates of the simulation
-for(i in 6:10){
-## Simulate the sampling process.
-set.seed(i)
-encounters <- rbinom(length(sim$R1_i), size=1, prob=sim$R1_i)
-## Carefully index to get the right SigmaObs by gear type
-sigma.obs <- sim$SigmaM[,1][as.numeric(Data_Geostat0$Gear)]
-logcatches <- rnorm(length(sim$R2_i), log(sim$R2_i)-sigma.obs^2/2, sigma.obs)
-catches <- exp(logcatches)*encounters
-
-## Rebuild the Obj with the new simulated data
-Data_Geostat <- Data_Geostat0
-Data_Geostat$Catch_KG <- catches
-DF1 <- subset(Data_Geostat, Gear=='Trawl')
-DF2 <- subset(Data_Geostat, Gear=='Acoustic_3-16')
-DF3 <- subset(Data_Geostat, Gear=='Acoustic_16-surface')
-DF1$knot_i <- DF2$knot_i <- DF3$knot_i <- NULL
-
-## Master settings which match the fitted OM
-getsd <- FALSE
-control <- list(seed=121, beta2temporal=TRUE, n_x=100, model='combined',
-                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-control$simdata <- TRUE
-savedir <- paste0(getwd(), '/simulations/simfit_', i, '_combined')
-source("prepare_inputs.R")
-saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, warmup=200,
-               init='last.par.best', thin=1,
-               control=list(max_treedepth=12))
-saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-plot.mcmc(Obj, savedir, fit)
-
-## Repeat with just the BTS
-control$model <- 'bts'; control$make_plots <- FALSE
-savedir <- paste0(getwd(), '/simulations/simfit_', i, '_bts')
-source("prepare_inputs.R")
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, warmup=200,
-               init='last.par.best', thin=1,
-               control=list(max_treedepth=12))
-saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-plot.mcmc(Obj, savedir, fit)
-saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-
-## Repeat with just the ATS
-control$model <- 'ats'
-savedir <- paste0(getwd(), '/simulations/simfit_', i, '_ats')
-source("prepare_inputs.R")
-fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-               iter=800, open_progress=FALSE, warmup=200,
-               init='last.par.best', thin=1,
-               control=list(max_treedepth=12))
-saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-plot.mcmc(Obj, savedir, fit)
-saveRDS(sim, paste0(savedir, '/simreport.RDS'))
-} ## end of loop over the replicates
-
-
-## load('simulations/simfit_1_combined/Save.RData')
-## indexc <- t(Save$Report$Index_cyl[,,1])
-## load('simulations/simfit_1_bts/Save.RData')
-## indexb <- Save$Report$Index_cyl[,,1]
-## load('simulations/simfit_1_ats/Save.RData')
-## indexa <- Save$Report$Index_cyl[,,1]
-
-library(magrittr)
-library(tidyr)
-library(dplyr)
-years <- 2007:2018
-## Process and compare the fits to the simulated truth
-sim <- readRDS('simulations/simfit_1_combined/simreport.RDS')
-index.sim <- sim$ln_ColeIndex_cy
-index <- t(sim$Index_cyl[,,1])
-matplot(log(index))
-all.errors <- total.errors <- list()
-for(i in 1:7){
-indexc <- readRDS(paste0('simulations/simfit_',i,'_combined/index.mcmc.RDS'))
-indexb <- readRDS(paste0('simulations/simfit_', i, '_bts/index.mcmc.RDS'))
-indexa <- readRDS(paste0('simulations/simfit_', i,'_ats/index.mcmc.RDS'))
-bts.sim <- log(rowSums(index[, 1:2]))
-bts.est <- indexb$index.strata$est
-bts.est2 <- indexc$index.gear %>% filter(gear=='BTS') %>% select(est) %>% .$est
-ats.sim <- log(rowSums(index[, 2:3]))
-ats.est <- indexa$index.strata$est
-ats.est2 <- indexc$index.gear %>% filter(gear=='ATS') %>% select(est) %>% .$est
-total.sim <- log(rowSums(index))
-total.bts <- bts.est # estimates of total biomass for the two gears
-total.ats <- ats.est
-total.combined <- indexc$index.gear %>% filter(gear=='Total') %>%
- pull(est)
-bts.errors <- rbind(data.frame(rep=i, year=years, gear='bts', model='combined', relerror=(bts.est2-bts.sim)/bts.sim),
-      data.frame(rep=i, year=years, gear='bts', model='independent', relerror=(bts.est-bts.sim)/bts.sim))
-ats.errors <- rbind(data.frame(rep=i, year=years, gear='ats', model='combined', relerror=(ats.est2-ats.sim)/ats.sim),
-      data.frame(rep=i, year=years, gear='ats', model='independent', relerror=(ats.est-ats.sim)/ats.sim))
-all.errors[[i]] <- rbind(bts.errors, ats.errors)
-total.errors[[i]] <-
-  rbind(data.frame(rep=i, year=years, gear='total', model='ats', relerror=(total.ats-total.sim)/total.sim),
-        data.frame(rep=i, year=years, gear='total', model='bts', relerror=(total.bts-total.sim)/total.sim),
-        data.frame(rep=i, year=years, gear='total', model='combined', relerror=(total.combined-total.sim)/total.sim))
+## Define the results lists to fill in loop below. There's two
+## ways to test  these, first their bias for the total biomass,
+## and second to what they are actually trying to estimate. The
+## second is more of a self check.
+index.combined.total.list <- index.combined.self.list <-
+index.ats.total.list <- index.ats.self.list <-
+index.bts.total.list <- index.bts.self.list <-
+  pars.ats.list <- pars.bts.list <- pars.combined.list <- list()
+kk <- 1
+## Start of looping. Out loop is over trend in the OM, inner loop
+## is replicates of the OM with process error.
+for(trend in rev(c('flat', 'trend'))){
+  if(trend=='trend'){
+    beta1 <- beta1.trend; beta2 <- beta2.trend
+  } else {
+    beta1 <- beta1.flat; beta2 <- beta2.flat
+  }
+  ## Build the OM true parameters.
+  par.truth <- par.truth0
+  par.truth[grep('beta1_ft', par.names)] <-  as.vector(t(beta1))
+  par.truth[grep('beta2_ft', par.names)] <-  as.vector(t(beta2))
+  par.truth[grep('gamma1_ctp', par.names)] <- -.1
+  par.truth[grep('gamma2_ctp', par.names)] <- -.1
+  par.truth[grep('lambda1_k', par.names)] <- -.05
+  par.truth[grep('logSigmaM', par.names)] <- c(1, 1)
+  ## matplot(t(rep.truth$Index_cyl[,,1]))
+  for(iii in 1:nsim){
+    Data_Geostat <- dat0
+    set.seed(iii) # works with TMB?? probably not
+    ## These are the truths after simulating new random effects
+    ## (process error). Using the built-in TMB simulate feature.
+    simdat <- Obj.OM$simulate(par=par.truth, complete=TRUE)
+    index.total.truth <- log(simdat$ColeIndex_cy[1,])
+    index.bts.truth <- log(simdat$ColeIndex_cy[2,])
+    index.ats.truth <- log(simdat$ColeIndex_cy[3,])
+    index.stratum1.truth <- log(simdat$Index_cyl[1,,1])
+    index.stratum2.truth <- log(simdat$Index_cyl[2,,1])
+    index.stratum3.truth <- log(simdat$Index_cyl[3,,1])
+    ## Rebuild the Obj with the new simulated data
+    Data_Geostat$Catch_KG <- simdat$b_i
+    ## Check that there are no 100% encounters or non-encounters
+    pct.zero <- Data_Geostat %>% group_by(Year, Gear) %>%
+      summarize(pct.zero=mean(Catch_KG==0)) %>% pull(pct.zero)
+    if(any(pct.zero==0)) {
+      warning(paste("100% encounter in", iii, "...skipping"))
+      break
+    }
+    if(any(pct.zero==1)) {
+      warning(paste("0% encounter in", iii, "...skipping"))
+      break
+    }
+    ## Process the simulated data to be put into the model
+    DF1 <- subset(Data_Geostat, Gear=='BT')
+    DF2 <- subset(Data_Geostat, Gear=='AT2')
+    DF3 <- subset(Data_Geostat, Gear=='AT3')
+    DF1$knot_i <- DF2$knot_i <- DF3$knot_i <- NULL
+    ## First run the combined model
+    control <- list(beta2temporal=TRUE, n_x=100, model='combined',
+                    n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                    beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
+                    kappaoff=12, temporal=0, fixlambda=2,
+                    simdata=TRUE, simulation=TRUE)
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_simfit_combined")
+    source("prepare_inputs.R")
+    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, startpar=par.truth,
+                   lower=TmbList$Lower, control=list(trace=10),
+                   newtonsteps=1, loopnum=5, getsd=FALSE)
+    results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+    ##                iter=800, open_progress=FALSE, warmup=700,
+    ##                init='last.par.best', thin=1,
+    ##                control=list(max_treedepth=5))
+    ## plot.vastfit(results, plotmaps=TRUE)
+    index.combined.self.list[[kk]] <-
+      data.frame(rep=iii, trend=trend, results$Index.strata,
+                 maxgrad=Opt$max_gradient,
+                 truth=as.vector(log(t(simdat$Index_cyl[,,1]))))
+    index.combined.total.list[[kk]] <-
+      data.frame(rep=iii,results$Index, trend=trend,
+                 maxgrad=Opt$max_gradient,
+                 truth=as.vector(log(t(simdat$ColeIndex_cy))))
+    pars.combined.list[[kk]] <-
+      data.frame(rep=iii, trend=trend, par=names(Opt$par),
+                 par.num=1:length(Opt$par),
+                 maxgrad=Opt$max_gradient,
+                 est=Opt$par, truth=par.truth)
+    ## Now repeat with AT
+    control$model <- 'ats'
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_simfit_bts")
+    source("prepare_inputs.R")
+    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
+                   control=list(trace=0), newtonsteps=1,
+                   loopnum=5, getsd=FALSE)
+    results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+    ##                iter=800, open_progress=FALSE, warmup=700,
+    ##                init='last.par.best', thin=1,
+    ##                control=list(max_treedepth=5))
+    ## plot.vastfit(results, plotmaps=TRUE)
+    index.ats.total.list[[kk]] <-
+      data.frame(rep=iii,results$Index, trend=trend,
+                 maxgrad=Opt$max_gradient,
+                 truth=index.total.truth)
+    index.ats.self.list[[kk]] <-
+      data.frame(rep=iii,results$Index, trend=trend,
+                 maxgrad=Opt$max_gradient,
+                 truth=index.ats.truth)
+    ## Now repeat with BT
+    control$model <- 'bts'
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_simfit_ats")
+    source("prepare_inputs.R")
+    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
+                   control=list(trace=0), newtonsteps=1,
+                   loopnum=5, getsd=FALSE)
+    results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+    ##                iter=800, open_progress=FALSE, warmup=700,
+    ##                init='last.par.best', thin=1,
+    ##                control=list(max_treedepth=5))
+    ## plot.vastfit(results, plotmaps=TRUE)
+    index.bts.total.list[[kk]] <-
+      data.frame(rep=iii,results$Index, trend=trend,
+                 maxgrad=Opt$max_gradient,
+                 truth=index.total.truth)
+    index.bts.self.list[[kk]] <-
+      data.frame(rep=iii,results$Index, trend=trend,
+                 maxgrad=Opt$max_gradient,
+                 truth=index.bts.truth)
+    kk <- kk+1
+  }
 }
-all.errors <- do.call(rbind, all.errors)
-total.errors <- do.call(rbind, total.errors)
+index.combined.self <- do.call(rbind, index.combined.self.list)
+index.combined.total <- do.call(rbind, index.combined.total.list)
+index.bts.self <- do.call(rbind, index.bts.self.list)
+index.bts.total <- do.call(rbind, index.bts.total.list)
+index.ats.self <- do.call(rbind, index.ats.self.list)
+index.ats.total <- do.call(rbind, index.ats.total.list)
+index.total <- rbind(index.ats.total, index.bts.total, filter(index.combined.total, strata=='total'))
+index.self <-  rbind(index.ats.self, index.bts.self, filter(index.combined.self))
+pars.combined <- do.call(rbind, pars.combined.list)
 
-g <- ggplot(all.errors, aes(year, relerror, group=rep)) + geom_line() +
-  facet_grid('model') + geom_abline(intercept=0, slope=0, col='red') +
-  ylab('Relative Error of Log of Individual Gears') + theme_bw()
-ggsave('plots/simulation_gear_errors.png', g, width=8, height=4)
-g <- ggplot(total.errors, aes(year, relerror, group=rep)) + geom_line()+
-  facet_wrap('model') + geom_abline(intercept=0, slope=0, col='red') +
-  ylab('Relative Error of Log of Total Biomass') + theme_bw()
-ggsave('plots/simulation_total_errors.png', g, width=8, height=4)
+
+## Look at the simulated truth
+ggplot(filter(index.self, model=='combined'), aes(year, y=truth, group=rep)) +
+  geom_line() + facet_grid(trend~strata)
+## Performance relative to total
+ggplot(index.total, aes(year, (est-truth)/truth, group=rep, color=log(maxgrad))) + geom_line() +
+  facet_grid(trend~strata)
+
+filter(index.self, model!='combined') %>%
+  ggplot(aes(year, (est-truth)/truth, group=interaction(rep,strata), color=log(maxgrad))) +
+  geom_line() +  geom_hline(yintercept=0, col=2) + facet_grid(trend~model)
+filter(index.self, model=='combined') %>%
+  ggplot(aes(year, (est-truth)/truth, group=interaction(rep,strata), color=log(maxgrad))) +
+  geom_line() +  geom_hline(yintercept=0, col=2) + facet_grid(trend~strata)
+
+filter(pars.combined, !grepl('beta', par)) %>%
+  ggplot(aes(factor(par.num), (est-truth))) +
+  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
+  facet_grid(trend~par, scales='free_x')
+
+filter(pars.combined, grepl('beta', par)) %>%
+  ggplot(aes(factor(par.num), (est-truth)/truth)) +
+  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
+  facet_grid(trend~par, scales='free_x')
+
