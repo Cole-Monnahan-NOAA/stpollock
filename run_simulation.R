@@ -4,7 +4,7 @@ rm(list=ls())
 source("startup.R")
 chains <- 4
 options(mc.cores = chains)
-nsim <- 20
+nsim <- 50
 
 ## Build a base OM model from which to simulate data.
 control <- list(beta2temporal=TRUE, n_x=100, model='combined',
@@ -46,7 +46,7 @@ index.combined.total.list <- index.combined.self.list <-
 kk <- 1
 ## Start of looping. Out loop is over trend in the OM, inner loop
 ## is replicates of the OM with process error.
-for(trend in rev(c('flat', 'trend'))){
+for(trend in c('flat', 'trend')){
   if(trend=='trend'){
     beta1 <- beta1.trend; beta2 <- beta2.trend
   } else {
@@ -103,6 +103,7 @@ for(trend in rev(c('flat', 'trend'))){
                    lower=TmbList$Lower, control=list(trace=0),
                    newtonsteps=1, loopnum=5, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    dyn.unload(paste0(savedir,'/VAST_v8_0_0.dll'))
     ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
     ##                iter=800, open_progress=FALSE, warmup=700,
     ##                init='last.par.best', thin=1,
@@ -128,6 +129,7 @@ for(trend in rev(c('flat', 'trend'))){
                    control=list(trace=0), newtonsteps=1,
                    loopnum=5, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    dyn.unload(paste0(savedir,'/VAST_v8_0_0.dll'))
     ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
     ##                iter=800, open_progress=FALSE, warmup=700,
     ##                init='last.par.best', thin=1,
@@ -149,6 +151,7 @@ for(trend in rev(c('flat', 'trend'))){
                    control=list(trace=0), newtonsteps=1,
                    loopnum=5, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
+    dyn.unload(paste0(savedir,'/VAST_v8_0_0.dll'))
     ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
     ##                iter=800, open_progress=FALSE, warmup=700,
     ##                init='last.par.best', thin=1,
@@ -163,6 +166,7 @@ for(trend in rev(c('flat', 'trend'))){
                  maxgrad=Opt$max_gradient,
                  truth=index.bts.truth)
     kk <- kk+1
+    ## Unlink DLLs to prevent error b/c there's a max # that can be loaded
   }
 }
 ### Process results and save them to file
@@ -185,6 +189,11 @@ saveRDS(list(index.combined.self=index.combined.self,
 g <- ggplot(filter(index.self, model=='combined'), aes(year, y=truth, group=rep)) +
   geom_line() + facet_grid(trend~strata) + theme_bw()
 ggsave('plots/simulation_OM.png', g, width=7, height=5)
+g <- ggplot(filter(index.total, strata=='total'), aes(year, y=truth, group=rep)) +
+  geom_line() + facet_grid(trend~strata) + theme_bw()
+ggsave('plots/simulation_OM_total.png', g, width=7, height=5)
+
+
 ## Performance relative to total
 g <- ggplot(index.total, aes(year, (est-truth)/truth, group=rep, color=log(maxgrad))) + geom_line() +
   facet_grid(trend~strata) + theme_bw() +
@@ -212,4 +221,14 @@ g <- filter(pars.combined, grepl('beta', par)) %>%
   facet_grid(trend~par, scales='free_x') + theme_bw() +
   geom_hline(yintercept=0, col=2)
 ggsave('plots/simulation_RE_betas.png', g, width=7, height=5)
+out <- filter(pars.combined, grepl('beta', par)) %>%
+  cbind(stratum=c(1,2,3), year=rep(1:8, each=3)) %>%
+  mutate(stratum=factor(stratum, levels=1:3, labels=c('<0.5m', '0.5-16m', '>16')),
+         abs.error=(est-truth)) %>%
+  select(-par.num, -maxgrad, -est, -truth) %>%
+  spread(key=par, value=abs.error)
+g <- ggplot(out, aes(beta1_ft, beta2_ft, color=trend)) + geom_point() +
+  facet_grid(year~stratum) + geom_hline(yintercept=0, color=2) +
+  geom_vline(xintercept=0, color=2)
+ggsave('plots/simulation_RE_betas_pairwise.png', g, width=12, height=9)
 
