@@ -8,5 +8,6 @@ source("run_aniso.R")
 ## full spatiotemporal (ST)
 source("run_spatialconfig.R")
 
+source("run_temporal.R")
 
 
