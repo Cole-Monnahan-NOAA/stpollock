@@ -18,8 +18,9 @@ if(H_pcod & !aniso) {
   warning("aniso needs to be on for H_pcod to have an effect, it will be mapped off")
   aniso <- TRUE
 }
-## default is to estimate only lambda1
-fixlambda <- ifelse(is.null(control$fixlambda), 2, control$fixlambda)
+## default is to estimate only lambda2
+fixlambda <- ifelse(is.null(control$fixlambda), 1, control$fixlambda)
+stopifnot(fixlambda %in% c(-2,-1,0,1,2))
 filterdata <- ifelse(is.null(control$filterdata), TRUE, control$filterdata)
 filteryears <- ifelse(is.null(control$filteryears), FALSE, control$filteryears)
 replicateyears <- ifelse(is.null(control$replicateyears), FALSE, control$replicateyears)
@@ -162,7 +163,7 @@ if(model=='combined'){
   ## This is a switch to turn off the combined part and revert back to
   ## standard multivariate model. For testing only.
   if(combinedoff){ c_iz[,2] <- NA; warning('turned off combined part')}
-  if(fixlambda== -1){
+  if(fixlambda<0){
     message('turning on annual catchability')
     ## Annual coefficient, create model matrix with sum to zero contrasts
     ## to avoid confounding with betas
@@ -286,13 +287,17 @@ if(model=='combined' & !simulation){
 if(model=='combined'){
   ## Params$L_beta1_z <- c(.2,.3,.5)
   ## Params$L_beta2_z <- c(.6,.3,1)
+  ## Note!! catchability has a hard-coded prior N(0,.15) which
+  ## applies to both p1 & p2 for all cases
   if(fixlambda==1) Map$lambda1_k <- factor(NA)
   if(fixlambda==2) Map$lambda2_k <- factor(NA)
   ## both off
   if(fixlambda==12) {
     Map$lambda1_k <- Map$lambda2_k <- factor(NA)
   }
-  if(fixlambda==-1) Map$lambda2_k <- factor(NA *Params$lambda2_k)
+  ## Time-varying catchability can be either in p1 or p2.
+  if(fixlambda==-1) Map$lambda1_k <- factor(NA *Params$lambda1_k)
+  if(fixlambda==-2) Map$lambda2_k <- factor(NA *Params$lambda2_k)
   Params$logSigmaM[1:3] <- c(1,1,1)
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )

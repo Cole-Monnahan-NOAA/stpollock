@@ -4,20 +4,20 @@ library(TMB)
 ## library(devtools)
 ## remove.packages('VAST')
 ## install_github('James-Thorson/VAST')
-library(VAST)
 library(reshape2)
-library(ggplot2)
 library(plyr)
 library(TMBhelper)
 library(snowfall)
-library(maps)
-library(mapdata)
 library(abind)
 library(tmbstan)
 library(shinystan)
 library(magrittr)
-library(dplyr)
-library(tidyr)
+library(tidyverse)
+library(here)
+library(VAST)
+library(FishStatsUtils)
+library(maps)
+library(mapdata)
 Version <- "VAST_v8_0_0"
 compile('models/VAST_v8_0_0.cpp')
 
@@ -763,7 +763,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.covcor.mcmc(results)
   ## Massage the output to get the beta's into a time format for ggplot
   pars.all <- names(fit)
-  p <- pars.all[grep('lambda1', x=pars.all)]
+  p <- pars.all[grep('lambda', x=pars.all)]
   if(length(p)>2){
     df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
     df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
