@@ -283,8 +283,7 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Save  <-  list(Index=Index, Opt=Opt, Report=Report, ParHat=ParHat,
                  ParHatList=ParHatList, est=est, Index.strata=Index.strata,
                  SE=SE, Inputs=Inputs, savedir=savedir, model=model)
-  save(Save, file=paste0(savedir,"/Save.RData"))
-  saveRDS(Save, file='Save.RDS')
+  saveRDS(Save, file=paste0(savedir, '/Save.RDS'))
   return(Save)
 }
 
@@ -1293,8 +1292,8 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   ylab("Sample Quantiles")
   ggsave(filename=paste0(savedir, '/QQplot_catchrate.png'), plot=g,
          width=7, height=5)
-  if(results$model=='combined')
-    plot.change(Report)
+  ## if(results$model=='combined')
+    ## plot.change(Report)
 }
 
 ##   ## This is a modified version of plot_residuals meant to work with my
