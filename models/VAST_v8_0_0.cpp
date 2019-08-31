@@ -1466,10 +1466,10 @@ Type objective_function<Type>::operator() ()
       prior-=dnorm(gamma2_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
     }
   }
-  // These give approximately U(0,1) on R1 and R2 is between roughtly -10
-  // and 20 which is wide but reasonable.
+  // These give approximately U(0,1) on R1 and R2 is between roughly 1
+  // and 11 which is wide but reasonable.
   prior-=dnorm(Beta_mean1_c, Type(-0.366), Type(1.5), true).sum();
-  prior-=dnorm(Beta_mean2_c, Type(5.0), Type(5.0), true).sum();
+  prior-=dnorm(Beta_mean2_c, Type(7.0), Type(3.0), true).sum();
   // Priors on correlation, per Stan's recommendation to use a dbeta(2,2)
   // to keep it off the boundary a bit better. If rho isn't active don't
   // apply it, taken from https://github.com/kaskr/adcomp/issues/154
