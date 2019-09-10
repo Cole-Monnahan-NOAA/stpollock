@@ -1,7 +1,6 @@
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-setwd('..')
 source('startup.R')
 td <- 15
 ad <- .9
@@ -10,7 +9,7 @@ warmup <- 400
 dir.create('sensitivities/kappascalefits')
 
 ### The effect of fixing logkappa. Run the models with half and double the
-### spatial range used (50km and 200km)
+### spatial range used
 for(model in c('bts', 'ats', 'combined')){
   for(kappascale in c(.5,1,2)){
     control <- list(n_x=100, n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
@@ -29,6 +28,7 @@ for(model in c('bts', 'ats', 'combined')){
     res$logkappainput1 <- logkappainput1
     res$logkappainput2 <- logkappainput2
     res$model <- model
+    ## These are big and not needed
     res$R1_in  <- res$R2_in  <- NULL
     saveRDS(res, file=file.path(savedir, 'res.RDS'))
   }
@@ -46,7 +46,7 @@ g1 <- out %>% filter(model !='combined') %>%
   ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
   facet_wrap('model', ncol=1, scales='free') + ylab('log index')+ theme_bw()
-ggsave('sensitivities/sensitivity_kappascale_independent.png', g1, width=7, height=6)
+ggsave('plots/sensitivity_kappascale_independent.png', g1, width=7, height=6)
 
 
 ## Look at strata in the combined model
@@ -58,7 +58,7 @@ g2 <- out %>% filter(model =='combined') %>%
   geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free') +
   ylab('log index')+theme_bw()
-ggsave('sensitivities/sensitivity_kappascale_combined.png', g2, width=7, height=6)
+ggsave('plots/sensitivity_kappascale_combined.png', g2, width=7, height=6)
 
 ## library(cowplot)
 ## g <- plot_grid(g1,g2, nrow=2)

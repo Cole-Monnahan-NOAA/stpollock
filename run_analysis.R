@@ -7,10 +7,13 @@
 source("startup.R")
 
 ### Step 2: Fit models to the real data
-source("fit_models.R")
+source("fit_mcmc.R")
 
 ### Step 3: Run a simulation test
 source("run_simulation.R")
+
+### Step 3: Run sensitivity checks
+source("run_sensitivities.R")
 
 ### Step 3: Check model diagnostics
 source("eval_models.R")

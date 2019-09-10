@@ -1,7 +1,6 @@
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-setwd('..')
 source('startup.R')
 dir.create('sensitivities/anisofits')
 td <- 15
@@ -46,7 +45,7 @@ out <- do.call(rbind, lapply(results.list, function(x)
 g1 <- out %>% filter(model !='combined') %>%
   ggplot(aes(year, est, fill=aniso.informative, color=aniso.informative, group=aniso.informative, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.5) + geom_line(lwd=1.5)+ facet_wrap('model', ncol=1) + ylab('log index')+ theme_bw()
-ggsave('sensitivities/sensitivity_aniso.informative_independent.png', g1, width=7, height=6)
+ggsave('plots/sensitivity_aniso.informative_independent.png', g1, width=7, height=6)
 
 
 ## Look at strata in the combined model
@@ -56,7 +55,7 @@ out <- do.call(rbind, lapply(results.list, function(x)
 g2 <- out %>% filter(model =='combined') %>%
   ggplot(aes(year, est, fill=aniso.informative,color=aniso.informative, group=aniso.informative, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.5)+ geom_line(lwd=1.5)+ facet_wrap('stratum', ncol=1) + ylab('log index')+theme_bw()
-ggsave('sensitivities/sensitivity_aniso_combined.png', g2, width=7, height=6)
+ggsave('plots/sensitivity_aniso_combined.png', g2, width=7, height=6)
 
 ## library(cowplot)
 ## g <- plot_grid(g1,g2, nrow=2)
