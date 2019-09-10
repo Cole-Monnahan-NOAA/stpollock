@@ -92,7 +92,7 @@ silent.fn <- function(expr){
 
 ### Step 1: Load in the real data if not doing simulation
 if(!simdata){
-  source("load_data.R")
+  source("data/load_data.R")
 } else {
   message("Using simulated data DF1, DF2, DF3 in global workspace")
 }
