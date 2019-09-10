@@ -1044,17 +1044,22 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 
 
 plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
-  beta1 <- data.frame(beta='beta1_ft',year=years,t(results$ParHatList$beta1_ft))
-  beta2 <- data.frame(beta='beta2_ft',year=years,t(results$ParHatList$beta2_ft))
-  if(results$model=='combined'){
-    names(beta1)[3:5] <- names(beta2)[3:5] <- strata.labels.combined
+  beta1 <- results$Report$beta1_tc
+  beta2 <- results$Report$beta2_tc
+  if(model !='combined'){
+    dimnames(beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts))
+    df1 <- cbind(beta='beta1', melt(beta1))
+    dimnames(beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts))
+    df2 <- cbind(beta='beta2', melt(beta2))
   } else {
-    names(beta1)[3] <- names(beta2)[3] <- results$model
+    dimnames(beta1) <- list(year=years, stratum=strata.labels.combined)
+    df1 <- cbind(beta='beta1', melt(beta1))
+    dimnames(beta2) <- list(year=years, stratum=strata.labels.combined)
+    df2 <- cbind(beta='beta2', melt(beta2))
   }
-  betas <- rbind(beta1,beta2)
+  betas <- rbind(df1,df2)
   if(nrow(betas)>0){
-    df <- melt(betas, id.vars=c('year', 'beta'), variable.name='stratum')
-    g <-  ggplot(df, aes(year, value, group=beta, color=beta)) +
+    g <-  ggplot(betas, aes(year, value, group=beta, color=beta)) +
       facet_wrap(stratum~.)+ geom_line(lwd=2)
     ggsave(file.path(savedir, 'betas.png'), g, width=7, height=5)
   }

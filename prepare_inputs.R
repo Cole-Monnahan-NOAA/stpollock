@@ -9,13 +9,13 @@
 finescale <- ifelse(is.null(control$finescale), FALSE, control$finescale)
 ## The initial values come from pcod. If aniso=TRUE it will just move off
 ## them which is probably not wanted.
-H_pcod <- ifelse(is.null(control$H_pcod), FALSE, control$H_pcod)
-## Whether to estimate it. Need to turn this on also if H_pcod is used
+H_informative <- ifelse(is.null(control$H_informative), FALSE, control$H_informative)
+## Whether to estimate it. Need to turn this on also if H_informative is used
 ## otherwise it won't have an affect. It is mapped off below if so. THus
-## this won't work to estimate aniso and start from H_pcod inits.
+## this won't work to estimate aniso and start from H_informative inits.
 aniso <- ifelse(is.null(control$aniso), FALSE, control$aniso)
-if(H_pcod & !aniso) {
-  warning("aniso needs to be on for H_pcod to have an effect, it will be mapped off")
+if(H_informative & !aniso) {
+  warning("aniso needs to be on for H_informative to have an effect, it will be mapped off")
   aniso <- TRUE
 }
 ## default is to estimate only lambda2
@@ -42,8 +42,10 @@ depthoff <- ifelse(is.null(control$depthoff), FALSE, control$depthoff)
 ## on it via kappascale (1/2 and 2 times the value). This is b/c kappa is
 ## very hard to estimate with MCMC as currently parameterized.
 kappascale <- ifelse(is.null(control$kappascale), 1, control$kappascale)
-logkappainput1 <- log(sqrt(8)/ (kappascale*400) ) ## assumed values for kappas
-logkappainput2 <- log(sqrt(8)/ (kappascale*350) ) ## assumed values for kappas
+## These are from earlier pollock runs and are the assumed values
+## unless modified by kappacale != 1.
+logkappainput1 <- -5.1*kappascale
+logkappainput2 <- -4.9*kappascale
 
 set.seed(seed)
 
@@ -273,10 +275,10 @@ message("Updating input Map and Params...")
 Map <- TmbList0$Map
 Params <- TmbList0$Parameters
 ## These come from pcod
-if(H_pcod){
-  message("Using pcod anisotropy parameters and mapping off ln_H_input")
-  Params$ln_H_input[1] <- 0.3235
-  Params$ln_H_input[2] <- -1.209
+if(H_informative){
+  message("Using informative anisotropy parameters and mapping off ln_H_input")
+  Params$ln_H_input[1] <- 0.29
+  Params$ln_H_input[2] <- -.73
   Map$ln_H_input <- factor(c(NA, NA))
 }
 
