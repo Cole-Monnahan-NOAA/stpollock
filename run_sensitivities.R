@@ -10,4 +10,5 @@ source("run_spatialconfig.R")
 
 source("run_temporal.R")
 
+source("run_catchability.R")
 

@@ -3,7 +3,7 @@
 ### base case is a single value for lambda1. Sensitivities are (1)
 ### time-varying lambda (with tight prior) and (2) both lambda1 and lambda2
 ### constant
-setwd(here())
+setwd(here::here())
 chains <- 6
 options(mc.cores = chains)
 source('startup.R')
