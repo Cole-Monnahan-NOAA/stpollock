@@ -46,13 +46,6 @@ ats <- read.csv('data/ats.csv')
 
 ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
 
-message("Converting to kg/km^2 units")
-## Convert to kg/km^2 from kg/nm^2
-ats <- mutate(ats, strata2=(stratum1+stratum2)/1.852^2,
-              strata3=stratum3/1.852^2) %>% select(-stratum1, -stratum2, -stratum3)
-## Convert to kg/km^2 from kg/ha
-bts$density <- bts$density/(0.01)
-
 message("Adding zeroes onto ATS data set")
 ats.zeroes <- readRDS('data/ats.zeroes.RDS')
 ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
