@@ -1117,14 +1117,16 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   ##   ggsave(file.path(savedir, 'map_omegas.png'), g, width=9, height=6, units='in')
   ## }
   Report <- results$Report
-  g <- ggplot(results$Index, aes(year, y=est, group=strata, fill=strata)) +
+  g <- ggplot(results$Index, aes(year, y=est, group=strata,
+                                 fill=strata), color=strata) +
     geom_ribbon(aes(ymin=est-1.96*se, ymax=est+1.96*se), alpha=.5) +
     geom_line() + geom_point()+ theme_bw() +
     ylab('log abundance')
   ggsave(file.path(savedir, 'index.png'), g, width=7, height=5)
   ## Also create an index of the individual strata
   if(results$model=='combined'){
-    g <- ggplot(results$Index.strata, aes(year, y=est, group=strata, fill=strata)) +
+    g <- ggplot(results$Index.strata,
+                aes(year, y=est, group=strata, fill=strata, color=strata)) +
       geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=.5) +
       geom_line() + geom_point()+ theme_bw() + ylab('log abundance')
     ggsave(file.path(savedir, 'index_strata.png'), g, width=7, height=5)
