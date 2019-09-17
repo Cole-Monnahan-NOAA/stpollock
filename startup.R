@@ -429,6 +429,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
               availability=availability2, scenario=scenario,
               R1_in=R1_in, R2_in=R2_in,
+              PR1_in=PR1_in, PR2_in=PR2_in,
               PR1=PR1, PR2=PR2,
               beta1=beta1_tcn, beta2=beta2_tcn,
               ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
@@ -705,8 +706,17 @@ plot.pearson.mcmc <- function(results){
       geom_point(alpha=.5) + facet_wrap('Year') + theme_bw() +
       ggtitle('Average Pearson resid for non-encounters', zz)
     ggsave(paste0(savedir, '/pearson_enc_', zz, '.png'), g, width=9, height=7)
-
   }
+  dat <- data.frame(year=Data_Geostat$Year, gear=Data_Geostat$Gear,
+               PR2=results$PR2_in) %>% na.omit() %>%
+    gather(rep, PR, -year, -gear) %>% mutate(pvalue=pnorm(PR))
+  g <- ggplot(dat, aes(pvalue)) + geom_histogram(bins=50) +
+    theme(axis.text.y=element_blank())
+  ##  ggsave(paste0(savedir, '/pivotal_discrepancy.png'), g, width=9, height=4)
+  ## g2 <- g+ facet_wrap('gear', scales='free')
+  ## ggsave(paste0(savedir, '/pivotal_discrepancy_gear.png'), g2, width=9, height=4)
+  g2 <- g+ facet_wrap(gear~year, scales='free')
+  ggsave(paste0(savedir, '/pivotal_discrepancy_gear_year.png'), g2, width=9, height=7)
 }
 
 
