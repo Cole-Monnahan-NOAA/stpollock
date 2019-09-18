@@ -18,3 +18,4 @@ source("sensitivities/run_spatialconfig.R")
 
 source("sensitivities/run_catchability.R")
 
+source("sensitivities/run_resolution.R")
