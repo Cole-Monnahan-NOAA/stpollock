@@ -300,15 +300,17 @@ if(model=='combined'){
   ## Time-varying catchability can be either in p1 or p2.
   if(fixlambda==-1) Map$lambda1_k <- factor(NA *Params$lambda1_k)
   if(fixlambda==-2) Map$lambda2_k <- factor(NA *Params$lambda2_k)
-  Params$logSigmaM[1:3] <- c(1,1,1)
+  Params$logSigmaM[1:3] <- c(1,1,1)*1000
   ## Assume that the two ATS strata have the same observation error
   Map$logSigmaM <- factor( cbind( c(1,2,2), NA, NA) )
 } else if(model=='ats' & !simulation){
   Params$Beta_mean1_c <- -2
   Params$Beta_mean2_c <- 5
+  Params$logSigmaM <- Params$logSigmaM*1000
 } else if(model=='bts' & !simulation) {
   Params$Beta_mean1_c <- 1
   Params$Beta_mean2_c <- 3.3
+  Params$logSigmaM <- Params$logSigmaM*1000
 }
 
 Params$logkappa1 <- logkappainput1
@@ -400,6 +402,8 @@ if(model=='combined'){
   TmbList$Lower[grep('L_beta2_z', names(TmbList$Lower))] <- 0
   TmbList$Upper[grep('L_beta1_z', names(TmbList$Upper))] <- 10
   TmbList$Upper[grep('L_beta2_z', names(TmbList$Upper))] <- 10
+  ## logSigma is scaled in the .cpp so widen it's bounds
+  TmbList$Upper[grep('logSigmaM', names(TmbList$Upper))] <- 10*1000
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   par[grep('L_omega1_z', names(par))[which.diag(3,n_omega1)]]  <-

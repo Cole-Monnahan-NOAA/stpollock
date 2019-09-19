@@ -660,7 +660,9 @@ Type objective_function<Type>::operator() ()
   array<Type> SigmaM( n_e, 3 );
   array<Type> sigmaXi1_cp( n_c, n_p );
   array<Type> sigmaXi2_cp( n_c, n_p );
-  SigmaM = exp( logSigmaM );
+  // Cole scaled this to inflate variance on MCMC side and
+  // improve efficiency during warmup
+  SigmaM = exp( logSigmaM/Type(1000.0) );
   sigmaXi1_cp = exp( log_sigmaXi1_cp );
   sigmaXi2_cp = exp( log_sigmaXi2_cp );
 

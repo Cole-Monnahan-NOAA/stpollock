@@ -74,7 +74,7 @@ for(trend in c('trend','flat')){
   ## runs to see the patterns clearly
   par.truth[grep('L_omega1_z', par.names)] <- c(.7, 1.8, 1.9)/2
   par.truth[grep('L_omega2_z', par.names)] <- c(2, .5, .5)/2
-  par.truth[grep('logSigmaM', par.names)] <- c(.4, .8)/2
+  par.truth[grep('logSigmaM', par.names)] <- 1000*c(.4, .8)/2
   ## From base case model
   par.truth[grep('ln_H_input', par.names)] <- c(.29, -.73)
   par.truth[grep('logkappa1', par.names)] <- -5.1
