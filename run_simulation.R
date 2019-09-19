@@ -183,7 +183,6 @@ for(trend in c('trend','flat')){
                    newtonsteps=ns, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     if(iii==1) plot.vastfit(results, plotmaps=TRUE)
-    clean.dir(savedir)
     indexb.total.list[[kk]] <-
       data.frame(rep=iii,results$Index, trend=trend,
                  maxgrad=Opt$max_gradient, truth=index.total.truth)
@@ -192,6 +191,9 @@ for(trend in c('trend','flat')){
                  maxgrad=Opt$max_gradient, truth=indexb.truth)
     kk <- kk+1
     ## Unlink DLLs to prevent error b/c there's a max # that can be loaded
+    clean.dir(savedir)
+    ## Save temporary file in case it crashes
+    save.image('simulations/.RData') #
   }
 }
 
@@ -202,7 +204,7 @@ indexb.self <- do.call(rbind, indexb.self.list)
 indexb.total <- do.call(rbind, indexb.total.list)
 indexa.self <- do.call(rbind, indexa.self.list)
 indexa.total <- do.call(rbind, indexa.total.list)
-index.total <- rbind(indexa.total, indexb.total, filter(indexc.total, strata=='total'))
+index.total <- rbind(indexa.total, indexb.total, dplyr::filter(indexc.total, strata=='total'))
 index.self <-  rbind(indexa.self, indexb.self, indexc.self)
 index.self$strata <- factor(index.self$strata,
                             levels=c('ats', 'bts', 'stratum1', 'stratum2', 'stratum3'),
@@ -224,12 +226,10 @@ saveRDS(list(indexc.self=indexc.self, indexc.total=indexc.total,
 x <- readRDS('results/simulation.RDS')
 meta <- filter(x$index.self, year ==1 & !strata %in% c('stratum2', 'stratum3'))
 table.simulation <-  meta %>% group_by(model, trend) %>%
-  summarize(n=n(), pct.badgrads=mean(maxgrad>.01))
+  dplyr::summarize(n=n(), pct.badgrads=mean(maxgrad>.001))
 write.csv('results/table.simulation.csv', x=table.simulation)
 
 ### Quick plots of these results
-
-## Performance relative to total
 library(cowplot)
 theme_set(theme_bw())
 alpha <- .5
@@ -238,12 +238,20 @@ g <- ggplot(meta, aes(x=trend, y=maxgrad)) +
   geom_violin() + facet_wrap('model') +
   geom_hline(yintercept=(.001), col=2) + scale_y_log10()
 ggsave('plots/simulation_maxgrads.png', g, width=7, height=5)
-g1 <- filter(x$index.self, model=='Combined') %>%
+## Filter out the unconverged ones
+indexc.self <- filter(x$indexc.self, maxgrad<=.001)
+indexc.total <- filter(x$indexc.total, maxgrad<=.001)
+index.self <- filter(x$index.self, maxgrad<=.001)
+index.total <- filter(x$index.total, maxgrad<=.001)
+pars <- filter(x$pars, maxgrad<=.001)
+
+## Performance relative to total
+g1 <- filter(index.self, model=='Combined') %>%
   ggplot(aes(factor(year), (est-truth)/truth)) +
   geom_violin() +  geom_hline(yintercept=0, col=2) +
   facet_grid(trend~strata) + theme_bw() + mylim +
   ylab('Relative Error')  + xlab('year')
-g2 <- filter(x$index.self, model!='Combined') %>%
+g2 <- filter(index.self, model!='Combined') %>%
   ggplot(aes(factor(year), (est-truth)/truth)) +
   geom_violin() +  geom_hline(yintercept=0, col=2) +
   geom_hline(yintercept=0, col=2) +
@@ -251,24 +259,24 @@ g2 <- filter(x$index.self, model!='Combined') %>%
   ylab('Relative Error') + xlab('year')
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
 ggsave('plots/simulation_self_RE.png', g, width=7, height=9)
-g <- ggplot(x$index.total, aes(factor(year), (est-truth)/truth)) +
+g <- ggplot(index.total, aes(factor(year), (est-truth)/truth)) +
   geom_violin() +
   facet_grid(trend~model) + theme_bw() +
   geom_hline(yintercept=0, col=2) + mylim +
   ylab('Error relative to total biomass') + xlab('year')
 ggsave('plots/simulation_total_RE.png', g, width=7, height=5)
-g1 <- filter(x$pars, !grepl('beta', par)) %>%
+g1 <- filter(pars, !grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth)/truth)) +
   geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
   facet_grid(trend~par, scales='free_x') + theme_bw() +  geom_hline(yintercept=0, col=2)
-g2 <- filter(x$pars, grepl('beta', par)) %>%
+g2 <- filter(pars, grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth))) +
   geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
   facet_grid(trend~par, scales='free_x') + theme_bw() +
   geom_hline(yintercept=0, col=2)
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
 ggsave('plots/simulation_pars_RE.png', g, width=7, height=9)
-## out <- filter(x$pars, grepl('beta', par)) %>%
+## out <- filter(pars, grepl('beta', par)) %>%
 ##   cbind(stratum=c(1,2,3), year=rep(1:8, each=3)) %>%
 ##   mutate(stratum=factor(stratum, levels=1:3, labels=c('<0.5m', '0.5-16m', '>16')),
 ##          abs.error=(est-truth)) %>%
@@ -279,25 +287,25 @@ ggsave('plots/simulation_pars_RE.png', g, width=7, height=9)
 ##   geom_vline(xintercept=0, color=2)
 ## ggsave('plots/simulation_RE_betas_pairwise.png', g, width=12, height=9)
 ## Get a proportion of biomass across strata in each replicate
-g <- x$indexc.self %>%
+g <- indexc.self %>%
   select(rep, trend, year, strata, truth) %>%
   group_by(rep, trend, year) %>%
   mutate(pct=(exp(truth))/sum(exp(truth))) %>%
   group_by(trend, year, strata) %>%
   summarize(mean.pct=mean(pct)) %>%
   ## spread(strata, mean.pct) %>%
-  mutate(stratum=factor(strata, levels=c('stratum3', 'stratum2', 'stratum1'),
+  dplyr::mutate(stratum=factor(strata, levels=c('stratum3', 'stratum2', 'stratum1'),
                         labels=rev(c('<0.5m', '0.5-16m', '>16m')))) %>%
   ggplot(aes(year, mean.pct, fill=stratum)) + geom_area() +
   facet_wrap('trend', nrow=2) + ylab('Proportion Abundance')
 ggsave('plots/simulation_OM_proportions.png', g, width=7, height=5)
 ## Look at the simulated truth by strata
-g1 <- filter(x$index.self, model=='Combined') %>%
+g1 <- filter(index.self, model=='Combined') %>%
   ggplot(aes(year, y=truth, group=rep)) +
   geom_line(alpha=alpha) + facet_grid(trend~strata) + theme_bw()
 ## Truth by gear
-g2 <- rbind(filter(x$index.total, strata=='total'),
-           cbind(filter(x$index.self, model!='Combined'))) %>%
+g2 <- rbind(filter(index.total, strata=='total'),
+           cbind(filter(index.self, model!='Combined'))) %>%
   ggplot(aes(year, truth, group=rep)) + geom_line(alpha=alpha) +
   facet_grid(trend~strata) + theme_bw()
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
