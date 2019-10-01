@@ -5,7 +5,6 @@
 ### constant
 chains <- 6
 options(mc.cores = chains)
-source('startup.R')
 dir.create('sensitivities/catchability')
 td <- 15
 ad <- .9
@@ -55,10 +54,12 @@ plot.mcmc(Obj, savedir, fit)
 
 x1 <- readRDS('sensitivities/catchability/senfit_tvlambda2/results.mcmc.RDS')$index.strata
 x2 <- readRDS('sensitivities/catchability/senfit_lambda2/results.mcmc.RDS')$index.strata
-x3 <- readRDS('sensitivities/catchability/senfit_lambda2/results.mcmc.RDS')$index.strata
+x3 <- readRDS('sensitivities/catchability/senfit_lambda1/results.mcmc.RDS')$index.strata
 out <- rbind(cbind(x1, lambda='tv_lambda2'), cbind(x2, lambda='lambda2'),
              cbind(x3, lambda='lambda1'))
+saveRDS(out, file='results/catchability.RDS')
 g <- ggplot(out, aes(year, est, ymin=lwr, ymax=upr, color=lambda, fill=lambda)) +
- geom_line(lwd=2) +  geom_ribbon(alpha=1/3) +
+  ## geom_line(lwd=2) +
+  geom_ribbon(alpha=1/3) + ylab('log index') +
   facet_wrap('stratum', ncol=1) + theme_bw()
 ggsave('plots/sensitivities_catchability.png', g, width=7, height=7)

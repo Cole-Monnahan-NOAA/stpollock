@@ -1,7 +1,6 @@
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-source('startup.R')
 dir.create('sensitivities/anisofits')
 td <- 15
 ad <- .9
@@ -37,6 +36,7 @@ for(model in c('bts', 'ats', 'combined')){
 
 results.list <- lapply(list.files('sensitivities/anisofits', full.names=TRUE),
                                  function(x) readRDS(file.path(x, 'res.RDS')))
+saveRDS(results.list, file='results/aniso.RDS')
 
 ## The indices for the independent models
 out <- do.call(rbind, lapply(results.list, function(x)
@@ -44,7 +44,8 @@ out <- do.call(rbind, lapply(results.list, function(x)
   mutate(aniso.informative=factor(aniso.informative))
 g1 <- out %>% filter(model !='combined') %>%
   ggplot(aes(year, est, fill=aniso.informative, color=aniso.informative, group=aniso.informative, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.5) + geom_line(lwd=1.5)+ facet_wrap('model', ncol=1) + ylab('log index')+ theme_bw()
+  geom_ribbon(alpha=.5) + #geom_line(lwd=1.5)+
+  facet_wrap('model', ncol=1) + ylab('log index')+ theme_bw()
 ggsave('plots/sensitivity_aniso.informative_independent.png', g1, width=7, height=6)
 
 
@@ -52,9 +53,10 @@ ggsave('plots/sensitivity_aniso.informative_independent.png', g1, width=7, heigh
 out <- do.call(rbind, lapply(results.list, function(x)
   data.frame(model=x$model, aniso.informative=x$aniso.informative, x$index.strata))) %>%
   mutate(aniso.informative=factor(aniso.informative))
-g2 <- out %>% filter(model =='combined') %>%
-  ggplot(aes(year, est, fill=aniso.informative,color=aniso.informative, group=aniso.informative, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.5)+ geom_line(lwd=1.5)+ facet_wrap('stratum', ncol=1) + ylab('log index')+theme_bw()
+g2 <- out %>% filter(model =='combined') %>% ggplot(aes(year, est, fill=aniso.informative,
+             color=aniso.informative, ymin=lwr, ymax=upr)) +
+  geom_ribbon(alpha=.5)+ ## geom_line(lwd=1.5)+
+  facet_wrap('stratum', ncol=1) + ylab('log index')+theme_bw()
 ggsave('plots/sensitivity_aniso_combined.png', g2, width=7, height=6)
 
 ## library(cowplot)
