@@ -1,17 +1,21 @@
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-source('startup.R')
 td <- 15
 ad <- .9
 iter <- 800
 warmup <- 400
 dir.create('sensitivities/kappascalefits')
 
-### The effect of fixing logkappa. Run the models with half and double the
-### spatial range used
-for(model in c('bts', 'ats', 'combined')){
-  for(kappascale in c(.5,1,2)){
+## I originally ran this on the independent ones but I don't
+## think it's really necessary and just takes time so just run
+## the combined model
+
+
+### The effect of fixing logkappa. Run the models with half and
+### double the spatial range used
+for(model in c('bts', 'ats', 'combined')[3]){
+  for(kappascale in c(.25,1,4)){
     control <- list(n_x=100, n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
                     model=model, kappascale=kappascale)
     if(model=='combined')
@@ -38,27 +42,30 @@ results.list <- lapply(list.files('sensitivities/kappascalefits', full.names=TRU
                                   pattern='kappascale'), function(x)
                        readRDS(file.path(x, 'res.RDS')))
 
-## The indices for the independent models
-out <- do.call(rbind, lapply(results.list, function(x)
-  data.frame(model=x$model, kappascale=x$kappascale, x$index.gear))) %>%
-  mutate(kappascale=factor(kappascale))
-g1 <- out %>% filter(model !='combined') %>%
-  ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
-  facet_wrap('model', ncol=1, scales='free') + ylab('log index')+ theme_bw()
-ggsave('plots/sensitivity_kappascale_independent.png', g1, width=7, height=6)
+out1 <- NULL
+## ## The indices for the independent models
+## out1 <- do.call(rbind, lapply(results.list, function(x)
+##   data.frame(model=x$model, kappascale=x$kappascale, x$index.gear))) %>%
+##   mutate(kappascale=factor(kappascale))
+## g1 <- out1 %>% filter(model !='combined') %>%
+##   ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
+##   geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
+##   facet_wrap('model', ncol=1, scales='free') + ylab('log index')+ theme_bw()
+## ggsave('plots/sensitivity_kappascale_independent.png', g1, width=7, height=6)
 
 
 ## Look at strata in the combined model
-out <- do.call(rbind, lapply(results.list, function(x)
+out2 <- do.call(rbind, lapply(results.list, function(x)
   data.frame(model=x$model, kappascale=x$kappascale, x$index.strata))) %>%
   mutate(kappascale=factor(kappascale))
-g2 <- out %>% filter(model =='combined') %>%
+g2 <- out2 %>% filter(model =='combined') %>%
   ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.3) + geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free') +
   ylab('log index')+theme_bw()
 ggsave('plots/sensitivity_kappascale_combined.png', g2, width=7, height=6)
+
+saveRDS(list(out1,out2), file='results/kappa.RDS')
 
 ## library(cowplot)
 ## g <- plot_grid(g1,g2, nrow=2)
