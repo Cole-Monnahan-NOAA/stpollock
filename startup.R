@@ -287,9 +287,23 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   return(Save)
 }
 
+
+plot.sampler.params <- function(fit){
+  sp <- get_sampler_params(fit)
+  sp <- lapply(1:length(sp), function(i) data.frame(chain=i, iter=1:nrow(sp[[i]]), sp[[i]])) %>% do.call(rbind,.) %>%
+    as.data.frame() %>%
+    mutate(log_stepsize=log(stepsize__), chain=factor(chain)) %>%
+    select(-energy__, -n_leapfrog__, -stepsize__) %>%
+    gather(variable, value, -chain, -iter) %>% filter(iter>5)
+  g <- ggplot(sp, aes(iter, y=value, color=chain)) + geom_point(alpha=.5) +
+    facet_wrap('variable', scales='free_y', ncol=1) + theme_bw()
+  ggsave('sampler_params.png', g, width=7, height=7)
+}
+
 get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   df <- as.matrix(fit)
   df <- df[,-ncol(df)] # drop lp__ column
+  plot.sampler.params(fit)
   if(model=='combined'){
     strata <- strata.labels.combined
     gear <- c('Total', 'BT', 'AT')
@@ -860,6 +874,12 @@ plot.slow.mcmc <- function(fit, savedir, n=8){
   mon <- monitor(fit, print=FALSE)
   mon <- as.data.frame(mon)
   mon$par <- row.names(mon)
+  mon.summary <- summarize(mon, minESS=min(n_eff), maxRhat=max(Rhat),
+                           minESSBulk=min(Bulk_ESS),
+                           minESSTail=min(Tail_ESS))
+  mon.summary$ndivs <- get_num_divergent(fit)
+  mon.summary$nmaxtd <- get_num_max_treedepth(fit)
+  write.csv(x=mon.summary, file='monitor_summary.csv')
   mon$par.type <- 'fixed'
   mon$par.type[grep('Omegainput|Epsiloninput', mon$par)] <- 'random'
   mon$par.name <- sapply(strsplit(mon$par, split='\\['), function(x) x[[1]])
