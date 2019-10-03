@@ -259,12 +259,16 @@ g2 <- filter(index.self, model!='Combined') %>%
   ylab('Relative Error') + xlab('year')
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
 ggsave('plots/simulation_self_RE.png', g, width=7, height=9)
+
 g <- ggplot(index.total, aes(factor(year), (est-truth)/truth)) +
-  geom_violin() +
-  facet_grid(trend~model) + theme_bw() +
-  geom_hline(yintercept=0, col=2) + mylim +
-  ylab('Error relative to total biomass') + xlab('year')
+ geom_violin(fill=gray(.9), scale='width') +
+  geom_boxplot(width=.2, color=gray(.3), outlier.color=1, outlier.size=1) +
+  facet_grid(trend~model) +
+  theme_bw() +
+  geom_hline(yintercept=0, col=2) +
+  ylab('Error relative to total biomass') + xlab('Year')
 ggsave('plots/simulation_total_RE.png', g, width=7, height=5)
+
 g1 <- filter(pars, !grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth)/truth)) +
   geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
