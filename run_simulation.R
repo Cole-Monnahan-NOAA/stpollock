@@ -224,7 +224,7 @@ saveRDS(list(indexc.self=indexc.self, indexc.total=indexc.total,
              pars=pars), file='results/simulation.RDS')
 
 x <- readRDS('results/simulation.RDS')
-meta <- filter(x$index.self, year ==1 & !strata %in% c('stratum2', 'stratum3'))
+meta <- filter(x$index.self, year ==1 & !strata %in% c('<0.5m', '>16m'))
 table.simulation <-  meta %>% group_by(model, trend) %>%
   dplyr::summarize(n=n(), pct.badgrads=mean(maxgrad>.001))
 write.csv('results/table.simulation.csv', x=table.simulation)
