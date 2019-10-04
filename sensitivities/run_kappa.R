@@ -1,9 +1,9 @@
+
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-source('startup.R')
 td <- 15
-ad <- .9
+ad <- .8
 iter <- 800
 warmup <- 400
 dir.create('sensitivities/kappascalefits')
@@ -34,13 +34,15 @@ for(model in c('bts', 'ats', 'combined')){
   }
 }
 
-results.list <- lapply(list.files('sensitivities/kappascalefits', full.names=TRUE,
-                                  pattern='kappascale'), function(x)
-                       readRDS(file.path(x, 'res.RDS')))
+results.list <-
+  lapply(list.files('sensitivities/kappascalefits', full.names=TRUE,
+                    pattern='kappascale'),
+         function(x) readRDS(file.path(x, 'res.RDS')))
 
 ## The indices for the independent models
 out <- do.call(rbind, lapply(results.list, function(x)
-  data.frame(model=x$model, kappascale=x$kappascale, x$index.gear))) %>%
+  data.frame(model=x$model , kappascale=x$kappascale,
+            x$index.gear))) %>%
   mutate(kappascale=factor(kappascale))
 g1 <- out %>% filter(model !='combined') %>%
   ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
