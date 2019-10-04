@@ -44,8 +44,11 @@ depthoff <- ifelse(is.null(control$depthoff), FALSE, control$depthoff)
 kappascale <- ifelse(is.null(control$kappascale), 1, control$kappascale)
 ## These are from earlier pollock runs and are the assumed values
 ## unless modified by kappacale != 1.
-logkappainput1 <- -5.1*kappascale
-logkappainput2 <- -4.9*kappascale
+logkappainput1 <- -5.1+log(kappascale)
+logkappainput2 <- -4.9+log(kappascale)
+## tau1 <- 1/( exp(logkappainput1) * sqrt(4*pi) )
+## tau2 <- 1/( exp(logkappainput2) * sqrt(4*pi) )
+## c(tau1, tau2)
 
 set.seed(seed)
 

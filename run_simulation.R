@@ -299,16 +299,19 @@ g <- indexc.self %>%
   ggplot(aes(year, mean.pct, fill=stratum)) + geom_area() +
   facet_wrap('trend', nrow=2) + ylab('Proportion Abundance')
 ggsave('plots/simulation_OM_proportions.png', g, width=7, height=5)
+
 ## Look at the simulated truth by strata
 g1 <- filter(index.self, model=='Combined') %>%
   ggplot(aes(year, y=truth, group=rep)) +
-  geom_line(alpha=alpha) + facet_grid(trend~strata) + theme_bw()
+  geom_line(alpha=alpha) + facet_grid(trend~strata) +
+  theme_bw() + labs(x='Year', y='log-index (truth)')
 ## Truth by gear
-g2 <- rbind(filter(index.total, strata=='total'),
+g2 <- rbind(filter(index.total, strata=='Total'),
            cbind(filter(index.self, model!='Combined'))) %>%
   ggplot(aes(year, truth, group=rep)) + geom_line(alpha=alpha) +
-  facet_grid(trend~strata) + theme_bw()
-g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
+  facet_grid(trend~strata) + theme_bw() +
+ labs(x='Year', y='log-index (truth)')
+g <- plot_grid(g1, g2, labels = c('(a)', '(b)'), label_size = 12, nrow=2)
 ggsave('plots/simulation_OM_truth.png', g, width=7, height=7)
 
 
