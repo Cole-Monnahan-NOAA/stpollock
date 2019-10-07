@@ -2,7 +2,6 @@
 ## File to run the sensitivities for spatial configurations
 chains <- 6
 options(mc.cores = chains)
-source('startup.R')
 dir.create('sensitivities/spatialconfig')
 td <- 15
 ad <- .9
@@ -58,9 +57,9 @@ out <- do.call(rbind, lapply(results.list, function(x)
   mutate(Configuration=factor(spatialconfig, levels=c("NS", "S",
                                  "ST"), labels=c("No Space",
                                  "Spatial", 'Spatiotemporal')))
-saveRDS(out, file='results/sensitivity_spatialconfig.RDS')
+saveRDS(out, file='results/spatialconfig.RDS')
 g1 <- ggplot(out, aes(year, est, fill=Configuration, color=Configuration, group=Configuration, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.5) + geom_line(lwd=1.5)+
+  geom_ribbon(alpha=1/3) +# geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free_y') + ylab('log index')+ theme_bw()
 ggsave('plots/sensitivity_spatialconfig.png', g1, width=7, height=6)
 

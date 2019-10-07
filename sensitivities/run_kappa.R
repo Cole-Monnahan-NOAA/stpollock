@@ -1,8 +1,9 @@
+
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
 td <- 15
-ad <- .9
+ad <- .8
 iter <- 800
 warmup <- 400
 dir.create('sensitivities/kappascalefits')
@@ -38,9 +39,10 @@ for(model in c('bts', 'ats', 'combined')[3]){
   }
 }
 
-results.list <- lapply(list.files('sensitivities/kappascalefits', full.names=TRUE,
-                                  pattern='kappascale'), function(x)
-                       readRDS(file.path(x, 'res.RDS')))
+results.list <-
+  lapply(list.files('sensitivities/kappascalefits', full.names=TRUE,
+                    pattern='kappascale'),
+         function(x) readRDS(file.path(x, 'res.RDS')))
 
 out1 <- NULL
 ## ## The indices for the independent models

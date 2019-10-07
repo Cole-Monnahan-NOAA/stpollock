@@ -405,8 +405,6 @@ if(model=='combined'){
   TmbList$Lower[grep('L_beta2_z', names(TmbList$Lower))] <- 0
   TmbList$Upper[grep('L_beta1_z', names(TmbList$Upper))] <- 10
   TmbList$Upper[grep('L_beta2_z', names(TmbList$Upper))] <- 10
-  ## logSigma is scaled in the .cpp so widen it's bounds
-  TmbList$Upper[grep('logSigmaM', names(TmbList$Upper))] <- 10*1000
   ## make sure inits are positive and thus in bound
   par <- Obj$par
   par[grep('L_omega1_z', names(par))[which.diag(3,n_omega1)]]  <-
@@ -432,6 +430,8 @@ if(model=='combined'){
   ind <- grep("L_", x=names(par))
   if(length(ind)>0) par[ind] <- abs(par[ind])
 }
+## logSigma is scaled in the .cpp so widen it's bounds
+TmbList$Upper[grep('logSigmaM', names(TmbList$Upper))] <- 10*1000
 
 if(temporal==4){
   TmbList$Upper[grep('rho', names(TmbList$Upper))] <- 1.0
