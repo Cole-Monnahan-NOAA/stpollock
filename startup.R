@@ -462,10 +462,10 @@ plot.posterior.predictive <- function(fit, results){
   R2 <- results$R2_in
   ## Observation variances depend on the gear and sample
   if(model=='combined'){
-    sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]'])
-    sigma.ats <- exp(as.data.frame(fit)[,'logSigmaM[2]'])
+    sigma.bts <- exp(as.data.frame(fit)[,'logSigmaM[1]']/1000)
+    sigma.ats <- exp(as.data.frame(fit)[,'logSigmaM[2]']/1000)
   } else {
-    sigma <- exp(as.data.frame(fit)[,'logSigmaM'])
+    sigma <- exp(as.data.frame(fit)[,'logSigmaM']/1000)
   }
   ## Genreate posterior predictive for each row of dat
   ppred <- array(NA, dim=c(nrow(R1), ncol(R1)))
@@ -490,7 +490,7 @@ plot.posterior.predictive <- function(fit, results){
     g <- ggplot(subset(Data_Geostat, Catch_KG>0 & Gear==zz),
                 aes(x=Lon, y=Lat, color=percentile)) +
       scale_color_gradient2(midpoint=.5, low="blue", mid="white",
-                            high="red", space ="Lab" )+
+                            high="red", space ="Lab", limits=c(0,1) )+
       geom_jitter(height=.1, width=.1) + facet_wrap('Year') + theme_bw() +
       ## geom_tufteboxplot(median.type='line', hoffset=0, width=3)+
       ## facet_grid(Gear~year) +
