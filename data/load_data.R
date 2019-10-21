@@ -23,27 +23,28 @@ ats <- read.csv('data/ats.csv')
 ## locs[[2016]] <- locate.year(2016)
 ## locs[[2018]] <- locate.year(2018)
 ## ats.zeroes <- do.call(rbind, locs)
-### Also need to get depths for these fake tows so use the NOAA bath data set
+## ## Also need to get depths for these fake tows so use the NOAA bath data set
 ## library(marmap)
 ## tmpmap <- getNOAA.bathy(lon1 = min(ats.zeroes$lon)-1, lon2 = max(ats.zeroes$lon)+1,
 ##                         lat1 = min(ats.zeroes$lat)-1, lat2 = max(ats.zeroes$lat)+1,
 ##                         resolution = 1)
-## ats.zeroes$surface <- -1*get.depth(tmpmap, x=ats.zeroes$lon, y=ats.zeroes$lat, locator=FALSE)$depth
-## ## a couple of these look to be on an island and thus are negative so just
-## ## ## drop them
-## ats.zeroes <- ats.zeroes[which(ats.zeroes$surface>20),]
 ## plot(tmpmap, image=TRUE, land=TRUE)
-## ats0 <- subset(ats, lon>= -179)
-## ats0$depthbath <- -1*get.depth(tmpmap, x=ats0$lon, y=ats0$lat, locator=FALSE)$depth
-## plot(log(ats0$depth), (ats0$depthbath-ats0$depth))
-## ggplot(ats0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
-##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
-## bts0 <- subset(bts, lon>= -179)
-## bts0$depthbath <- -1*get.depth(tmpmap, x=bts0$lon, y=bts0$lat, locator=FALSE)$depth
-## plot(log(bts0$depth), (bts0$depthbath-bts0$depth)/bts0$depth)
-## ggplot(bts0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
-##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
-
+## ## a couple of these look to be on an island and thus are
+## ## negative so just drop them
+## ats.zeroes$surface <- -1*get.depth(tmpmap, x=ats.zeroes$lon, y=ats.zeroes$lat, locator=FALSE)$depth
+## ## old code to check that the predicted depths make sense by
+## ## predicting at the real AT data... they are identical
+## ## suggesting MACE gets depths from this data set.
+## ## ats0 <- subset(ats, lon>= -179)
+## ## ats0$depthbath <- -1*get.depth(tmpmap, x=ats0$lon, y=ats0$lat, locator=FALSE)$depth
+## ## plot(log(ats0$depth), (ats0$depthbath-ats0$depth))
+## ## ggplot(ats0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+## ##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
+## ## bts0 <- subset(bts, lon>= -179)
+## ## bts0$depthbath <- -1*get.depth(tmpmap, x=bts0$lon, y=bts0$lat, locator=FALSE)$depth
+## ## plot(log(bts0$depth), (bts0$depthbath-bts0$depth)/bts0$depth)
+## ## ggplot(bts0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+## ##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
 ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
 
 message("Adding zeroes onto ATS data set")
