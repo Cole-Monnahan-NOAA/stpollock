@@ -297,7 +297,7 @@ plot.sampler.params <- function(fit){
     gather(variable, value, -chain, -iter) %>% filter(iter>5)
   g <- ggplot(sp, aes(iter, y=value, color=chain)) + geom_point(alpha=.5) +
     facet_wrap('variable', scales='free_y', ncol=1) + theme_bw()
-  ggsave('sampler_params.png', g, width=7, height=7)
+  ggsave(paste0(savedir, '/sampler_params.png'), g, width=7, height=7)
 }
 
 get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
@@ -330,7 +330,6 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   random.summary <- cbind(par=rownames(random.summary), random.summary)
   write.csv(file=paste0(savedir,'/random.estimates.csv'), x=random.summary, row.names=FALSE)
   index.gear.tmp <- index.strata.tmp <- D_gcy.list <- list()
-  ##  R1_gcy.list <- R2_gcy.list <- list()
   covcor_omega1.list <- covcor_omega2.list <- covcor_epsilon1.list <- list()
   message("Looping through and calculating report...")
   tmp <- Obj$report(df[1,])
@@ -339,6 +338,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   R1_in <- R2_in <- array(NA, dim=c(length(tmp$R1_i), nrow(df)))
   PR1_in <- PR2_in <- R1_in
   beta1_tcn <- beta2_tcn <- array(NA, dim=c(dim(tmp$beta1_tc), nrow(df)))
+  R1_gcy.list <- R2_gcy.list <- list()
   for(i in 1:nrow(df)){
     if(i %% 50 ==0) print(i)
     tmp <- Obj$report(df[i,])
@@ -353,8 +353,8 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
     D_gcyn[,,,i] <- tmp$D_gcy
     R1_in[,i] <- tmp$R1_i
     R2_in[,i] <- tmp$R2_i
-    ## R1_gcy.list[[i]] <- tmp$R1_gcy
-    ## R2_gcy.list[[i]] <- tmp$R2_gcy
+    R1_gcy.list[[i]] <- tmp$R1_gcy
+    R2_gcy.list[[i]] <- tmp$R2_gcy
     covcor_omega1.list[[i]] <- tmp$lowercov_uppercor_omega1
     covcor_omega2.list[[i]] <- tmp$lowercov_uppercor_omega2
     covcor_epsilon1.list[[i]] <- tmp$lowercov_uppercor_epsilon1
@@ -372,7 +372,6 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
         PR2_in[ii,i] <- (log(obs)-log(tmp$R2_i[ii])+tmp$SigmaM[gr]^2/2)/tmp$SigmaM[gr]
       }
     }
-    rm(tmp); gc()
   }
   ## For now taking the mean of the Pearson residuals across posterior
   ## draws
@@ -380,10 +379,14 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   PR2 <- apply(PR2_in, 1, mean, na.rm=TRUE)
   PR2[is.nan(PR2)] <- NA
   ## stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
-  ## R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
-  ## stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
-  ## R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
-  ## stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
+  R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
+  stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
+  R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
+  stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
+  ## Report only the mean of these
+  R1_gcy <- apply(R1_gcyn, 1:3, mean)
+  R2_gcy <- apply(R2_gcyn, 1:3, mean)
+  rm(R1_gcyn, R2_gcyn); gc()
   ## Organize the corcov matrices
   covcor_omega1 <- covcor_omega2 <- covcor_epsilon1 <- NULL
   if(length(covcor_omega1.list)>0)
@@ -446,7 +449,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
               PR1_in=PR1_in, PR2_in=PR2_in,
               PR1=PR1, PR2=PR2,
               beta1=beta1_tcn, beta2=beta2_tcn,
-              ## R1_gcyn=R1_gcyn, R2_gcyn=R2_gcyn,
+              R1_gcy=R1_gcy, R2_gcy=R2_gcy,
               D_gcyn=D_gcyn, covcor=covcor, savedir=savedir)
   saveRDS(out, file.path(savedir, 'results.mcmc.RDS'))
   return(out)
@@ -660,20 +663,19 @@ plot.density.map.mcmc <- function(results){
 }
 
 
-plot.R1.map.mcmc <- function(results){
-  if(is.null(results$R1_gcyn)){
-    warning("R1_gcyn missing from index so skipping density maps")
+plot.R.map.mcmc <- function(results){
+  Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
+                              Extrapolation_List=Extrapolation_List)
+  Mapdetails$Legend$x <- Mapdetails$Legend$x-70
+  Mapdetails$Legend$y <- Mapdetails$Legend$y-45
+  mdl <- Mapdetails
+  Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
+  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+  if(is.null(results$R1_gcy)){
+    warning("R1_gcy missing from index so skipping density maps")
   } else {
-    R1_gcyn <- results$R1_gcyn
-    Mapdetails <- make_map_info(Region, spatial_list=Spatial_List,
-                                Extrapolation_List=Extrapolation_List)
-    Mapdetails$Legend$x <- Mapdetails$Legend$x-70
-    Mapdetails$Legend$y <- Mapdetails$Legend$y-45
-    mdl <- Mapdetails
-    Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-    Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
     ## For each strata calculate mean probability of occurence
-    MatStrata <- apply(R1_gcyn, 1:3, mean)
+    MatStrata <- results$R1_gcy
     zlimtmp <- c(0,1)
     for(ii in 1:3){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
@@ -687,21 +689,24 @@ plot.R1.map.mcmc <- function(results){
                  textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
                  oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
     }
-    ## ## Repeat with CVs
-    ## MatStrata <- apply(R1_gcyn, 1:3, function(x) sd(x)/mean(x))
-    ## zlimtmp <- c(0, max(MatStrata))
-    ## for(ii in 1:3){
-    ##   PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-    ##              Mat=MatStrata[,ii,],
-    ##              PlotDF=mdl$PlotDF,
-    ##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-    ##              FileName=paste0(savedir, '/mcmc_map_R1CV_',ii),
-    ##              Year_Set=Year_Set[Years2Include],
-    ##              Legend=mdl$Legend, zlim=zlimtmp,
-    ##              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-    ##              textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
-    ##              oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
-    ## }
+  }
+  if(is.null(results$R2_gcy)){
+    warning("R2_gcy missing from index so skipping density maps")
+  } else {
+    MatStrata <- log(results$R2_gcy)
+    zlimtmp <- range(MatStrata)
+    for(ii in 1:3){
+      PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+                 Mat=MatStrata[,ii,],
+                 PlotDF=mdl$PlotDF,
+                 MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                 FileName=paste0(savedir, '/mcmc_map_R2_',ii),
+                 Year_Set=Year_Set[Years2Include],
+                 Legend=mdl$Legend, zlim=zlimtmp,
+                 mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+                 textmargin='Availability', zone=mdl$Zone, mar=c(0,0,2,0),
+                 oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    }
   }
 }
 
@@ -784,6 +789,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   plot.posterior.predictive(fit, results)
   plot.pearson.mcmc(results)
   plot.density.map.mcmc(results)
+  plot.R.map.mcmc(results)
   plot.covcor.mcmc(results)
   ## Massage the output to get the beta's into a time format for ggplot
   pars.all <- names(fit)
