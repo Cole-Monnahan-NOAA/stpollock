@@ -6,14 +6,16 @@ bts <- read.csv('data/bts.csv')
 ats <- read.csv('data/ats.csv')
 
 ## The "inflated" zeroes (see below too)
-message("Adding zeroes onto ATS data set")
 if(zeroes.case=='basecase'){
+  message("Adding zeroes onto ATS data set")
   ats.zeroes <- readRDS('data/ats.zeroes.basecase.RDS')
 } else if(zeroes.case=='sensitivity'){
   ats.zeroes <- readRDS('data/ats.zeroes.sensitivity.RDS')
 } else {
   stop("Invalid zeroes.case")
 }
+
+ats.zeroes <- ats.zeroes[, names(ats)]
 ats <- rbind(ats.zeroes, ats)
 ats$depth <- ats$surface# norm(ats$surface)
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
@@ -53,6 +55,7 @@ DF2 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
 DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Catch_KG=ats$strata3, Gear='AT3', AreaSwept_km2=1,
                    Vessel='none', depth=ats$depth, X=ats$X)
+message("Done loading data...")
 
 #### --------------------------------------------------
 #### Old code to get the AT inflated zeroes. Should not need to
