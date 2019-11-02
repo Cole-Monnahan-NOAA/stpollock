@@ -31,7 +31,7 @@ mcmcfit_*
 fit_*
 resolution_tests
 simulations
-sensitivities/pcod
+sensitivities/inflated0
 breakpoint_tests/breakpoints*
 sensitivities/fit_*
 sensitivities/anisofits
