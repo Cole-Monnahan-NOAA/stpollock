@@ -4,11 +4,11 @@
 chains <- 6
 options(mc.cores = chains)
 dir.create('sensitivities/inflated0', FALSE)
-td <- 13
+td <- 12
 ad <- .8
 iter <- 800
-warmup <- 300
-n_x <- 40
+warmup <- 200
+n_x <- 200
 
 ### These zeroes are tacked on in the load_data.R script from
 ### file 'ats.zeroes.RDS' so if I switch out that file and fit
