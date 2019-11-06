@@ -57,9 +57,9 @@ DF3 <- data.frame( Lat=ats$lat, Lon=ats$lon, Year=ats$year,
                    Vessel='none', depth=ats$depth, X=ats$X)
 message("Done loading data...")
 
-#### --------------------------------------------------
-#### Old code to get the AT inflated zeroes. Should not need to
-#### redo this.
+## #### --------------------------------------------------
+## #### Old code to get the AT inflated zeroes. Should not need to
+## #### redo this.
 ## ## The hard part is getting the coordinates to plot between. I do this by
 ## ## plotting the annual data on a map and then use the locator() function to
 ## ## manually select pairs of points which mimic the track of the AT survey
@@ -89,41 +89,71 @@ message("Done loading data...")
 ## ## a couple of these look to be on an island and thus are
 ## ## negative so just drop them
 ## ats.zeroes$surface <- -1*get.depth(tmpmap, x=ats.zeroes$lon, y=ats.zeroes$lat, locator=FALSE)$depth
-## ## old code to check that the predicted depths make sense by
-## ## predicting at the real AT data... they are identical
-## ## suggesting MACE gets depths from this data set.
-## ## ats0 <- subset(ats, lon>= -179)
-## ## ats0$depthbath <- -1*get.depth(tmpmap, x=ats0$lon, y=ats0$lat, locator=FALSE)$depth
-## ## plot(log(ats0$depth), (ats0$depthbath-ats0$depth))
-## ## ggplot(ats0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
-## ##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
-## ## bts0 <- subset(bts, lon>= -179)
-## ## bts0$depthbath <- -1*get.depth(tmpmap, x=bts0$lon, y=bts0$lat, locator=FALSE)$depth
-## ## plot(log(bts0$depth), (bts0$depthbath-bts0$depth)/bts0$depth)
-## ## ggplot(bts0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
-## ##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
-## ## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
-## ## These are the densities (kg/km2) from Levine & De Robertis
-## ## 2019 but previously processed (see manuscript for details).
-## inshore <- read.table('data/inshore.catches.txt')[,1]
-## ats.zeroes <- readRDS('data/ats.zeroes.full.RDS')
-## ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
-## ats.zeroes$strata1 <- NULL
-## ## Filter inflated zeroes to be <80m. Then fill in with inshore
-## ## observed data from Levine et al 2018 which is from 2017 and
-## ## maybe not all pollock so is an upper bound. Thus divide by 4.
-## ## plot(lat~lon, data=ats.zeroes, col=ifelse(ats.zeroes$surface>80, 1,2))
-## ## ggplot(ats.zeroes, aes(lon, lat, col=surface)) + geom_point()
-## ats.zeroes <- subset(ats.zeroes, surface <=80)
-## ## Also chop it down to be fewer points
-## ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=15),]
-## ## I assume that most fish are in the middle stratum, and that
-## ## the Levine inshore values are too high so divide those by
-## ## 4. Then split the density 4/5 into s2 and 1/5 into s3.
-## set.seed(2352152)
-## ats.zeroes$strata2 <-
-##   rbinom(nrow(ats.zeroes), 1, prob=.4)*sample(inshore*(1/5), size=nrow(ats.zeroes), replace=TRUE)
-## ats.zeroes$strata3 <-
-##   rbinom(nrow(ats.zeroes), 1, prob=.2)*sample(inshore*(1/20), size=nrow(ats.zeroes), replace=TRUE)
-## saveRDS(ats.zeroes, file='data/ats.zeroes.basecase.RDS') # use ats.zeroes.reduced.RDS
-## saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity.RDS') # use ats.zeroes.full.RDS
+## old code to check that the predicted depths make sense by
+## predicting at the real AT data... they are identical
+## suggesting MACE gets depths from this data set.
+## ats0 <- subset(ats, lon>= -179)
+## ats0$depthbath <- -1*get.depth(tmpmap, x=ats0$lon, y=ats0$lat, locator=FALSE)$depth
+## plot(log(ats0$depth), (ats0$depthbath-ats0$depth))
+## ggplot(ats0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
+## bts0 <- subset(bts, lon>= -179)
+## bts0$depthbath <- -1*get.depth(tmpmap, x=bts0$lon, y=bts0$lat, locator=FALSE)$depth
+## plot(log(bts0$depth), (bts0$depthbath-bts0$depth)/bts0$depth)
+## ggplot(bts0, aes(lon, lat, col=log(depthbath), size=log(depthbath))) + geom_point(alpha=.5) +
+##   scale_colour_gradient2() + facet_wrap('year') + scale_size(range=c(1,3))
+## saveRDS(ats.zeroes, file='data/ats.zeroes.RDS')
+
+## ### There are three cases. (1) no buffer and assuming
+## ### miniscule densities. This is our minimal case. (2)
+## ### basecase where we have a buffer but use miniscule
+## ### amounts. (3) upper case where we use the buffer but draw
+## ### on Levine's data for the later years. This data comes from
+## ### 2017 and is likely not entirely pollock. It's also 0.5m to
+## ### surface so we have to assume how it would be distributed
+## ### vertically.
+
+## These are the densities (kg/km2) from Levine & De Robertis
+## 2019 but previously processed (see manuscript for details).
+inshore <- read.table('data/inshore.catches.txt')[,1]
+ats.zeroes <- readRDS('data/ats.zeroes.reduced.RDS') # with buffer
+## ats.zeroes <- readRDS('data/ats.zeroes.full.RDS')    # without buffer
+## Also chop it down to be fewer points and nothing west of -170
+ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=15),]
+ats.zeroes <- subset(ats.zeroes, lon >= -170)
+## Then fill in with inshore observed data from Levine et al 2018
+## which is from 2017 and maybe not all pollock so is an upper
+## bound. Thus divide by 4.
+## I assume that most fish are in the middle stratum, and that
+## the Levine inshore values are too high so divide those by
+## 4. Then split the density 4/5 into s2 and 1/5 into s3.
+
+## This assumes virtually no fish inshore (which would be true if
+## protocol was followed), and more zeroes in the upper stratum.
+set.seed(2352152)
+ats.zeroes$strata2 <-
+  rbinom(nrow(ats.zeroes), 1, prob=.3)*runif(n=nrow(ats.zeroes),
+                                             exp(-3), exp(1))
+ats.zeroes$strata3 <-
+  rbinom(nrow(ats.zeroes), 1, prob=.1)*runif(n=nrow(ats.zeroes),
+                                             exp(-4), exp(0))
+ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
+ats.zeroes$strata1 <- NULL
+
+## This is our "high" case where we use the Levine data for years >2015
+set.seed(2352152)
+x1 <- sample(inshore*(.7), size=nrow(ats.zeroes), replace=TRUE)
+x2 <- sample(inshore*(.3), size=nrow(ats.zeroes), replace=TRUE)
+ind <- ats.zeroes$year > 2015
+ats.zeroes$strata2[ind] <- x1[ind]
+ats.zeroes$strata3[ind] <- x2[ind]
+
+
+ggplot(ats.zeroes, aes(lon, lat, col=strata2==0)) + geom_point() +
+  facet_wrap('year')
+ggplot() + geom_point(data=ats, aes(lon, lat)) +
+  geom_point(data=ats.zeroes, aes(lon, lat), col=2)+ facet_wrap('year')
+
+saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity1.RDS') # use ats.zeroes.full.RDS
+saveRDS(ats.zeroes, file='data/ats.zeroes.basecase.RDS') # use ats.zeroes.reduced.RDS
+saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity2.RDS') # use ats.zeroes.reduced.RDS
