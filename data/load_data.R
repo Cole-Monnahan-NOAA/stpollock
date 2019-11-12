@@ -3,14 +3,24 @@
 
 ## Main data sets
 bts <- read.csv('data/bts.csv')
-ats <- read.csv('data/ats.csv')
+if(efh==16) {
+  ats <- read.csv('data/ats_16.csv')
+} else if(efh==3){
+  ats <- read.csv('data/ats_3.csv')
+} else {
+  stop("invalid efh")
+}
 
 ## The "inflated" zeroes (see below too)
 if(zeroes.case=='basecase'){
   message("Adding zeroes onto ATS data set")
   ats.zeroes <- readRDS('data/ats.zeroes.basecase.RDS')
-} else if(zeroes.case=='sensitivity'){
-  ats.zeroes <- readRDS('data/ats.zeroes.sensitivity.RDS')
+} else if(zeroes.case=='sensitivity1'){
+  ats.zeroes <- readRDS('data/ats.zeroes.sensitivity1.RDS')
+} else if(zeroes.case=='sensitivity2'){
+  ats.zeroes <- readRDS('data/ats.zeroes.sensitivity2.RDS')
+} else if(zeroes.case=='none'){
+  ats.zeroes <- NULL
 } else {
   stop("Invalid zeroes.case")
 }
@@ -113,47 +123,44 @@ message("Done loading data...")
 ## ### surface so we have to assume how it would be distributed
 ## ### vertically.
 
-## These are the densities (kg/km2) from Levine & De Robertis
-## 2019 but previously processed (see manuscript for details).
-inshore <- read.table('data/inshore.catches.txt')[,1]
-ats.zeroes <- readRDS('data/ats.zeroes.reduced.RDS') # with buffer
+## ## These are the densities (kg/km2) from Levine & De Robertis
+## ## 2019 but previously processed (see manuscript for details).
+## inshore <- read.table('data/inshore.catches.txt')[,1]
+## ats.zeroes <- readRDS('data/ats.zeroes.reduced.RDS') # with buffer
 ## ats.zeroes <- readRDS('data/ats.zeroes.full.RDS')    # without buffer
-## Also chop it down to be fewer points and nothing west of -170
-ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=15),]
-ats.zeroes <- subset(ats.zeroes, lon >= -170)
-## Then fill in with inshore observed data from Levine et al 2018
-## which is from 2017 and maybe not all pollock so is an upper
-## bound. Thus divide by 4.
-## I assume that most fish are in the middle stratum, and that
-## the Levine inshore values are too high so divide those by
-## 4. Then split the density 4/5 into s2 and 1/5 into s3.
+## ## Also chop it down to be fewer points and nothing west of -170
+## ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=15),]
+## ats.zeroes <- subset(ats.zeroes, lon >= -170)
+## ## Then fill in with inshore observed data from Levine et al 2018
+## ## which is from 2017 and maybe not all pollock so is an upper
+## ## bound. Thus divide by 4.
+## ## I assume that most fish are in the middle stratum, and that
+## ## the Levine inshore values are too high so divide those by
+## ## 4. Then split the density 4/5 into s2 and 1/5 into s3.
 
-## This assumes virtually no fish inshore (which would be true if
-## protocol was followed), and more zeroes in the upper stratum.
-set.seed(2352152)
-ats.zeroes$strata2 <-
-  rbinom(nrow(ats.zeroes), 1, prob=.3)*runif(n=nrow(ats.zeroes),
-                                             exp(-3), exp(1))
-ats.zeroes$strata3 <-
-  rbinom(nrow(ats.zeroes), 1, prob=.1)*runif(n=nrow(ats.zeroes),
-                                             exp(-4), exp(0))
-ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
-ats.zeroes$strata1 <- NULL
+## ## This assumes virtually no fish inshore (which would be true if
+## ## protocol was followed), and more zeroes in the upper stratum.
+## set.seed(2352152)
+## ats.zeroes$strata2 <-
+##   rbinom(nrow(ats.zeroes), 1, prob=.3)*runif(n=nrow(ats.zeroes),
+##                                              exp(-3), exp(1))
+## ats.zeroes$strata3 <-
+##   rbinom(nrow(ats.zeroes), 1, prob=.1)*runif(n=nrow(ats.zeroes),
+##                                              exp(-4), exp(0))
+## ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
+## ats.zeroes$strata1 <- NULL
 
-## This is our "high" case where we use the Levine data for years >2015
-set.seed(2352152)
-x1 <- sample(inshore*(.7), size=nrow(ats.zeroes), replace=TRUE)
-x2 <- sample(inshore*(.3), size=nrow(ats.zeroes), replace=TRUE)
-ind <- ats.zeroes$year > 2015
-ats.zeroes$strata2[ind] <- x1[ind]
-ats.zeroes$strata3[ind] <- x2[ind]
-
-
-ggplot(ats.zeroes, aes(lon, lat, col=strata2==0)) + geom_point() +
-  facet_wrap('year')
-ggplot() + geom_point(data=ats, aes(lon, lat)) +
-  geom_point(data=ats.zeroes, aes(lon, lat), col=2)+ facet_wrap('year')
-
-saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity1.RDS') # use ats.zeroes.full.RDS
-saveRDS(ats.zeroes, file='data/ats.zeroes.basecase.RDS') # use ats.zeroes.reduced.RDS
-saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity2.RDS') # use ats.zeroes.reduced.RDS
+## ## This is our "high" case where we use the Levine data for years >2015
+## set.seed(2352152)
+## x1 <- sample(inshore*(.7), size=nrow(ats.zeroes), replace=TRUE)
+## x2 <- sample(inshore*(.3), size=nrow(ats.zeroes), replace=TRUE)
+## ind <- ats.zeroes$year > 2015
+## ats.zeroes$strata2[ind] <- x1[ind]
+## ats.zeroes$strata3[ind] <- x2[ind]
+## ggplot(ats.zeroes, aes(lon, lat, col=strata2==0)) + geom_point() +
+##   facet_wrap('year')
+## ggplot() + geom_point(data=ats, aes(lon, lat)) +
+##   geom_point(data=ats.zeroes, aes(lon, lat), col=2)+ facet_wrap('year')
+## saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity1.RDS') # use ats.zeroes.full.RDS
+## saveRDS(ats.zeroes, file='data/ats.zeroes.basecase.RDS') # use ats.zeroes.reduced.RDS
+## saveRDS(ats.zeroes, file='data/ats.zeroes.sensitivity2.RDS') # use ats.zeroes.reduced.RDS

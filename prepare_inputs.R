@@ -50,6 +50,7 @@ logkappainput2 <- -4.9+log(kappascale)
 ## tau2 <- 1/( exp(logkappainput2) * sqrt(4*pi) )
 ## c(tau1, tau2)
 zeroes.case <- ifelse(is.null(control$zeroes.case), 'basecase', control$zeroes.case)
+efh <- ifelse(is.null(control$efh), 16, control$efh)
 set.seed(seed)
 
 ## These depend on the model and spatial setup

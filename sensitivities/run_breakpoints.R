@@ -1,157 +1,74 @@
 
 ## Look at how the ATS changes with different breakpoints for the lower and
-## upper bounds (EFH)
-setwd('..')
+## upper bounds (EFH). We have two cases: [.5,16] (Stan's EFH
+## estimate) and [.5,3] which implies no vertical schooling so
+## the EFH is the physical height of the gear.
 
-source("startup.R")
+## Note that there are two input data files created specifically
+## for these. It cannot be changed from 3 and 16. The control$efh
+## changes which file is read in and used.
 
-library(ggplot2)
-library(tidyr)
-library(magrittr)
-library(dplyr)
-
-ats1 <- cbind(breakpoints='3_16', read.csv('data/ats_3_16.csv'))
-ats2 <- cbind(breakpoints='.5_16', read.csv('data/ats_.5_16.csv'))
-ats3 <- cbind(breakpoints='.5_20', read.csv('data/ats_.5_20.csv'))
-ats4 <- cbind(breakpoints='.5_12', read.csv('data/ats_.5_12.csv'))
-## ats2 <- ats2[,names(ats1)]
-## ats3 <- ats3[,names(ats1)]
-## ats4 <- ats4[,names(ats1)]
-## rbind(ats1, ats2, ats3, ats4) %>% group_by(breakpoints) %>%
-##   summarize(total1=sum(strata1), total2=sum(strata2), total3=sum(strata3))
-
-ats <- rbind(ats1, ats2, ats3, ats4) %>%
-  select(-X, -surface, -ground, -dist, -strata1) %>%
-  gather(stratum, value, -lon, -lat, -breakpoints, -year) %>%
-  filter(value<10000)
-g <- ggplot(ats, aes(log(value), fill=breakpoints)) +
-  geom_histogram(position='identity', alpha=.5, bins=50) +
-  facet_grid(year~stratum) + theme_bw()
-ggsave('plots/breakpoints_histograms.png', g, width=7, height=5, dpi=500)
-col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
-g <- ggplot(subset(ats, stratum=='strata2'), aes(lon ,lat, color=log(value))) +
-  geom_point(cex=1) + facet_grid(year~breakpoints) +
-  scale_color_gradientn(colours=col(15)) + theme_bw()
-ggsave('plots/breakpoints_maps.png', g,  width=7, height=5, dpi=500)
+chains <- 6
+options(mc.cores = chains)
+td <- 12
+ad <- .8
+iter <- 800
+warmup <- 200
+dir.create('sensitivities/breakpoints', showWarnings=FALSE)
 
 
-controlc <- list(seed=121, beta2temporal=TRUE, n_x=200, model='combined',
-                n_eps1='IID', n_eps2='IID', n_omega2='IID', n_omega1='IID',
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
+control <- list(model='combined', n_x=100,
+                n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                make_plots=FALSE)
+## The flag "fixlambda" controls the catchability
+## configuration. Kind of a bad way to set it up, see
+## prepare.inputs for how it actually works.
 
-## Fit 3-16 (original)
-control <- list(seed=121, beta2temporal=TRUE, n_x=200, model='ats',
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_3_16_ats')
+## Case 1: base case from paper
+control$efh <- 16
+savedir <- paste0(getwd(), '/sensitivities/breakpoints/senfit_efh16')
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_3_16_combined')
-control <- controlc
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=iter, open_progress=FALSE, warmup=warmup,
+               init=prior.fn, seed=85234,
+               control=list(max_treedepth=td, adapt_delta=ad))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
+
+## Case 2: sensitivity of 3m
+control$efh <- 3
+savedir <- paste0(getwd(), '/sensitivities/breakpoints/senfit_efh3')
 source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=iter, open_progress=FALSE, warmup=warmup,
+               init=prior.fn, seed=85234,
+               control=list(max_treedepth=td, adapt_delta=ad))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 
-## Fit .5-16 !!!! Manually copy the ats.csv over !!!!!
-control <- list(seed=121, beta2temporal=TRUE, n_x=200, model='ats',
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_16_ats')
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_16_combined')
-control <- controlc
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
+x1 <- readRDS('sensitivities/breakpoints/senfit_efh16/results.mcmc.RDS')$index.gear
+x2 <- readRDS('sensitivities/breakpoints/senfit_efh3/results.mcmc.RDS')$index.gear
+index.gear <- rbind(cbind(x1, EFH=factor(16)), cbind(x2, EFH=factor(3)))
+x1 <- readRDS('sensitivities/breakpoints/senfit_efh16/results.mcmc.RDS')$index.strata
+x2 <- readRDS('sensitivities/breakpoints/senfit_efh3/results.mcmc.RDS')$index.strata
+index.strata <- rbind(cbind(x1, EFH=factor(16)), cbind(x2, EFH=factor(3)))
+index <- list(index.gear, index.strata)
 
-## Fit .5-12 !!!! Manually copy the ats.csv over !!!!!
-control <- list(seed=121, beta2temporal=TRUE, n_x=200, model='ats',
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_12_ats')
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_12_combined')
-control <- controlc
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
+saveRDS(index, file='results/breakpoints.RDS')
 
-## Fit .5-20 !!!! Manually copy the ats.csv over !!!!!
-control <- list(seed=121, beta2temporal=TRUE, n_x=200, model='ats',
-                n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                beta1temporal=TRUE, filteryears=FALSE, finescale=FALSE,
-                kappaoff=12, temporal=2, fixlambda=2, make_plots=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_20_ats')
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
-savedir <- paste0(getwd(), '/breakpoint_tests/breakpoints_.5_20_combined')
-control <- controlc
-source("prepare_inputs.R")
-Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                upper=TmbList$Upper,   savedir=savedir,
-                newtonsteps=1, control=list(trace=1))
-results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-plot.vastfit(results, plotmaps=TRUE)
+g1 <- ggplot(index.strata, aes(year, est, ymin=lwr, ymax=upr, color=EFH, fill=EFH)) +
+  geom_line(lwd=2)+
+  geom_ribbon(alpha=1/3) + ylab('log index') +
+  facet_wrap('stratum', ncol=1) + theme_bw()
 
+g2 <- ggplot(index.gear, aes(year, est, ymin=lwr, ymax=upr, color=EFH, fill=EFH)) +
+  geom_line(lwd=2)+
+  geom_ribbon(alpha=1/3) + ylab('log index') +
+  facet_wrap('gear', ncol=1) + theme_bw()
 
-## Compare the indices from the independent ones
-setwd('breakpoint_tests/')
-load('breakpoints_3_16_ats/Save.RData')
-index3_16_raw <- read.csv('breakpoints_3_16_ats/index.raw.csv')
-index3_16 <- Save$Index
-load('breakpoints_.5_16_ats/Save.RData')
-index.5_16_raw <- read.csv('breakpoints_.5_16_ats/index.raw.csv')
-index.5_16 <- Save$Index
-load('breakpoints_.5_12_ats/Save.RData')
-index.5_12_raw <- read.csv('breakpoints_.5_12_ats/index.raw.csv')
-index.5_12 <- Save$Index
-load('breakpoints_.5_20_ats/Save.RData')
-index.5_20_raw <- read.csv('breakpoints_.5_20_ats/index.raw.csv')
-index.5_20 <- Save$Index
-setwd('..')
+## combine those two above into one
+library(cowplot)
+g <- cowplot::plot_grid(g1, g2, ncol=2)
+ggsave('plots/sensitivities_breakpoints.png', g, width=9, height=7)
 
-index.model <- rbind(cbind(breakpoint='3_16', index3_16),
-                  cbind(breakpoint='.5_16', index.5_16),
-                  cbind(breakpoint='.5_20', index.5_20),
-                  cbind(breakpoint='.5_12', index.5_12))
-index.raw <- rbind(cbind(breakpoint='3_16', index3_16_raw),
-                  cbind(breakpoint='.5_16', index.5_16_raw),
-                  cbind(breakpoint='.5_20', index.5_20_raw),
-                  cbind(breakpoint='.5_12', index.5_12_raw))
-
-g <- ggplot(index.model, aes(year, est, color=breakpoint)) + geom_line()
-ggsave('plots/breakpoints_index_model.png', g, width=7, height=5)
-g <- ggplot(subset(index.raw, type=='Naive'), aes(year, log(value), color=breakpoint)) + geom_line()
-ggsave('plots/breakpoints_index_raw.png', g, width=7, height=5)
