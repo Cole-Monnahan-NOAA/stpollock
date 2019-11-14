@@ -32,11 +32,10 @@ fit_*
 resolution_tests
 simulations
 sensitivities/inflated0
-breakpoint_tests/breakpoints*
-sensitivities/fit_*
+sensitivities/breakpoints
 sensitivities/anisofits
 sensitivities/kappascale
 sensitivities/spatialconfig
 sensitivities/temporal
-sensitivities/catchability*
+sensitivities/catchability
 sensitivities/resolution
