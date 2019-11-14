@@ -1,9 +1,10 @@
 
-
 library(TMB)
 ## library(devtools)
 ## remove.packages('VAST')
-## install_github('James-Thorson/VAST')
+## install_github('James-Thorson/FishStatsUtils', ref='2.3.2')
+## install_github('James-Thorson/VAST', ref='3.2.1')
+
 library(reshape2)
 library(plyr)
 library(TMBhelper)
@@ -787,7 +788,7 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   if(model=='combined')
     plot.availability.map.mcmc(results)
   plot.posterior.predictive(fit, results)
-  plot.pearson.mcmc(results)
+  ## plot.pearson.mcmc(results)
   plot.density.map.mcmc(results)
   plot.R.map.mcmc(results)
   plot.covcor.mcmc(results)
