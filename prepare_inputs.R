@@ -208,6 +208,7 @@ silent.fn(Spatial_List  <-
                               ## LON_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lon'],
                               ## LAT_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lat'],
                               Extrapolation_List=Extrapolation_List,
+                              knot_method='grid',
                               DirPath=savedir, Save_Results=FALSE ))
 ## silent.fn(Spatial_List <-
 ##             make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
@@ -466,7 +467,6 @@ if(make_plots){
   ## Some custom maps of the data properties
   ## Plot log average catch in grid
   Year_Set <- sort(unique(Data_Geostat$Year))
-  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
   MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                        FUN=mean, na.rm=TRUE))
   MatDatSD <- tapply(log(Data_Geostat$Catch_KG), Data_Geostat[, c( 'knot_i', 'Gear','Year')],
@@ -477,67 +477,34 @@ if(make_plots){
   ## Use consistent zlim for all three data types
   zlim <- range(MatDat, na.rm=TRUE)
   message('Making data maps by gear type...')
+  Years2Include <- list(1:12, c(1:4,6,8,10,12), c(1:4,6,8,10,12))
   for(ii in 1:dim(MatDat)[2]){
-    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-               Mat=MatDat[,ii,Years2Include,drop=TRUE],
-               PlotDF=mdl$PlotDF,
-               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-               FileName=paste0(savedir, '/data_plots/map_data_avg_', ii),
-               Year_Set=Year_Set[Years2Include],
-               Legend=mdl$Legend, zlim=zlim,
-               mfrow = c(ceiling(sqrt(length(Years2Include))),
-                         ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-               textmargin='Log avg catches', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    plot_variable(map_list=mdl,
+               Y_gt=MatDat[,ii,Years2Include[[ii]],drop=TRUE],
+               xlim=mdl$Xlim, ylim=mdl$Ylim,
+               working_dir=savedir,
+               file_name= paste0('/data_plots/map_data_avg_', ii),
+               panel_labels=Year_Set[Years2Include[[ii]]],
+               zlim=zlim,
+               mfrow = c(ceiling(sqrt(length(Years2Include[[ii]]))),
+                         ceiling(length(Years2Include[[ii]])/ceiling(sqrt(length(Years2Include[[ii]]))))),
+               mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
   }
   ## Plot percentage 0's
   MatDat <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                    FUN=function(x) mean(x>0, na.rm=TRUE))
   for(ii in 1:dim(MatDat)[2]){
-    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-               Mat=MatDat[,ii,Years2Include,drop=TRUE],
-               PlotDF=mdl$PlotDF,
-               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-               FileName=paste0(savedir, '/data_plots/map_data_pres_', ii),
-               Year_Set=Year_Set[Years2Include],
-               Legend=mdl$Legend, zlim=c(0,1),
-               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-               textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
-               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
+    plot_variable(map_list=mdl,
+               Y_gt=MatDat[,ii,Years2Include[[ii]],drop=TRUE],
+               xlim=mdl$Xlim, ylim=mdl$Ylim,
+               working_dir=savedir,
+               file_name= paste0('/data_plots/map_data_pres_', ii),
+               panel_labels=Year_Set[Years2Include[[ii]]],
+               zlim=zlim,
+               mfrow = c(ceiling(sqrt(length(Years2Include[[ii]]))),
+                         ceiling(length(Years2Include[[ii]])/ceiling(sqrt(length(Years2Include[[ii]]))))),
+               mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
   }
-  ## ## Plot standard deviation of data
-  ## for(ii in 1:dim(MatDat)[2]){
-  ##   PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-  ##              Mat=MatDatSD[,ii,Years2Include,drop=TRUE],
-  ##              PlotDF=mdl$PlotDF,
-  ##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-  ##              FileName=paste0(savedir, '/data_plots/map_data_sd_', ii),
-  ##              Year_Set=Year_Set[Years2Include],
-  ##              Legend=mdl$Legend, zlim=range(MatDatSD, na.rm=TRUE),
-  ##              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-  ##              textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
-  ##              oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
-  ## }
-  ## if(model=='combined'){
-  ##   ## Plot log average catch in BTS divided by ATS 3-16. This shouldn't be
-  ##   ## possible b/c the BTS also includes the ATS data. Although this ignores
-  ##   ## catchability.
-  ##   MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
-  ##                     FUN=mean, na.rm=TRUE))
-  ##   MatDat <- (MatDat[,2,]/MatDat[,1,])>1
-  ##   ## Some grids have only zero observations
-  ##   MatDat[is.infinite(MatDat) | MatDat==0]  <-  NA
-  ##   PlotMap_Fn(MappingDetails=mdl$MappingDetails,
-  ##              Mat=MatDat[,Years2Include],
-  ##              PlotDF=mdl$PlotDF, zlim=c(0,1),
-  ##              MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-  ##              FileName=paste0(savedir, '/data_plots/map_data_ratio'),
-  ##              Year_Set=Year_Set[Years2Include],
-  ##              Legend=mdl$Legend,
-  ##              mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
-  ##              textmargin='Ratio log(ATS)/log(BTS)) avg catches', zone=MapDetails_List[["Zone"]], mar=c(0,0,2,0),
-  ##              oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
-  ## }
   ## Calculate raw indices from the data. Took the vAST code and modified to
   ## do it in R. First the totally naive way without space which includes
   ## the added zeroes
