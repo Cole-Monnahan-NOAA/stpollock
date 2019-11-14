@@ -9,7 +9,7 @@ td <- 12
 ad <- .8
 iter <- 800
 warmup <- 200
-n_x <- 401
+n_x <- 400
 
 ### These zeroes are tacked on in the load_data.R script from
 ### file 'ats.zeroes.RDS' so if I switch out that file and fit
@@ -18,10 +18,11 @@ n_x <- 401
 
 ### First run some MLE fits to just the AT data and are faster
 ### and a little easier to compare.
-control$model <- 'ats'
-n_x <- 200
+n_x <- 400
 fits <- list()
-for(zeroes.case %in% c('basecase', 'sensitivity1', 'sensitivity2', 'none')){
+replicateyears <- filteryears <- FALSE
+efh <- 16
+for(zeroes.case in c('basecase', 'sensitivity1', 'sensitivity2', 'none')){
   source('data/load_data.R')
   dat <- DF2
   dat$Gear <- factor('AT')
@@ -30,20 +31,30 @@ for(zeroes.case %in% c('basecase', 'sensitivity1', 'sensitivity2', 'none')){
   settings <- make_settings(n_x=n_x, Region="eastern_bering_sea",
                             purpose="index", bias.correct=FALSE,
                             fine_scale=TRUE)
-  ## settings$FieldConfig[2,1:2] <- 0 # turn off spatiotemporal?
+  settings$RhoConfig[1:4] <- c(2,2,2,2)
+  ## settings$FieldConfig[1:2,1:2] <- 0 # turn off spatiotemporal?
   savedir <- paste0(getwd(), '/sensitivities/inflated0/atfit_',
-                    n_x,"_", zeroes.case)
+                    n_x,"_", zeroes.case, "/")
   fit <- fit_model(settings=settings, Lat_i=dat$Lat,
                    Lon_i=dat$Lon, t_i=dat$Year, working_dir=savedir,
-                   b_i=dat$Catch_KG, a_i=dat$AreaSwept_km2)
-  plot(fit, working_dir=savedir)
+                   b_i=dat$Catch_KG, a_i=dat$AreaSwept_km2,
+                   knot_method="grid", test_fit=FALSE)
+  plot(fit, working_dir=savedir, check_residuals=FALSE)
   fits[[zeroes.case]] <- fit
 }
 
-
+indices <- lapply(names(fits), function(i) {
+  x=fits[[i]]$parameter_estimates$SD
+  ind=names(x$value) =='ln_Index_cyl'
+  data.frame(case=i, est=x$value[ind], se=x$sd[ind])
+}) %>% do.call(rbind,.) %>% group_by(case) %>%
+  mutate(lwr=est-1.96*se, upr=est+1.96*se, year=2007:2018)
+g <- ggplot(indices, aes(year, est, ymin=lwr, ymax=upr, fill=case, color=case)) +
+  geom_ribbon(alpha=.3) + geom_line(lwd=2) + ylab("log index")
+ggsave('plots/sensitivity_inflated0.png', width=7, height=5)
 
 ## Same controls for all test caes
-control <- list(model='combined', n_x=n_x,
+ control <- list(model='combined', n_x=n_x,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 ## n_eps1=0, n_eps2=0, n_omega2="IID", n_omega1="IID",
                 make_plots=TRUE)
