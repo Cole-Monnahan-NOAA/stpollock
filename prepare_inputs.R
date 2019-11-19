@@ -215,23 +215,49 @@ silent.fn(Spatial_List  <-
 ##                               Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
 ##                               Extrapolation_List=Extrapolation_List, DirPath=savedir,
 ##                               Save_Results=FALSE ))
-Data_Geostat <- cbind( Data_Geostat, "knot_i"=Spatial_List$knot_i )
-
-## Standardize the raw depth if not done yet
-if(!simdata){
-  Data_Geostat$depth <- log(Data_Geostat$depth)
-  Data_Geostat$depth <- (Data_Geostat$depth-mean(Data_Geostat$depth))/sd(Data_Geostat$depth)
-}
-silent.fn(XX <- (FishStatsUtils::format_covariates(
-                                   Lat_e = Data_Geostat$Lat,
-                                   Lon_e = Data_Geostat$Lon,
-                                   t_e = Data_Geostat$Year,
-                                   Cov_ep = Data_Geostat[,'depth'],
-                                   Extrapolation_List = Extrapolation_List,
-                                   Spatial_List = Spatial_List, FUN = mean,
-                                   na.omit = "time-average")))
+Data_Geostat$knot_i <- Spatial_List$knot_i
+## MapDetails_list for saving and plotting
+mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
+                     Extrapolation_List=Extrapolation_List)
+mdl$Legend$x <- mdl$Legend$x-70
+mdl$Legend$y <- mdl$Legend$y-45
 ## Normalize depth and then add depth^2
-X_gtp <- XX$Cov_xtp
+if(!simdata){
+  ## Get depth from NOAA bathymetry instead of using data b/c this
+  ## fails sometimes.
+  message("Getting depth from online bathy data.base")
+  library(marmap)
+  tmp <- subset(mdl$PlotDF, Lon>-179)
+  tmpmap <- getNOAA.bathy(lon1 = min(tmp$Lon)-.5, lon2 = max(tmp$Lon)+1,
+                          lat1 = min(tmp$Lat)-1, lat2 = max(tmp$Lat)+1,
+                          resolution = 4)
+  tmp$depth <- -1*get.depth(tmpmap, x=tmp$Lon, y=tmp$Lat,
+                            locator=FALSE)$depth
+  ## tmp <- group_by(tmp, x2i) %>% mutate(avg.depth=mean(depth))
+  ## ggplot(tmp, aes(Lon, Lat, color=log(avg.depth))) + geom_point()
+  depth <- group_by(tmp, x2i) %>% summarize(depth=mean(depth))
+  ## Carefully standardize depth
+  mu0 <- mean(log(Data_Geostat$depth))
+  sd0 <- sd(log(Data_Geostat$depth))
+  X_gtp <- array(NA, dim=c(n_x, length(years), 1))
+  X_gtp[,,1] <- (log(depth$depth)-mu0)/sd0
+  Data_Geostat$depth <- (log(Data_Geostat$depth)-mu0)/sd0
+}
+### old way:
+## silent.fn(XX <- (FishStatsUtils::format_covariates(
+##                                    Lat_e = Data_Geostat$Lat,
+##                                    Lon_e = Data_Geostat$Lon,
+##                                    t_e = Data_Geostat$Year,
+##                                    Cov_ep = Data_Geostat[,'depth'],
+##                                    Extrapolation_List = Extrapolation_List,
+##                                    Spatial_List = Spatial_List, FUN = mean,
+##                                    na.omit = "time-average")))
+## X_gtp <- XX$Cov_xtp
+## XX$Cov_xtp <- XX$Cov_xtp*0
+## new  <- XX$Cov_xtp[,,1]^2
+## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
+## hist(XX$Cov_xtp[,,1])
+## hist(XX$Cov_xtp[,,2])
 ## Extract covariate measurements at samples
 X_ip  <-  as.matrix(Data_Geostat$depth)
 ## Expand to expected size of input
@@ -242,13 +268,8 @@ if(!depthoff){
   X_gtp <- X_gtp*0
   X_itp <- X_itp*0
 }
-
-
-## XX$Cov_xtp <- XX$Cov_xtp*0
-## new  <- XX$Cov_xtp[,,1]^2
-## XX$Cov_xtp <- abind(XX$Cov_xtp, new, along=3)
-## hist(XX$Cov_xtp[,,1])
-## hist(XX$Cov_xtp[,,2])
+#### Now X_gtp and X_ip are ready for use and are standardized on
+#### log scale with accurate depths averaged by grid cell
 
 
 ## Build data and object for first time
@@ -452,16 +473,17 @@ if(!is.null(Obj$env$random)) Obj$env$last.par[-Obj$env$random] <- par
 loc <- data.frame(Spatial_List$MeshList$isotropic_mesh$loc[,-3])
 names(loc) <- c('E_km', 'N_km')
 Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
-## MapDetails_list for saving and plotting
-mdl <- make_map_info(Region=Region, spatial_list=Spatial_List,
-                     Extrapolation_List=Extrapolation_List )
-mdl$Legend$x <- mdl$Legend$x-70
-mdl$Legend$y <- mdl$Legend$y-45
 
 
 if(make_plots){
+
   if(!dir.exists(paste0(savedir, '/data_plots')))
     dir.create(paste0(savedir, '/data_plots'))
+  png(paste0(savedir, '/data_plots/mesh.png'))
+  plot(Spatial_List$MeshList$isotropic_mesh)
+  points(Spatial_List$loc_i, col=2, pch='.')
+  axis(1); axis(2)
+  dev.off()
   silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
                       Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
   ## Some custom maps of the data properties
@@ -477,17 +499,16 @@ if(make_plots){
   ## Use consistent zlim for all three data types
   zlim <- range(MatDat, na.rm=TRUE)
   message('Making data maps by gear type...')
-  Years2Include <- list(1:12, c(1:4,6,8,10,12), c(1:4,6,8,10,12))
   for(ii in 1:dim(MatDat)[2]){
     plot_variable(map_list=mdl,
-               Y_gt=MatDat[,ii,Years2Include[[ii]],drop=TRUE],
+               Y_gt=MatDat[,ii,,drop=TRUE],
                xlim=mdl$Xlim, ylim=mdl$Ylim,
                working_dir=savedir,
                file_name= paste0('/data_plots/map_data_avg_', ii),
-               panel_labels=Year_Set[Years2Include[[ii]]],
+               panel_labels=Year_Set,
                zlim=zlim,
-               mfrow = c(ceiling(sqrt(length(Years2Include[[ii]]))),
-                         ceiling(length(Years2Include[[ii]])/ceiling(sqrt(length(Years2Include[[ii]]))))),
+               ## mfrow = c(ceiling(sqrt(length(Year_Set))),
+               ##           ceiling(length(Year_Set)/ceiling(sqrt(length(Year_Set))))),
                mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
   }
   ## Plot percentage 0's
@@ -495,14 +516,14 @@ if(make_plots){
                    FUN=function(x) mean(x>0, na.rm=TRUE))
   for(ii in 1:dim(MatDat)[2]){
     plot_variable(map_list=mdl,
-               Y_gt=MatDat[,ii,Years2Include[[ii]],drop=TRUE],
+               Y_gt=MatDat[,ii,,drop=TRUE],
                xlim=mdl$Xlim, ylim=mdl$Ylim,
                working_dir=savedir,
                file_name= paste0('/data_plots/map_data_pres_', ii),
-               panel_labels=Year_Set[Years2Include[[ii]]],
+               panel_labels=Year_Set,
                zlim=zlim,
-               mfrow = c(ceiling(sqrt(length(Years2Include[[ii]]))),
-                         ceiling(length(Years2Include[[ii]])/ceiling(sqrt(length(Years2Include[[ii]]))))),
+               ## mfrow = c(ceiling(sqrt(length(Year_Set)),
+               ##           ceiling(length(Year_Set/ceiling(sqrt(length(Year_Set)))),
                mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
   }
   ## Calculate raw indices from the data. Took the vAST code and modified to
