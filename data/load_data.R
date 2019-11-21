@@ -25,7 +25,7 @@ message("Filtering out AT points outside of EBS...")
 hull <- readRDS('data/ebs_outer_hull.RDS')
 ats$out <- with(hull, sp::over(points, poly))
 ## ggplot(ats, aes(lon,lat, color=is.na(out))) + geom_point() + facet_wrap('year')
-ats <- ats[!is.na(ats$out),]
+ats <- ats[!is.na(ats$out),] %>% select(-out)
 
 
 ## The "inflated" zeroes (see below too)
