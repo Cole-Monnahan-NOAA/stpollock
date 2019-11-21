@@ -11,6 +11,23 @@ if(efh==16) {
   stop("invalid efh")
 }
 
+## ## Filter out AT data outside the extrapolation region? Use the
+## ## PlotDF from mdl (need to run this in prepare_inputs first) to
+## ## get a nonconvex hull and then fileter out points outside of
+## ## that. To save time do it once and read in from file.
+## outer_hull <-
+##   as.matrix(subset(mdl$PlotDF, Include, select=c('Lon', "Lat"))) %>%
+##   INLA::inla.nonconvex.hull(convex = -0.05, concave = -0.05)
+## poly <- mapview::coords2Polygons(outer_hull$loc, ID='a')
+## points <- sp::SpatialPoints(ats[,c('lon', 'lat')])
+## saveRDS(list(points=points, poly=poly), file='data/ebs_outer_hull.RDS')
+message("Filtering out AT points outside of EBS...")
+hull <- readRDS('data/ebs_outer_hull.RDS')
+ats$out <- with(hull, sp::over(points, poly))
+## ggplot(ats, aes(lon,lat, color=is.na(out))) + geom_point() + facet_wrap('year')
+ats <- ats[!is.na(ats$out),]
+
+
 ## The "inflated" zeroes (see below too)
 if(zeroes.case=='basecase'){
   message("Adding zeroes onto ATS data set")
@@ -29,6 +46,7 @@ ats.zeroes <- ats.zeroes[, names(ats)]
 ats <- rbind(ats.zeroes, ats)
 ats$depth <- ats$surface# norm(ats$surface)
 ats$mlength <- ats$temp.bottom <- ats$tmp.surface <- NA
+
 
 ## Temporarily drop some years
 if(filteryears){
