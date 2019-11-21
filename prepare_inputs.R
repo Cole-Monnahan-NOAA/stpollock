@@ -225,21 +225,26 @@ mdl$Legend$y <- mdl$Legend$y-45
 if(!simdata){
   ## Get depth from NOAA bathymetry instead of using data b/c this
   ## fails sometimes.
-  message("Getting depth from online bathy data.base")
-  library(marmap)
-  tmp <- subset(mdl$PlotDF, Lon>-179)
-  tmpmap <- getNOAA.bathy(lon1 = min(tmp$Lon)-.5, lon2 = max(tmp$Lon)+1,
-                          lat1 = min(tmp$Lat)-1, lat2 = max(tmp$Lat)+1,
-                          resolution = 4)
-  tmp$depth <- -1*get.depth(tmpmap, x=tmp$Lon, y=tmp$Lat,
+  if(file.exists('data/bathy_depths.RDS')){
+    tmpmap <- readRDS('data/bathy_depths.RDS')
+  } else {
+    message("Getting depth from online bathy data.base")
+    library(marmap)
+    tmpmap <- getNOAA.bathy(lon1 = min(tmp$Lon)-.5, lon2 = max(tmp$Lon)+1,
+                            lat1 = min(tmp$Lat)-1, lat2 = max(tmp$Lat)+1,
+                            resolution = 1)
+    saveRDS(tmpmap, file='data/bathy_depths.RDS')
+  }
+  tmp <- subset(mdl$PlotDF, Lon>-179 & Include)
+  tmp$depth <- -1*marmap::get.depth(tmpmap, x=tmp$Lon, y=tmp$Lat,
                             locator=FALSE)$depth
-  ## tmp <- group_by(tmp, x2i) %>% mutate(avg.depth=mean(depth))
-  ## ggplot(tmp, aes(Lon, Lat, color=log(avg.depth))) + geom_point()
-  depth <- group_by(tmp, x2i) %>% summarize(depth=mean(depth))
+  ## tmp <- group_by(tmp, x2i) %>% mutate(avg.depth=median(depth))
+  ## ggplot(tmp, aes(Lon, Lat, color=log(avg.depth))) + geom_point() + scale_color_viridis_c(option="A")
+  depth <- group_by(tmp, x2i) %>% summarize(depth=median(depth))
   ## Carefully standardize depth
   mu0 <- mean(log(Data_Geostat$depth))
   sd0 <- sd(log(Data_Geostat$depth))
-  X_gtp <- array(NA, dim=c(n_x, length(years), 1))
+  X_gtp <- array(NA, dim=c(control$n_x, length(years), 1))
   X_gtp[,,1] <- (log(depth$depth)-mu0)/sd0
   Data_Geostat$depth <- (log(Data_Geostat$depth)-mu0)/sd0
 }
@@ -476,19 +481,20 @@ Inputs <- list(loc=loc, loc_x=data.frame(knot_x=1:n_x, Spatial_List$loc_x))
 
 
 if(make_plots){
-
   if(!dir.exists(paste0(savedir, '/data_plots')))
     dir.create(paste0(savedir, '/data_plots'))
-  png(paste0(savedir, '/data_plots/mesh.png'))
+  png(paste0(savedir, '/data_plots/mesh.png'), width=5, height=5,
+    res=500, units='in')
   plot(Spatial_List$MeshList$isotropic_mesh)
   points(Spatial_List$loc_i, col=2, pch='.')
-  axis(1); axis(2)
+  axis(1); axis(2); box()
   dev.off()
   silent.fn(plot_data(Extrapolation_List=Extrapolation_List, Spatial_List=Spatial_List,
-                      Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/") ))
+                      Data_Geostat=Data_Geostat, PlotDir=paste0(savedir,"/data_plots/") ))
   ## Some custom maps of the data properties
   ## Plot log average catch in grid
   Year_Set <- sort(unique(Data_Geostat$Year))
+  Data_Geostat$knot_i <- factor(Data_Geostat$knot_i, levels=1:control$n_x)
   MatDat <- log(tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                        FUN=mean, na.rm=TRUE))
   MatDatSD <- tapply(log(Data_Geostat$Catch_KG), Data_Geostat[, c( 'knot_i', 'Gear','Year')],
@@ -498,33 +504,35 @@ if(make_plots){
   MatDatSD[is.infinite(MatDatSD) | is.nan(MatDatSD)]  <-  NA
   ## Use consistent zlim for all three data types
   zlim <- range(MatDat, na.rm=TRUE)
+  Years2Include  <-  which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
   message('Making data maps by gear type...')
   for(ii in 1:dim(MatDat)[2]){
-    plot_variable(map_list=mdl,
-               Y_gt=MatDat[,ii,,drop=TRUE],
-               xlim=mdl$Xlim, ylim=mdl$Ylim,
-               working_dir=savedir,
-               file_name= paste0('/data_plots/map_data_avg_', ii),
-               panel_labels=Year_Set,
-               zlim=zlim,
-               ## mfrow = c(ceiling(sqrt(length(Year_Set))),
-               ##           ceiling(length(Year_Set)/ceiling(sqrt(length(Year_Set))))),
-               mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
+    PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+               Mat=MatDat[,ii,Years2Include,drop=TRUE],
+               PlotDF=mdl$PlotDF,
+               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/data_plots/map_data_avg_', dimnames(MatDat)[[2]][ii]),
+               Year_Set=Year_Set[Years2Include],
+               Legend=mdl$Legend, zlim=zlim,
+               mfrow = c(ceiling(sqrt(length(Years2Include))),
+                         ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               textmargin='Log avg catches', zone=mdl$Zone, mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
   ## Plot percentage 0's
   MatDat <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                    FUN=function(x) mean(x>0, na.rm=TRUE))
   for(ii in 1:dim(MatDat)[2]){
-    plot_variable(map_list=mdl,
-               Y_gt=MatDat[,ii,,drop=TRUE],
-               xlim=mdl$Xlim, ylim=mdl$Ylim,
-               working_dir=savedir,
-               file_name= paste0('/data_plots/map_data_pres_', ii),
-               panel_labels=Year_Set,
-               zlim=zlim,
-               ## mfrow = c(ceiling(sqrt(length(Year_Set)),
-               ##           ceiling(length(Year_Set/ceiling(sqrt(length(Year_Set)))),
-               mar=c(0,0,2,0), oma=c(3.5,3.5,0,0), cex=1.8, pch=16)
+        PlotMap_Fn(MappingDetails=mdl$MappingDetails,
+               Mat=MatDat[,ii,Years2Include,drop=TRUE],
+               PlotDF=mdl$PlotDF,
+               MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+               FileName=paste0(savedir, '/data_plots/map_data_encounter_', dimnames(MatDat)[[2]][ii]),
+               Year_Set=Year_Set[Years2Include],
+               Legend=mdl$Legend, zlim=c(0,1),
+               mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),
+               textmargin='Presence', zone=mdl$Zone, mar=c(0,0,2,0),
+               oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE, pch=16)
   }
   ## Calculate raw indices from the data. Took the vAST code and modified to
   ## do it in R. First the totally naive way without space which includes
