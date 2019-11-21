@@ -381,9 +381,9 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   PR2[is.nan(PR2)] <- NA
   ## stopifnot(all.equal(D_gcyn[,,,1],D_gcy.list[[1]]))
   R1_gcyn <- array(do.call(c, R1_gcy.list), dim=c(dim(tmp$R1_gcy), nrow(df)))
-  stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
+  ## stopifnot(all.equal(R1_gcyn[,,,1],R1_gcy.list[[1]]))
   R2_gcyn <- array(do.call(c, R2_gcy.list), dim=c(dim(tmp$R2_gcy), nrow(df)))
-  stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
+  ## stopifnot(all.equal(R2_gcyn[,,,1],R2_gcy.list[[1]]))
   ## Report only the mean of these
   R1_gcy <- apply(R1_gcyn, 1:3, mean)
   R2_gcy <- apply(R2_gcyn, 1:3, mean)
@@ -671,14 +671,14 @@ plot.R.map.mcmc <- function(results){
   Mapdetails$Legend$y <- Mapdetails$Legend$y-45
   mdl <- Mapdetails
   Year_Set = seq(min(Data_Geostat[,'Year']),max(Data_Geostat[,'Year']))
-  Years2Include = which( Year_Set %in% sort(unique(Data_Geostat[,'Year'])))
+  Years2Include = 1:length(Year_Set)
   if(is.null(results$R1_gcy)){
     warning("R1_gcy missing from index so skipping density maps")
   } else {
     ## For each strata calculate mean probability of occurence
     MatStrata <- results$R1_gcy
     zlimtmp <- c(0,1)
-    for(ii in 1:3){
+    for(ii in 1:dim(MatStrata)[[2]]){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatStrata[,ii,],
                  PlotDF=mdl$PlotDF,
@@ -696,7 +696,7 @@ plot.R.map.mcmc <- function(results){
   } else {
     MatStrata <- log(results$R2_gcy)
     zlimtmp <- range(MatStrata)
-    for(ii in 1:3){
+    for(ii in 1:dim(MatStrata)[[2]]){
       PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                  Mat=MatStrata[,ii,],
                  PlotDF=mdl$PlotDF,
