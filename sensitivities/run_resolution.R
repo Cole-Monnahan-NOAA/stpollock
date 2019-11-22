@@ -129,3 +129,30 @@ ggsave('plots/resolution_by_knots.png', g, width=9, height=5.5)
 ## g <- ggplot(nlls, aes(n_x, y=nll0, color=model)) +
 ##   facet_wrap('comp', scales='free_y') + geom_line() + theme_bw()
 ## ggsave('plots/resolution_nllcomp.png', width=9, height=5)
+
+
+## Explore the raw indices and how it changes with resoultion
+## for(nx in c(10, 25, 50, 75, 100, 200, 300, 400, 500, 750)){
+##   control <- list(model='combined', n_x=nx,
+##                   n_eps1="IID", n_eps2="IID",
+##                   n_omega2="IID", n_omega1="IID",
+##                   make_plots=TRUE)
+##   savedir <- paste0(getwd(), '/sensitivities/resolution/senfit_', nx)
+##   source("prepare_inputs.R")
+##   ## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+##   ##                iter=iter, open_progress=FALSE, warmup=warmup,
+##   ##                init=prior.fn, seed=12512,
+##   ##                control=list(max_treedepth=td, adapt_delta=ad))
+##   ## saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+##   ## plot.mcmc(Obj, savedir, fit)
+## }
+## dirs <- list.dirs('sensitivities/resolution', recursive=FALSE)
+## index.raw <- lapply(dirs, function(x) {
+##   nx <- as.numeric(strsplit(x, '_')[[1]][2])
+##   res <- read.csv(file.path(x, 'index.raw.csv'))
+##   index.raw <- cbind(res, knots=nx)
+##   return(index.raw)
+## }) %>% do.call(rbind, .)
+## g <- ggplot(index.raw, aes(year, log(value), group=knots, color=factor(knots))) +
+##   geom_line() + geom_point(size=2) +
+##   facet_grid(gear~type, scales='free_y') + theme_bw() + ylab('log index')
