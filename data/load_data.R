@@ -147,7 +147,7 @@ message("Done loading data...")
 ## ats.zeroes <- readRDS('data/ats.zeroes.reduced.RDS') # with buffer
 ## ats.zeroes <- readRDS('data/ats.zeroes.full.RDS')    # without buffer
 ## ## Also chop it down to be fewer points and nothing west of -170
-## ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=15),]
+## ats.zeroes <- ats.zeroes[seq(1, nrow(ats.zeroes), by=50),]
 ## ats.zeroes <- subset(ats.zeroes, lon >= -170)
 ## ## Then fill in with inshore observed data from Levine et al 2018
 ## ## which is from 2017 and maybe not all pollock so is an upper
@@ -156,15 +156,18 @@ message("Done loading data...")
 ## ## the Levine inshore values are too high so divide those by
 ## ## 4. Then split the density 4/5 into s2 and 1/5 into s3.
 
-## ## This assumes virtually no fish inshore (which would be true if
-## ## protocol was followed), and more zeroes in the upper stratum.
+## ## This assumes virtually no fish inshore (mostly zeroes with a
+## ## few small catches, which would be true if protocol was
+## ## followed), and more and larger positives in the upper
+## ## stratum. These densities are really small. exp(3) is 20kg/km^2
+## ## which is like 4 fish in a square km.
 ## set.seed(2352152)
 ## ats.zeroes$strata2 <-
-##   rbinom(nrow(ats.zeroes), 1, prob=.3)*runif(n=nrow(ats.zeroes),
-##                                              exp(-3), exp(1))
-## ats.zeroes$strata3 <-
 ##   rbinom(nrow(ats.zeroes), 1, prob=.1)*runif(n=nrow(ats.zeroes),
-##                                              exp(-4), exp(0))
+##                                              exp(2), exp(3))
+## ats.zeroes$strata3 <-
+##   rbinom(nrow(ats.zeroes), 1, prob=.05)*runif(n=nrow(ats.zeroes),
+##                                              exp(1), exp(2))
 ## ats.zeroes$time <- ats.zeroes$date <- ats.zeroes$ground <- NA
 ## ats.zeroes$strata1 <- NULL
 
@@ -175,7 +178,7 @@ message("Done loading data...")
 ## ind <- ats.zeroes$year > 2015
 ## ats.zeroes$strata2[ind] <- x1[ind]
 ## ats.zeroes$strata3[ind] <- x2[ind]
-## ggplot(ats.zeroes, aes(lon, lat, col=strata2==0)) + geom_point() +
+## ggplot(ats.zeroes, aes(lon, lat, col=strata3==0)) + geom_point() +
 ##   facet_wrap('year')
 ## ggplot() + geom_point(data=ats, aes(lon, lat)) +
 ##   geom_point(data=ats.zeroes, aes(lon, lat), col=2)+ facet_wrap('year')
