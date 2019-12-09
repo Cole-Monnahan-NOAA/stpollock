@@ -4,11 +4,11 @@ options(mc.cores = chains)
 td <- 15
 ad <- .8
 iter <- 800
-warmup <- 400
+warmup <- 300
 dir.create('sensitivities/resolution', showWarnings=FALSE)
 
-## Base case for paper: combined
-for(nx in c(50, 100, 200, 300)){
+## Take 400 from the basecase
+for(nx in c(50, 100, 200)){
   control <- list(model='combined', n_x=nx,
                   n_eps1="IID", n_eps2="IID",
                   n_omega2="IID", n_omega1="IID",

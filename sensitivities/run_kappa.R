@@ -3,9 +3,9 @@
 chains <- 6
 options(mc.cores = chains)
 td <- 13
-ad <- .8
+ad <- .9
 iter <- 1000
-warmup <- 400
+warmup <- 300
 dir.create('sensitivities/kappascale')
 
 ## I originally ran this on the independent ones but I don't
@@ -14,27 +14,27 @@ dir.create('sensitivities/kappascale')
 
 ### The effect of fixing logkappa. Run the models with quarter and
 ### quadruple the spatial range used
-for(model in c('bts', 'ats', 'combined')[3]){
-  for(kappascale in c(.5,1,2)){
-    control <- list(n_x=100, n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                    model=model, kappascale=kappascale)
-    if(model=='combined')
-      control[c('n_eps1', 'n_eps2', 'n_omega1', 'n_omega2')] <- "IID"
-    savedir <- paste0(getwd(), '/sensitivities/kappascale/mcmcfit_kappascale_', kappascale,'_', model)
-    source("prepare_inputs.R")
-    fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-                   iter=iter, open_progress=FALSE, warmup=warmup,
-                   init=prior.fn, thin=1, seed=1,
-                   control=list(max_treedepth=td, adapt_delta=ad))
-    saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-    plot.mcmc(Obj, savedir, fit)
-    ## Only save the pieces needed
-    index.strata <- readRDS(file.path(savedir, 'results.mcmc.RDS'))$index.strata
-    res <- list(index.strata=index.strata,
-                kappascale=kappascale, model=model)
-    saveRDS(res, file=file.path(savedir, 'res.RDS'))
-  }
+model <- 'combined'
+for(kappascale in c(.5,1,2)){
+  control <- list(n_x=200, n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
+                  model=model, kappascale=kappascale)
+  if(model=='combined')
+    control[c('n_eps1', 'n_eps2', 'n_omega1', 'n_omega2')] <- "IID"
+  savedir <- paste0(getwd(), '/sensitivities/kappascale/senfit_kappascale_', kappascale,'_', model)
+  source("prepare_inputs.R")
+  fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+                 iter=iter, open_progress=FALSE, warmup=warmup,
+                 init=prior.fn, thin=1, seed=1,
+                 control=list(max_treedepth=td, adapt_delta=ad))
+  saveRDS(object = fit, file=paste0(savedir,'/senfit.RDS'))
+  plot.mcmc(Obj, savedir, fit)
+  ## Only save the pieces needed
+  index.strata <- readRDS(file.path(savedir, 'results.mcmc.RDS'))$index.strata
+  res <- list(index.strata=index.strata,
+              kappascale=kappascale, model=model)
+  saveRDS(res, file=file.path(savedir, 'res.RDS'))
 }
+
 
 
 results.list <-
@@ -50,7 +50,7 @@ g <- out %>% filter(model =='combined') %>%
   geom_ribbon(alpha=.3) + #geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free') +
   ylab('log index')+theme_bw()
-ggsave('plots/sensitivity_kappascale.png', g, width=7, height=6)
+ggsave('plots/sensitivities_kappascale.png', g, width=7, height=6)
 
 saveRDS(out, file='results/kappascale.RDS')
 
