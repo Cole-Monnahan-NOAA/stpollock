@@ -1080,7 +1080,7 @@ calculate.index.old <- function(Opt, Report, model, space, log, strata){
 }
 
 
-plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
+plot.vastfit <- function(results, savedir,  plotQQ=FALSE, plotmaps=FALSE){
   beta1 <- results$Report$beta1_tc
   beta2 <- results$Report$beta2_tc
   if(model !='combined'){
@@ -1186,8 +1186,8 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
   ## This was causing problems and not sure why. Will fix later.
   if(TmbData$n_c>1){
     Report$D_xcy <- Report$D_gcy
-    Plot_factors(Report, results$ParHatList, Data=TmbData, SD=Opt$SD,
-                 mapdetails_list=Mapdetails, plotdir=paste0(savedir, "/"))
+    plot_factors(Report, ParHat=results$ParHatList, Data=TmbData, SD=Opt$SD,
+                 mapdetails_list=Mapdetails, plotdir=savedir)
   }
   Enc_prob <- plot_encounter_diagnostic(Report=Report,
                                         Data_Geostat=Data_Geostat,
@@ -1230,19 +1230,21 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
     Report$D_gcy <- Report$R1_gcy <- Report$R2_gcy <- NULL
     TmbData$X_xtp <- TmbData$X_gtp
     Dens_xt = plot_maps(plot_set=tmp,
-                        MappingDetails=Mapdetails[["MappingDetails"]],
+                        ## MappingDetails=Mapdetails[["MappingDetails"]],
                         Report=Report, Sdreport=Opt$SD,
                         TmbData=TmbData,
                         PlotDF=Mapdetails[["PlotDF"]],
                         MapSizeRatio=Mapdetails[["MapSizeRatio"]],
-                        Xlim=Mapdetails[["Xlim"]],
-                        Ylim=Mapdetails[["Ylim"]], FileName=paste0(savedir,'/'),
+                        ## Xlim=Mapdetails[["Xlim"]],
+                        ## Ylim=Mapdetails[["Ylim"]],
+                        working_dir=paste0(savedir,'/'),
                         Year_Set=Year_Set, Years2Include=Years2Include,
-                        Rotate=Mapdetails[["Rotate"]],
-                        Cex=Mapdetails[["Cex"]],
-                        Legend=Mapdetails[["Legend"]],
-                        zone=Mapdetails[["Zone"]], mar=c(0,0,2,0),
-                        oma=c(3.5,3.5,0,0), cex=1.8, plot_legend_fig=FALSE)
+                        ## Rotate=Mapdetails[["Rotate"]],
+                        ## Cex=Mapdetails[["Cex"]],
+                        ##Legend=Mapdetails[["Legend"]],
+                        ## zone=Mapdetails[["Zone"]],
+                        mar=c(0,0,2,0),
+                        oma=c(3.5,3.5,0,0), cex=1.8)
     ## Dens_DF = cbind( "Density"=as.vector(Dens_xt),
     ##                 "Year"=Year_Set[col(Dens_xt)],
     ##                 "E_km"=Spatial_List$MeshList$loc_x[row(Dens_xt),'E_km'],
@@ -1252,7 +1254,7 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
       ##  pander::pandoc.table( Index$Table[,c("Year","Fleet","Estimate_metric_tons","SD_log","SD_mt")] )
       plot_range_index(Report=Report, TmbData=TmbData, Sdreport=Opt[["SD"]], Znames=colnames(TmbData$Z_xm), PlotDir=savedir, Year_Set=Year_Set)
     }
-      if(results$Index$model[1]=='combined'){
+    if(results$Index$model[1]=='combined'){
       ## Plot ratio of observed/predicted by grid cell for the three gear types
       MatDat <- (tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],
                         FUN=mean, na.rm=TRUE))
@@ -1268,8 +1270,9 @@ plot.vastfit <- function(results, plotQQ=FALSE, plotmaps=FALSE){
         PlotMap_Fn(MappingDetails=mdl$MappingDetails,
                    Mat=MatRatio[,ii,Years2Include,drop=TRUE],
                    PlotDF=mdl$PlotDF,
-                   MapSizeRatio=mdl$MapSizeRatio, Xlim=mdl$Xlim, Ylim=mdl$Ylim,
-                   FileName=paste0(savedir, '/map_data_ratio_', ii),
+                   MapSizeRatio=mdl$MapSizeRatio,
+                   Xlim=mdl$Xlim, Ylim=mdl$Ylim,
+                   FileName=paste0(savedir, 'map_data_ratio_', ii),
                    Year_Set=Year_Set[Years2Include],
                    Legend=mdl$Legend, zlim=range(MatRatio, na.rm=TRUE),
                    mfrow = c(ceiling(sqrt(length(Years2Include))), ceiling(length(Years2Include)/ceiling(sqrt(length(Years2Include))))),

@@ -1,7 +1,7 @@
 ### This files runs the simulation testing component of the analysis.
 
-nsim <- 200
-n_x <- 300 # number of knots for OM and EM (they match)
+nsim <- 50
+n_x <- 100 # number of knots for OM and EM (they match)
 ns <- 1 # number of newton steps
 ln <- 5 # loop number in optimizer
 clean.dir <- function(savedir){
@@ -18,7 +18,7 @@ clean.dir <- function(savedir){
 ### from the base case model and estimate them here b/c we use
 ### MLE.
 control <- list(beta2temporal=TRUE, n_x=n_x, model='combined',
-                n_eps1=0, n_eps2=0, n_omega2="IID", n_omega1='IID',
+                n_eps1='IID', n_eps2='IID', n_omega2="IID", n_omega1='IID',
                 beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
                 kappaoff=0, temporal=0, fixlambda=1,
                 simdata=FALSE, simulation=TRUE,
@@ -70,10 +70,12 @@ for(trend in c('trend','flat')){
   par.truth[grep('gamma1_ctp', par.names)] <- c(.4,.2,.5)
   par.truth[grep('gamma2_ctp', par.names)] <- c(.9, -.3, -.3)
   par.truth[grep('lambda2_k', par.names)] <- 0
-  ## Half of the estimates from pollock just so we need fewer
-  ## runs to see the patterns clearly
+  ## Halve and quarter the estimates from pollock just so we need
+  ## fewer runs to see the patterns clearly
   par.truth[grep('L_omega1_z', par.names)] <- c(.7, 1.8, 1.9)/2
   par.truth[grep('L_omega2_z', par.names)] <- c(2, .5, .5)/2
+  par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.85, 1.3)/4
+  par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, .9)/4
   par.truth[grep('logSigmaM', par.names)] <- 1000*c(.4, .8)/2
   ## From base case model
   par.truth[grep('ln_H_input', par.names)] <- c(.29, -.73)
@@ -97,7 +99,7 @@ for(trend in c('trend','flat')){
   ##       line=0, cex=1.5)
   ## mtext('Year', side=1, line=-2, outer=TRUE)
   ## dev.off()
-  for(iii in 1:nsim){
+  for(iii in 2:nsim){
     Data_Geostat <- dat0
     set.seed(iii) # works with TMB?? probably not
     ## These are the truths after simulating new random effects
@@ -135,17 +137,18 @@ for(trend in c('trend','flat')){
     ## First run the combined model
     control <- controlOM
     control$simdata <- TRUE; control$make_plots <- iii==1
-    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_combined")
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_combined/")
     source("prepare_inputs.R")
     Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper,
                    ## start from MLE to speed things up
                    startpar=par.truth[-Obj.OM$env$random],
-                   lower=TmbList$Lower, control=list(trace=0),
+                   lower=TmbList$Lower, control=list(trace=5),
                    newtonsteps=ns,
                    loopnum=ln, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     clean.dir(savedir)
-    if(iii==1) plot.vastfit(results, plotmaps=TRUE)
+    if(iii==1)
+      plot.vastfit(results, savedir, plotmaps=TRUE)
     indexc.self.list[[kk]] <-
       data.frame(rep=iii, trend=trend, results$Index.strata,
                  maxgrad=Opt$max_gradient,
@@ -160,13 +163,13 @@ for(trend in c('trend','flat')){
                  est=Opt$par, truth=par.truth[-Obj.OM$env$random])
     ## Now repeat with AT
     control$model <- 'ats'; control$make_plots <- FALSE
-    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_ats")
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_ats/")
     source("prepare_inputs.R")
     Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
-                   control=list(trace=0), loopnum=ln,
+                   control=list(trace=5), loopnum=ln,
                    newtonsteps=ns, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-    if(iii==1) plot.vastfit(results, plotmaps=TRUE)
+    if(iii==1) plot.vastfit(results, savedir, plotmaps=TRUE)
     clean.dir(savedir)
     indexa.total.list[[kk]] <-
       data.frame(rep=iii,results$Index, trend=trend,
@@ -176,13 +179,13 @@ for(trend in c('trend','flat')){
                  maxgrad=Opt$max_gradient, truth=indexa.truth)
     ## Now repeat with BT
     control$model <- 'bts'
-    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_bts")
+    savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_bts/")
     source("prepare_inputs.R")
     Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
-                   control=list(trace=0), loopnum=ln,
+                   control=list(trace=5), loopnum=ln,
                    newtonsteps=ns, getsd=FALSE)
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-    if(iii==1) plot.vastfit(results, plotmaps=TRUE)
+    if(iii==1) plot.vastfit(results, savedir, plotmaps=TRUE)
     indexb.total.list[[kk]] <-
       data.frame(rep=iii,results$Index, trend=trend,
                  maxgrad=Opt$max_gradient, truth=index.total.truth)
