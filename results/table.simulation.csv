@@ -1,7 +1,4 @@
 "","model","trend","n","pct.badgrads"
-"1","AT","trend",92,0
-"2","AT","flat",100,0
-"3","BT","trend",92,0
-"4","BT","flat",100,0
-"5","Combined","trend",91,0
-"6","Combined","flat",100,0
+"1","Acoustic","trend",97,0.0103092783505155
+"2","Bottom Trawl","trend",98,0.0102040816326531
+"3","Combined","trend",294,0.142857142857143

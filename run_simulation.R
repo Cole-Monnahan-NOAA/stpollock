@@ -1,6 +1,6 @@
 ### This files runs the simulation testing component of the analysis.
 
-nsim <- 50
+nsim <- 100
 n_x <- 100 # number of knots for OM and EM (they match)
 ns <- 1 # number of newton steps
 ln <- 5 # loop number in optimizer
@@ -11,6 +11,9 @@ clean.dir <- function(savedir){
   x <- paste0(savedir,'/', c('VAST_v8_0_0.dll', 'VAST_v8_0_0.o', 'Record.RData'))
   trash <- file.remove(x)
 }
+getsd <- TRUE
+bias.correct <- TRUE
+vars_to_correct <- c('ln_ColeIndex_cy', 'ln_Index_cyl')
 
 ### Step 1: Build a base OM model from which to simulate
 ### data. This model has no ST effects and independent spatial
@@ -55,7 +58,7 @@ indexc.total.list <- indexc.self.list <-
 kk <- 1
 ## Start of looping. Outer loop is over trend in the OM, inner loop
 ## is replicates of the OM with process error.
-for(trend in c('trend','flat')){
+for(trend in c('trend','flat')[1]){
   if(trend=='trend'){
     beta1 <- beta1.trend; beta2 <- beta2.trend
   } else {
@@ -99,7 +102,7 @@ for(trend in c('trend','flat')){
   ##       line=0, cex=1.5)
   ## mtext('Year', side=1, line=-2, outer=TRUE)
   ## dev.off()
-  for(iii in 2:nsim){
+  for(iii in 24:nsim){
     Data_Geostat <- dat0
     set.seed(iii) # works with TMB?? probably not
     ## These are the truths after simulating new random effects
@@ -140,13 +143,34 @@ for(trend in c('trend','flat')){
     savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_combined/")
     source("prepare_inputs.R")
     Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper,
-                   ## start from MLE to speed things up
+                   ## start from truth to speed things up
                    startpar=par.truth[-Obj.OM$env$random],
-                   lower=TmbList$Lower, control=list(trace=5),
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
+                   newtonsteps=0,
+                   loopnum=ln,
+                   getsd=FALSE,
+                   bias.correct=FALSE)
+    ## If there's a problem the returned list is a different structure
+    if(is.null(Opt$par)) Opt <- Opt$opt
+    test <- tryCatch(fit_tmb(TmbList$Obj, upper=TmbList$Upper,
+                   ## restart from MLE amd try to calculate Hessian
+                   startpar=Opt$par,
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
                    newtonsteps=ns,
-                   loopnum=ln, getsd=FALSE)
-    results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-    clean.dir(savedir)
+                   loopnum=1,
+                   getsd=getsd,
+                   bias.correct=bias.correct,
+                   bias.correct.control=list(vars_to_correct=vars_to_correct)),
+                   error = function(e) 'error')
+    if(is.list(test)){
+      if(is.null(test$par)) Opt <- test$opt else Opt <- test
+    } else {
+      message(paste('Failure for combined replicate:', iii))
+    }
+    results <- process.results(Opt, TmbList$Obj, Inputs, model, space, savedir)
+    clean.dir(savedir); rm(test)
     if(iii==1)
       plot.vastfit(results, savedir, plotmaps=TRUE)
     indexc.self.list[[kk]] <-
@@ -165,9 +189,31 @@ for(trend in c('trend','flat')){
     control$model <- 'ats'; control$make_plots <- FALSE
     savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_ats/")
     source("prepare_inputs.R")
-    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
-                   control=list(trace=5), loopnum=ln,
-                   newtonsteps=ns, getsd=FALSE)
+    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper,
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
+                   newtonsteps=0,
+                   loopnum=ln,
+                   getsd=FALSE,
+                   bias.correct=FALSE)
+    ## If there's a problem the returned list is a different structure
+    if(is.null(Opt$par)) Opt <- Opt$opt
+    test <- tryCatch(fit_tmb(TmbList$Obj, upper=TmbList$Upper,
+                   ## restart from MLE amd try to calculate Hessian
+                   startpar=Opt$par,
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
+                   newtonsteps=ns,
+                   loopnum=1,
+                   getsd=getsd,
+                   bias.correct=bias.correct,
+                   bias.correct.control=list(vars_to_correct=vars_to_correct)),
+                   error = function(e) 'error')
+    if(is.list(test)){
+      if(is.null(test$par)) Opt <- test$opt else Opt <- test
+    } else {
+      message(paste('Failure for ATS replicate:', iii))
+    }
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     if(iii==1) plot.vastfit(results, savedir, plotmaps=TRUE)
     clean.dir(savedir)
@@ -181,9 +227,31 @@ for(trend in c('trend','flat')){
     control$model <- 'bts'
     savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_bts/")
     source("prepare_inputs.R")
-    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper, lower=TmbList$Lower,
-                   control=list(trace=5), loopnum=ln,
-                   newtonsteps=ns, getsd=FALSE)
+    Opt <- fit_tmb(TmbList$Obj, upper=TmbList$Upper,
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
+                   newtonsteps=0,
+                   loopnum=ln,
+                   getsd=FALSE,
+                   bias.correct=FALSE)
+    ## If there's a problem the returned list is a different structure
+    if(is.null(Opt$par)) Opt <- Opt$opt
+    test <- tryCatch(fit_tmb(TmbList$Obj, upper=TmbList$Upper,
+                   ## restart from MLE amd try to calculate Hessian
+                   startpar=Opt$par,
+                   lower=TmbList$Lower,
+                   control=list(iter.max=200, trace=5),
+                   newtonsteps=ns,
+                   loopnum=1,
+                   getsd=getsd,
+                   bias.correct=bias.correct,
+                   bias.correct.control=list(vars_to_correct=vars_to_correct)),
+                   error = function(e) 'error')
+    if(is.list(test)){
+      if(is.null(test$par)) Opt <- test$opt else Opt <- test
+    } else {
+      message(paste('Failure for BTS replicate:', iii))
+    }
     results <- process.results(Opt, Obj, Inputs, model, space, savedir)
     if(iii==1) plot.vastfit(results, savedir, plotmaps=TRUE)
     indexb.total.list[[kk]] <-
@@ -211,16 +279,17 @@ index.total <- rbind(indexa.total, indexb.total, dplyr::filter(indexc.total, str
 index.self <-  rbind(indexa.self, indexb.self, indexc.self)
 index.self$strata <- factor(index.self$strata,
                             levels=c('ats', 'bts', 'stratum1', 'stratum2', 'stratum3'),
-                            labels=c('AT', 'BT', '<0.5m', '0.5-16m', '>16m'))
+                            labels=c('Acoustic', 'Bottom Trawl',
+                                     '<0.5 m', '0.5-16 m', '>16 m'))
 index.total$strata <- factor(index.total$strata,
                             levels=c('ats', 'bts', 'total'),
-                            labels=c('AT', 'BT', 'Total'))
+                            labels=c('Acoustic', 'Bottom Trawl', 'Total'))
 index.total$model <- factor(index.total$model,
                             levels=c('ats', 'bts', 'combined'),
-                            labels=c('AT', 'BT', 'Combined'))
+                            labels=c('Acoustic', 'Bottom Trawl', 'Combined'))
 index.self$model <- factor(index.self$model,
                             levels=c('ats', 'bts', 'combined'),
-                            labels=c('AT', 'BT', 'Combined'))
+                            labels=c('Acoustic', 'Bottom Trawl', 'Combined'))
 pars <- do.call(rbind, pars.list)
 saveRDS(list(indexc.self=indexc.self, indexc.total=indexc.total,
              index.total=index.total, index.self=index.self,
@@ -229,7 +298,7 @@ saveRDS(list(indexc.self=indexc.self, indexc.total=indexc.total,
 x <- readRDS('results/simulation.RDS')
 meta <- filter(x$index.self, year ==1 & !strata %in% c('<0.5m', '>16m'))
 table.simulation <-  meta %>% group_by(model, trend) %>%
-  dplyr::summarize(n=n(), pct.badgrads=mean(maxgrad>.001))
+  dplyr::summarize(n=n(), pct.badgrads=mean(maxgrad>.01))
 write.csv('results/table.simulation.csv', x=table.simulation)
 
 ### Quick plots of these results
@@ -239,7 +308,7 @@ alpha <- .5
 mylim <- coord_cartesian(ylim=c(-.25,.25))
 g <- ggplot(meta, aes(x=trend, y=maxgrad)) +
   geom_violin() + facet_wrap('model') +
-  geom_hline(yintercept=(.001), col=2) + scale_y_log10()
+  geom_hline(yintercept=(.01), col=2) + scale_y_log10()
 ggsave('plots/simulation_maxgrads.png', g, width=7, height=5)
 ## Filter out the unconverged ones
 indexc.self <- filter(x$indexc.self, maxgrad<=.001)

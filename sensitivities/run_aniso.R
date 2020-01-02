@@ -2,19 +2,19 @@
 chains <- 6
 options(mc.cores = chains)
 dir.create('sensitivities/anisofits')
-td <- 15
+td <- 16
 ad <- .9
 iter <- 800
-warmup <- 400
+warmup <- 300
 
 
-### The effect of fixing logkappa. Run the models with half and double the
-### spatial range used (50km and 200km)
+### The effect of assuming anisotropic parameters. Run it fixed
+### at informative values, and with assumed isotropic.
 for(model in c('bts', 'ats', 'combined')){
   for(H_informative in c(TRUE, FALSE)){
-    control <- list(n_x=100, H_informative=H_informative,
+    control <- list(n_x=200, H_informative=H_informative,
                 n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                model=model)
+                model=model, make_plots=FALSE)
     if(model=='combined')
       control[c('n_eps1', 'n_eps2', 'n_omega1', 'n_omega2')] <- "IID"
     savedir <- paste0(getwd(), '/sensitivities/anisofits/senfit_aniso_informative_', H_informative,'_', model)
@@ -24,7 +24,8 @@ for(model in c('bts', 'ats', 'combined')){
                    init=prior.fn, thin=1, seed=1,
                    control=list(max_treedepth=td, adapt_delta=ad))
     saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-    res <- get.results.mcmc(Obj, fit)
+    plot.mcmc(Obj, savedir, fit)
+    res <- readRDS(paste0(savedir, '/results.mcmc.RDS'))
     res$aniso.informative <- H_informative
     res$model <- model
     res$R1_in  <- res$R2_in  <- NULL
@@ -55,7 +56,7 @@ out2 <- do.call(rbind, lapply(results.list, function(x)
 g2 <- out2 %>% filter(model =='combined') %>% ggplot(aes(year, est, fill=aniso.informative,
              color=aniso.informative, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.5)+ ## geom_line(lwd=1.5)+
-  facet_wrap('stratum', ncol=1) + ylab('log index')+theme_bw()
+  facet_wrap('stratum', ncol=1, scales='free') + ylab('log index')+theme_bw()
 ggsave('plots/sensitivity_aniso_combined.png', g2, width=7, height=6)
 
 saveRDS(list(out1, out2), file='results/aniso.RDS')
