@@ -5,16 +5,16 @@ library(TMB)
 ## install_github('James-Thorson/FishStatsUtils', ref='2.3.2')
 ## install_github('James-Thorson/VAST', ref='3.2.1')
 
-library(reshape2)
-library(plyr)
+## library(reshape2)
+## library(plyr)
 library(TMBhelper)
 library(snowfall)
 library(abind)
 library(tmbstan)
 library(shinystan)
-library(magrittr)
+## library(magrittr)
 library(tidyverse)
-library(here)
+## library(here)
 library(VAST)
 library(FishStatsUtils)
 library(maps)
@@ -270,13 +270,17 @@ process.results <- function(Opt, Obj, Inputs, model, space, savedir){
   Report  <-  Obj$report()
   ParHatList <- Obj$env$parList(Opt$par)
   ParHat <- Opt$par
+  par2 <- do.call(c, sapply(unique(names(ParHat)), function(x){
+    n <- length(which(names(ParHat)==x))
+    if(n>1) paste0(x,"_",1:n) else x
+  }))
   if(is.null(Opt$SD$cov.fixed)){ # no SD
     SE <- rep(Inf, len=length(ParHat))
   } else {
     SE <- sqrt(diag(Opt$SD$cov.fixed))
   }
-  est <- data.frame(par=names(ParHat), est=ParHat, lwr=ParHat-1.96*SE,
-                    upr=ParHat+1.96*SE)
+  est <- data.frame(par=names(ParHat), par2=par2, est=ParHat, lwr=ParHat-1.96*SE,
+                    upr=ParHat+1.96*SE, SE=SE)
   est$significant <- !(est$lwr<0 & est$upr>0)
   write.csv(est, file=paste0(savedir, "/estimates.csv"))
   Index <- calculate.index(Opt, Report, model, space, log=TRUE, strata=FALSE)
@@ -457,7 +461,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
 }
 
 
-plot.posterior.predictive <- function(fit, results){
+plot.posterior.predictive <- function(fit, results, plot=TRUE){
   ## Get some from each gear type and 0's and >0's
   message('Calculating posterior predictive...')
   x <- (1:nrow(Data_Geostat))
@@ -473,7 +477,7 @@ plot.posterior.predictive <- function(fit, results){
   }
   ## Genreate posterior predictive for each row of dat
   ppred <- array(NA, dim=c(nrow(R1), ncol(R1)))
-  for(i in 1:nrow(R1)){
+  for(i in 1:nrow(dat)){
     ## Careful to use the right variance here
     if(model=='combined'){
       sig <- ifelse(dat$Gear[i]=='BT', sigma.bts, sigma.ats)
@@ -490,6 +494,7 @@ plot.posterior.predictive <- function(fit, results){
   ## Make plots of positive catches. Using percentile as metric
   Data_Geostat$percentile <- sapply(1:nrow(dat), function(i)
     mean(ppred[i,]<dat[i,'Catch_KG']))
+  if(plot){
   for(zz in levels(Data_Geostat$Gear)){
     g <- ggplot(subset(Data_Geostat, Catch_KG>0 & Gear==zz),
                 aes(x=Lon, y=Lat, color=percentile)) +
@@ -515,6 +520,8 @@ plot.posterior.predictive <- function(fit, results){
       ggtitle("Posterior predictive distribution for non-encounters:", zz)
     ggsave(paste0(savedir, '/ppred_zeros_', zz,'.png'), g, width=9, height=5)
   }
+  }
+  return(invisible(Data_Geostat$percentile))
 }
 
 plot.covcor.mcmc <- function(results){

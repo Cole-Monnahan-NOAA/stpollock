@@ -1,3 +1,4 @@
+
 ### This files runs the simulation testing component of the analysis.
 
 nsim <- 100
@@ -21,7 +22,7 @@ vars_to_correct <- c('ln_ColeIndex_cy', 'ln_Index_cyl')
 ### from the base case model and estimate them here b/c we use
 ### MLE.
 control <- list(beta2temporal=TRUE, n_x=n_x, model='combined',
-                n_eps1='IID', n_eps2='IID', n_omega2="IID", n_omega1='IID',
+                n_eps1=0, n_eps2=0, n_omega2="IID", n_omega1='IID',
                 beta1temporal=TRUE, filteryears=TRUE, finescale=FALSE,
                 kappaoff=0, temporal=0, fixlambda=1,
                 simdata=FALSE, simulation=TRUE,
@@ -70,16 +71,16 @@ for(trend in c('trend','flat')[1]){
   par.truth[grep('beta1_ft', par.names)] <-  as.vector(t(beta1))
   par.truth[grep('beta2_ft', par.names)] <-  as.vector(t(beta2))
   ## Loosely based on fitted model
-  par.truth[grep('gamma1_ctp', par.names)] <- c(.4,.2,.5)
-  par.truth[grep('gamma2_ctp', par.names)] <- c(.9, -.3, -.3)
-  par.truth[grep('lambda2_k', par.names)] <- 0
+  par.truth[grep('gamma1_ctp', par.names)] <- c(.1,-.2,-.5)
+  par.truth[grep('gamma2_ctp', par.names)] <- c(1.5, .3, -.3)
+  par.truth[grep('lambda2_k', par.names)] <- .17
   ## Halve and quarter the estimates from pollock just so we need
   ## fewer runs to see the patterns clearly
-  par.truth[grep('L_omega1_z', par.names)] <- c(.7, 1.8, 1.9)/2
-  par.truth[grep('L_omega2_z', par.names)] <- c(2, .5, .5)/2
-  par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.85, 1.3)/4
-  par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, .9)/4
-  par.truth[grep('logSigmaM', par.names)] <- 1000*c(.4, .8)/2
+  par.truth[grep('L_omega1_z', par.names)] <- c(1.5, 2, 2.25)
+  par.truth[grep('L_omega2_z', par.names)] <- c(2, 2, .8)
+  par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.6, 1.3)
+  par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, 1)
+  par.truth[grep('logSigmaM', par.names)] <- c(444,500)
   ## From base case model
   par.truth[grep('ln_H_input', par.names)] <- c(.29, -.73)
   par.truth[grep('logkappa1', par.names)] <- -5.1
@@ -182,9 +183,8 @@ for(trend in c('trend','flat')[1]){
                  maxgrad=Opt$max_gradient,
                  truth=as.vector(log(t(simdat$ColeIndex_cy))))
     pars.list[[kk]] <-
-      data.frame(rep=iii, trend=trend, par=names(Opt$par),
-                 par.num=1:length(Opt$par), maxgrad=Opt$max_gradient,
-                 est=Opt$par, truth=par.truth[-Obj.OM$env$random])
+      data.frame(rep=iii, trend=trend, results$est, maxgrad=Opt$max_gradient,
+                 truth=par.truth[-Obj.OM$env$random])
     ## Now repeat with AT
     control$model <- 'ats'; control$make_plots <- FALSE
     savedir <- paste0(getwd(), '/simulations/', trend, "_", iii, "_ats/")
@@ -296,7 +296,7 @@ saveRDS(list(indexc.self=indexc.self, indexc.total=indexc.total,
              pars=pars), file='results/simulation.RDS')
 
 x <- readRDS('results/simulation.RDS')
-meta <- filter(x$index.self, year ==1 & !strata %in% c('<0.5m', '>16m'))
+meta <- filter(x$index.self, year ==1 & !strata %in% c('<0.5 m', '>16 m'))
 table.simulation <-  meta %>% group_by(model, trend) %>%
   dplyr::summarize(n=n(), pct.badgrads=mean(maxgrad>.01))
 write.csv('results/table.simulation.csv', x=table.simulation)
@@ -343,13 +343,15 @@ ggsave('plots/simulation_total_RE.png', g, width=7, height=5)
 
 g1 <- filter(pars, !grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth)/truth)) +
-  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
-  facet_grid(trend~par, scales='free_x') + theme_bw() +  geom_hline(yintercept=0, col=2)
+  geom_violin(fill=gray(.8)) + geom_abline(slope=0, intercept=0, color='red')+
+  facet_grid(trend~par, scales='free_x') + theme_bw() +
+  geom_hline(yintercept=0, col=2) + ylab("Relative Error") +
+  coord_cartesian(ylim=c(-2,2))
 g2 <- filter(pars, grepl('beta', par)) %>%
   ggplot(aes(factor(par.num), (est-truth))) +
-  geom_violin() + geom_abline(slope=0, intercept=0, color='red')+
+  geom_violin(fill=gray(.8)) + geom_abline(slope=0, intercept=0, color='red')+
   facet_grid(trend~par, scales='free_x') + theme_bw() +
-  geom_hline(yintercept=0, col=2)
+  geom_hline(yintercept=0, col=2) + ylab("Absolute Error") + coord_cartesian(ylim=c(-3,3))
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
 ggsave('plots/simulation_pars_RE.png', g, width=7, height=9)
 ## out <- filter(pars, grepl('beta', par)) %>%
