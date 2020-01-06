@@ -6,23 +6,23 @@ dir.create('sensitivities/spatialconfig')
 td <- 15
 ad <- .9
 iter <- 800
-warmup <- 400
+warmup <- 300
 
 ## Combined with no spatial
-control <- list(model='combined', n_x=100,
+control <- list(model='combined', n_x=200,
                 n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
                 make_plots=FALSE)
 savedir <- paste0(getwd(), '/sensitivities/spatialconfig/senfit_NS')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
                iter=iter, open_progress=FALSE, warmup=warmup,
-               init=prior.fn, seed=62,
+               init='last.par.best', seed=62,
                control=list(max_treedepth=td, adapt_delta=ad))
 saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 ## Spatial only
-control <- list(model='combined', n_x=100,
+control <- list(model='combined', n_x=200,
                 n_eps1=0, n_eps2=0, n_omega2="IID", n_omega1="IID",
                 make_plots=FALSE)
 savedir <- paste0(getwd(), '/sensitivities/spatialconfig/senfit_S')
@@ -35,7 +35,7 @@ saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 ## Spatiotemporal
-control <- list(model='combined', n_x=100,
+control <- list(model='combined', n_x=200,
                 n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
                 make_plots=FALSE)
 savedir <- paste0(getwd(), '/sensitivities/spatialconfig/senfit_ST')
@@ -48,9 +48,15 @@ saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 
+## Pull the ST one from kappascale sensitivities to save run time
+## since redundant and this one has the same resolution (200)
+results.list <- list(
+  readRDS('sensitivities/spatialconfig/senfit_NS/results.mcmc.RDS'),
+  readRDS('sensitivities/spatialconfig/senfit_S/results.mcmc.RDS'),
+  readRDS('sensitivities/kappascale/senfit_kappascale_1_combined/results.mcmc.RDS'))
 
-results.list <- lapply(list.files('sensitivities/spatialconfig', full.names=TRUE),
-                                 function(x) readRDS(file.path(x, 'results.mcmc.RDS')))
+## results.list <- lapply(list.files('sensitivities/spatialconfig', full.names=TRUE),
+##                                  function(x) readRDS(file.path(x, 'results.mcmc.RDS')))
 ## The indices for the independent models
 out <- do.call(rbind, lapply(results.list, function(x)
   cbind(x$index.strata, spatialconfig=x$index.gear$space[1])))  %>%
