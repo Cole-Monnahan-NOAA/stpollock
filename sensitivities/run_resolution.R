@@ -1,14 +1,14 @@
 ## File to run the fits to the real data
-chains <- 6
+chains <- 5
 options(mc.cores = chains)
-td <- 15
+td <- 12
 ad <- .8
 iter <- 800
 warmup <- 300
 dir.create('sensitivities/resolution', showWarnings=FALSE)
 
-## Take 400 from the basecase
-for(nx in c(50, 100, 200)){
+## Take 400 from the basecase and 200 from the other sensitivities
+for(nx in c(50, 100)){
   control <- list(model='combined', n_x=nx,
                   n_eps1="IID", n_eps2="IID",
                   n_omega2="IID", n_omega1="IID",
@@ -23,25 +23,40 @@ for(nx in c(50, 100, 200)){
   plot.mcmc(Obj, savedir, fit)
 }
 
-## Read in results and save them
-dirs <- list.dirs('sensitivities/resolution', recursive=FALSE)
-results.list <- lapply(dirs, function(x) {
-  nx <- as.numeric(strsplit(x, '_')[[1]][2])
-  res <- readRDS(file.path(x, 'results.mcmc.RDS'))
-  index <- cbind(res$index.strata, knots=nx)
-  return(index)
-})
+## Read in results and save them. Reusing 200 and 400 from other
+## runs to save time
+results.list <- list(
+  cbind(nx=50, readRDS('sensitivities/resolution/senfit_50/results.mcmc.RDS')$index.strata),
+  cbind(nx=100, readRDS('sensitivities/resolution/senfit_100/results.mcmc.RDS')$index.strata),
+  cbind(nx=200, readRDS('sensitivities/kappascale/senfit_kappascale_1_combined/results.mcmc.RDS')$index.strata),
+  cbind(nx=400, readRDS('mcmcfit_400_combined/results.mcmc.RDS')$index.strata))
+## dirs <- list.dirs('sensitivities/resolution', recursive=FALSE)
+## results.list <- lapply(dirs, function(x) {
+##   nx <- as.numeric(strsplit(x, '_')[[1]][2])
+##   res <- readRDS(file.path(x, 'results.mcmc.RDS'))
+##   index <- cbind(res$index.strata, knots=nx)
+##   return(index)
+## })
+
 ## Create a special x column to improve plotting look
 results <- do.call(rbind, results.list) %>%
-  mutate(knots2=as.numeric(factor(knots), levels=c(50,100,200,300))+ .15 * as.numeric(stratum))
+  mutate(knots=factor(nx), knots2=as.numeric(factor(nx), levels=c(50,100,200,400))+ .15 * as.numeric(stratum))
+levels(results$stratum) <- c('0.5 m', '0.5-16 m', '>16 m' )
 saveRDS(results, 'results/resolution.RDS')
 
+theme_set(theme_bw())
 g <- ggplot(results, aes(knots2, est, ymin=lwr, ymax=upr, color=stratum)) +
   geom_linerange( lwd=1) +geom_line() + geom_point(size=2) +
-  facet_wrap('year') + theme_bw() + ylab('log index') +
+  facet_wrap('year') + ylab('log index') +
   scale_x_continuous(labels=sort(unique(results$knots)),
   breaks=1:4) + xlab('# of knots')
-ggsave('plots/resolution_by_knots.png', g, width=9, height=5.5)
+ggsave('plots/sensitivity_resolution_by_year.png', g, width=7, height=5.5)
+g <- ggplot(results, aes(year, est, group=knots, color=knots)) +
+  geom_line(lwd=1.5, alpha=.8)+ facet_wrap('stratum', ncol=1) + ylab('log-index')
+ggsave('plots/sensitivity_resolution_by_stratum.png', g, width=7, height=7)
+
+
+
 
 ## stop("This is old")
 ## ### Fit some resolution tests on the two independent model since they're
