@@ -2,7 +2,7 @@
 ## A series of sensitivity analyses to run
 chains <- 6
 options(mc.cores = chains)
-td <- 13
+td <- 16
 ad <- .9
 iter <- 1000
 warmup <- 300
@@ -11,6 +11,9 @@ dir.create('sensitivities/kappascale')
 ## I originally ran this on the independent ones but I don't
 ## think it's really necessary and just takes time so just run
 ## the combined model
+
+### Note that the kappascale=.5 is REALLY slow because of big
+### tree depths. That's why td is 16 here
 
 ### The effect of fixing logkappa. Run the models with quarter and
 ### quadruple the spatial range used
@@ -45,12 +48,15 @@ results.list <-
 out <- do.call(rbind, lapply(results.list, function(x)
   data.frame(model=x$model, kappascale=x$kappascale, x$index.strata))) %>%
   mutate(kappascale=factor(kappascale))
+
+levels(out$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
+
 g <- out %>% filter(model =='combined') %>%
-  ggplot(aes(year, est, fill=kappascale, color=kappascale, group=kappascale, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.3) + #geom_line(lwd=1.5)+
+  ggplot(aes(x=year, y=est, fill=kappascale,   group=kappascale, ymin=lwr, ymax=upr)) +
+  geom_ribbon(alpha=.3) + geom_line(aes(color=kappascale), alpha=.6, lwd=1, show.legend=FALSE)+
   facet_wrap('stratum', ncol=1, scales='free') +
-  ylab('log index')+theme_bw()
-ggsave('plots/sensitivities_kappascale.png', g, width=7, height=6)
+  ylab('log index')+theme_bw() + labs(fill='kappa\nmultiplier')
+ggsave('plots/sensitivity_kappascale.png', g, width=7, height=6)
 
 saveRDS(out, file='results/kappascale.RDS')
 
