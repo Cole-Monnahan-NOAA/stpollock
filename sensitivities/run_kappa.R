@@ -50,12 +50,14 @@ out <- do.call(rbind, lapply(results.list, function(x)
   mutate(kappascale=factor(kappascale))
 
 levels(out$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
-
+out$Range <- 1/as.numeric(as.character(out$kappascale))
+out$Range <- factor(out$Range, levels=c(.5, 1, 2),
+                    labels=c('Half', 'Baseline', 'Double'))
 g <- out %>% filter(model =='combined') %>%
-  ggplot(aes(x=year, y=est, fill=kappascale,   group=kappascale, ymin=lwr, ymax=upr)) +
-  geom_ribbon(alpha=.3) + geom_line(aes(color=kappascale), alpha=.6, lwd=1, show.legend=FALSE)+
+  ggplot(aes(x=year, y=est, fill=Range,   group=Range, ymin=lwr, ymax=upr)) +
+  geom_ribbon(alpha=.3) +# geom_line(aes(color=Range), alpha=.6, lwd=1, show.legend=FALSE)+
   facet_wrap('stratum', ncol=1, scales='free') +
-  ylab('log index')+theme_bw() + labs(fill='kappa\nmultiplier')
+  ylab('log index')+theme_bw()
 ggsave('plots/sensitivity_kappascale.png', g, width=7, height=6)
 
 saveRDS(out, file='results/kappascale.RDS')

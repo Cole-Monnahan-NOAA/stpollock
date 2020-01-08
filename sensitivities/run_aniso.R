@@ -53,10 +53,14 @@ ggsave('plots/sensitivity_aniso.informative_independent.png', g1, width=7, heigh
 out2 <- do.call(rbind, lapply(results.list, function(x)
   data.frame(model=x$model, aniso.informative=x$aniso.informative, x$index.strata))) %>%
   mutate(aniso.informative=factor(aniso.informative))
-g2 <- out2 %>% filter(model =='combined') %>% ggplot(aes(year, est, fill=aniso.informative,
-             color=aniso.informative, ymin=lwr, ymax=upr)) +
+temp <- out2 %>% filter(model =='combined') %>% droplevels()
+levels(temp$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
+temp$Anisotropic <- temp$aniso.informative
+g2 <- temp %>% ggplot(aes(year, est, fill=Anisotropic, color=Anisotropic,
+             ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.5)+ ## geom_line(lwd=1.5)+
-  facet_wrap('stratum', ncol=1, scales='free') + ylab('log index')+theme_bw()
+  facet_wrap('stratum', ncol=1, scales='free') +
+  ylab('log index')+theme_bw()
 ggsave('plots/sensitivity_aniso_combined.png', g2, width=7, height=6)
 
 saveRDS(list(out1, out2), file='results/aniso.RDS')
