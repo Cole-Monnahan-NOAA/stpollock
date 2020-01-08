@@ -64,6 +64,7 @@ out <- do.call(rbind, lapply(results.list, function(x)
                                  "ST"), labels=c("No Space",
                                  "Spatial", 'Spatiotemporal')))
 saveRDS(out, file='results/spatialconfig.RDS')
+levels(out$stratum)   <- c('<0.5 m', '0.5-16 m', '>16 m')
 g1 <- ggplot(out, aes(year, est, fill=Configuration, color=Configuration, group=Configuration, ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=1/3) +# geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free_y') + ylab('log index')+ theme_bw()
