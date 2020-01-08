@@ -78,8 +78,8 @@ for(trend in c('trend','flat')[1]){
   ## fewer runs to see the patterns clearly
   par.truth[grep('L_omega1_z', par.names)] <- c(1.5, 2, 2.25)
   par.truth[grep('L_omega2_z', par.names)] <- c(2, 2, .8)
-  par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.6, 1.3)
-  par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, 1)
+  ## par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.6, 1.3)
+  ## par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, 1)
   par.truth[grep('logSigmaM', par.names)] <- c(444,500)
   ## From base case model
   par.truth[grep('ln_H_input', par.names)] <- c(.29, -.73)
@@ -103,7 +103,7 @@ for(trend in c('trend','flat')[1]){
   ##       line=0, cex=1.5)
   ## mtext('Year', side=1, line=-2, outer=TRUE)
   ## dev.off()
-  for(iii in 24:nsim){
+  for(iii in 101:200){
     Data_Geostat <- dat0
     set.seed(iii) # works with TMB?? probably not
     ## These are the truths after simulating new random effects
@@ -316,6 +316,7 @@ indexc.total <- filter(x$indexc.total, maxgrad<=.001)
 index.self <- filter(x$index.self, maxgrad<=.001)
 index.total <- filter(x$index.total, maxgrad<=.001)
 pars <- filter(x$pars, maxgrad<=.001)
+pars <- pars %>% group_by(par) %>% mutate(par.num=1:length(par)) %>% ungroup()
 
 ## Performance relative to total
 g1 <- filter(index.self, model=='Combined') %>%
@@ -342,18 +343,21 @@ g <- ggplot(index.total, aes(factor(year), (est-truth)/truth)) +
 ggsave('plots/simulation_total_RE.png', g, width=7, height=5)
 
 g1 <- filter(pars, !grepl('beta', par)) %>%
-  ggplot(aes(factor(par.num), (est-truth)/truth)) +
-  geom_violin(fill=gray(.8)) + geom_abline(slope=0, intercept=0, color='red')+
-  facet_grid(trend~par, scales='free_x') + theme_bw() +
+  ggplot(aes(factor(par2), (est-truth)/truth, fill=par)) +
+  geom_violin()+ geom_abline(slope=0, intercept=0, color='red')+
+   theme_bw() +
   geom_hline(yintercept=0, col=2) + ylab("Relative Error") +
-  coord_cartesian(ylim=c(-2,2))
+  coord_cartesian(ylim=c(-1,1)) + theme(axis.text.x =
+  element_text(angle = 90, hjust = 1))
 g2 <- filter(pars, grepl('beta', par)) %>%
-  ggplot(aes(factor(par.num), (est-truth))) +
-  geom_violin(fill=gray(.8)) + geom_abline(slope=0, intercept=0, color='red')+
-  facet_grid(trend~par, scales='free_x') + theme_bw() +
-  geom_hline(yintercept=0, col=2) + ylab("Absolute Error") + coord_cartesian(ylim=c(-3,3))
+  ggplot(aes(factor(par2), (est-truth)/truth, fill=par)) +
+  geom_violin()+ geom_abline(slope=0, intercept=0, color='red')+
+   theme_bw() +
+  geom_hline(yintercept=0, col=2) + ylab("Absolute Error") +
+  coord_cartesian(ylim=c(-2,2)) + theme(axis.text.x =
+  element_text(angle = 90, hjust = 1))
 g <- plot_grid(g1, g2, labels = c('A', 'B'), label_size = 12, nrow=2)
-ggsave('plots/simulation_pars_RE.png', g, width=7, height=9)
+ggsave('plots/simulation_pars_RE.png', g, width=12, height=7)
 ## out <- filter(pars, grepl('beta', par)) %>%
 ##   cbind(stratum=c(1,2,3), year=rep(1:8, each=3)) %>%
 ##   mutate(stratum=factor(stratum, levels=1:3, labels=c('<0.5m', '0.5-16m', '>16')),
