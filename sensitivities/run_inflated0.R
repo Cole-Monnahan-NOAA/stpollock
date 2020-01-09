@@ -88,20 +88,27 @@ plot.mcmc(Obj, savedir, fit)
 
 x1 <- readRDS('sensitivities/kappascale/senfit_kappascale_1_combined/results.mcmc.RDS')
 x2 <- readRDS('sensitivities/inflated0/senfit_200_none/results.mcmc.RDS')
-out <- rbind(cbind(x1$index.strata, case='Inflated Zeroes'),
+out1 <- rbind(cbind(x1$index.strata, case='Inflated'),
              cbind(x2$index.strata, case='None'))
-levels(out$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
-saveRDS(out, file='results/inflated0.RDS')
-out <- rbind(cbind(x1$index.strata, case='Inflated Zeroes'),
-             cbind(x2$index.strata, case='None'))
-levels(out$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
-saveRDS(out, file='results/inflated0.RDS')
+levels(out1$stratum) <- c('<0.5 m', '0.5-16 m', '>16 m')
+out2 <- rbind(cbind(x1$index.gear, case='Inflated'),
+             cbind(x2$index.gear, case='None'))
+levels(out2$gear) <- c('Acoustic', 'Bottom Trawl', 'Total')
+saveRDS(list(out1,out2), file='results/inflated0.RDS')
 
 
-g <-  out %>%  ggplot(aes(year, est, fill=case, color=case,
+g1 <-  out1 %>%  ggplot(aes(year, est, fill=case, color=case,
              ymin=lwr, ymax=upr)) +
   geom_ribbon(alpha=.5)+ ## geom_line(lwd=1.5)+
   facet_wrap('stratum', ncol=1, scales='free') +
-  ylab('log index')+theme_bw()
-ggsave('plots/sensitivity_inflated0.png', g, width=7, height=6)
+  ylab('log index')+theme_bw() + theme(legend.position='none')
+## ggsave('plots/sensitivity_inflated0.png', g1, width=7, height=6)
+g2 <-  out2 %>%  ggplot(aes(year, est, fill=case, color=case,
+             ymin=lwr, ymax=upr)) +
+  geom_ribbon(alpha=.5)+ ## geom_line(lwd=1.5)+
+  facet_wrap('gear', ncol=1, scales='free') +
+  ylab('log index')+theme_bw() + labs(y=NULL)
+## ggsave('plots/sensitivity_inflated0.png', g1, width=7, height=6)
 
+p <- plot_grid(g1, g2, rel_widths=c(1,1.3))
+ggsave('plots/sensitivity_inflated0.png', p, width=7, height=6)
