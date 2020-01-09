@@ -1,3 +1,15 @@
+
+// This is a modified VAST file for use in a research study.
+//*** It should not be used for anything else ***
+//
+
+// Cole modified it to be able to simulate w/ fixed effect betas,
+// rescale certain parameters to aid in Bayesian convergence and
+// added priors. Modifications can be located by searching for
+// "cole" throughout the source code
+
+// See study at https://github.com/colemonnahan/stpollock
+
 #include <TMB.hpp>
 #include <Eigen/Eigenvalues>
 
