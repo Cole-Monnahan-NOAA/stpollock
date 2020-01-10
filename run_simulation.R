@@ -1,7 +1,7 @@
 
 ### This files runs the simulation testing component of the analysis.
 
-nsim <- 100
+nsim <- 200
 n_x <- 100 # number of knots for OM and EM (they match)
 ns <- 1 # number of newton steps
 ln <- 5 # loop number in optimizer
@@ -76,8 +76,8 @@ for(trend in c('trend','flat')[1]){
   par.truth[grep('lambda2_k', par.names)] <- .17
   ## Halve and quarter the estimates from pollock just so we need
   ## fewer runs to see the patterns clearly
-  par.truth[grep('L_omega1_z', par.names)] <- c(1.5, 2, 2.25)
-  par.truth[grep('L_omega2_z', par.names)] <- c(2, 2, .8)
+  par.truth[grep('L_omega1_z', par.names)] <- c(1.5, 2, 2.25)/4
+  par.truth[grep('L_omega2_z', par.names)] <- c(2, 2, .8)/4
   ## par.truth[grep('L_epsilon1_z', par.names)] <- c(.6,.6, 1.3)
   ## par.truth[grep('L_epsilon2_z', par.names)] <- c(1.3, 1.2, 1)
   par.truth[grep('logSigmaM', par.names)] <- c(444,500)
@@ -103,7 +103,7 @@ for(trend in c('trend','flat')[1]){
   ##       line=0, cex=1.5)
   ## mtext('Year', side=1, line=-2, outer=TRUE)
   ## dev.off()
-  for(iii in 101:200){
+  for(iii in 1:nsim){
     Data_Geostat <- dat0
     set.seed(iii) # works with TMB?? probably not
     ## These are the truths after simulating new random effects
