@@ -19,6 +19,7 @@ library(VAST)
 library(FishStatsUtils)
 library(maps)
 library(mapdata)
+library(cowplot)
 Version <- "VAST_v8_0_0"
 compile('models/VAST_v8_0_0.cpp')
 
