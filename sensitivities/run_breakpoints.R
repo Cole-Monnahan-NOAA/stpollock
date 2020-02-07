@@ -23,15 +23,15 @@ control <- list(model='combined', n_x=100,
                 make_plots=FALSE)
 
 ## Case 1: base case from paper: take this from sensitivity tests
-## control$efh <- 16
-## savedir <- paste0(getwd(), '/sensitivities/breakpoints/senfit_efh16')
-## source("prepare_inputs.R")
-## fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
-##                iter=iter, open_progress=FALSE, warmup=warmup,
-##                init=prior.fn, seed=85234,
-##                control=list(max_treedepth=td, adapt_delta=ad))
-## saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
-## plot.mcmc(Obj, savedir, fit)
+control$efh <- 16
+savedir <- paste0(getwd(), '/sensitivities/breakpoints/senfit_efh16')
+source("prepare_inputs.R")
+fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+               iter=iter, open_progress=FALSE, warmup=warmup,
+               init=prior.fn, seed=85234,
+               control=list(max_treedepth=td, adapt_delta=ad))
+saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+plot.mcmc(Obj, savedir, fit)
 
 ## Case 2: sensitivity of 3m
 control$efh <- 3
@@ -68,3 +68,18 @@ library(cowplot)
 g <- cowplot::plot_grid(g1, g2, ncol=2, rel_widths=c(1,1.2))
 ggsave('plots/sensitivity_breakpoints.png', g, width=9, height=7)
 
+## ## Quick test of lambda
+## x1 <- readRDS('sensitivities/breakpoints/senfit_efh16/mcmcfit.RDS')
+## x2 <- readRDS('sensitivities/breakpoints/senfit_efh3/mcmcfit.RDS')
+## x3 <- readRDS('mcmcfit_400_combined/mcmcfit.RDS')
+## x4 <- readRDS('sensitivities/breakpoints/senfit_efh3_paper/mcmcfit.RDS')
+
+## temp <- rbind(data.frame(prior='vague', EFH=16, lambda=exp(as.data.frame(x1)$lambda2_k)),
+##               data.frame(prior='vague', EFH=3, lambda=exp(as.data.frame(x2)$lambda2_k)),
+##               data.frame(prior='informative', EFH=16, lambda=exp(as.data.frame(x3)$lambda2_k)),
+##               data.frame(prior='informative', EFH=3, lambda=exp(as.data.frame(x4)$lambda2_k)))
+
+## ggplot(temp, aes(factor(EFH), lambda)) + geom_violin() +
+##               geom_abline(intercept=1, slope=0, col='red') +
+##               facet_grid(.~prior) +
+##               labs(x='Effective Fishing Height', y='Bias-Ratio (Catchability)')

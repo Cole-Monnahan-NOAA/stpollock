@@ -1472,8 +1472,10 @@ Type objective_function<Type>::operator() ()
   jnll = jnll_comp.sum();
   // Cole added priors here, specific to pollock example
   Type prior=0.0;
-  prior -= dnorm(lambda1_k, Type(0.0), Type(.15), true).sum();
-  prior -= dnorm(lambda2_k, Type(0.0), Type(.15), true).sum();
+  prior -= dnorm(lambda1_k, Type(0.0), Type(1), true).sum();
+  prior -= dnorm(lambda2_k, Type(0.0), Type(1), true).sum();
+  // prior -= dnorm(lambda1_k, Type(0.0), Type(.15), true).sum();
+  // prior -= dnorm(lambda2_k, Type(0.0), Type(.15), true).sum();
   for(int ccc=0; ccc<n_c; ccc++){ // loop over categories 
     for(int ppp=0; ppp<n_p; ppp++){ // loop over covariates
       prior-=dnorm(gamma1_ctp(ccc,1,ppp), Type(0.0), Type(5.0), true);
