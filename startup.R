@@ -6,7 +6,7 @@ library(TMB)
 ## install_github('James-Thorson/VAST', ref='3.2.1')
 
 library(reshape2)
-library(plyr)
+## library(plyr)
 library(TMBhelper)
 library(snowfall)
 library(abind)
@@ -53,11 +53,12 @@ plot.change <- function(Report){
   ## Look at trend in % of population <3m.
   Dtmp <- Report$D_gcy
   dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
-  Dtmp.wide <- melt(Dtmp)
-  pct <- ddply(Dtmp.wide, .(cell, year), mutate, pct=value/sum(value))
+  Dtmp.wide <- plyr::melt(Dtmp)
+  ## pct <- ddply(Dtmp.wide, .(cell, year), mutate, pct=value/sum(value))
+  pct <- Dtmp.wide %>% group_by(cell, year) %>% mutate(pct=value/sum(value))
   ## g <- ggplot(pct, aes(year, pct, fill=stratum)) + geom_area() + facet_wrap('cell')
   pct2 <- subset(pct, stratum==strata.labels.combined[1])
-  MatDat <- ddply(pct2, .(cell), function(x) {
+  MatDat <- plyr::ddply(pct2, .(cell), function(x) {
     fit <- lm(pct~year, data=x)
     out <- data.frame(slope=coef(fit)[2], pvalue=summary(fit)$coefficients[2,4] )
     row.names(out) <- NULL
@@ -83,20 +84,20 @@ plot.change <- function(Report){
   Dtmp <- Report$Epsilon1_gct
   if(!is.null(Dtmp)){
     dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
-    Dtmp.wide <- melt(Dtmp)
+    Dtmp.wide <- plyr::melt(Dtmp)
     Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
     names(Dtmp.long)[3:5] <- strata.labels.combined
     g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
       geom_point()+ facet_wrap('cell') +
       theme(strip.background = element_blank(), strip.text.x = element_blank())
     ggsave(file.path(savedir, 'eps1_correlations_pairwise.png'), g, width=12, height=9)
-    cors <- ddply(Dtmp.wide, .(cell), function(x){
+    cors <- plyr::ddply(Dtmp.wide, .(cell), function(x){
       s1=subset(x, stratum==strata.labels.combined[1])$value
       s2=subset(x, stratum==strata.labels.combined[2])$value
       s3=subset(x, stratum==strata.labels.combined[3])$value
       data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
     })
-    cors.wide <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
+    cors.wide <- plyr::melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
     PlotMap_Fn(MappingDetails=mdl$MappingDetails, Mat=matrix(cors[,2], ncol=1),
                PlotDF=mdl$PlotDF, zlim=c(-1,1),
                MapSizeRatio=mdl$MapSizeRatio,
@@ -129,20 +130,20 @@ plot.change <- function(Report){
   Dtmp <- Report$Epsilon2_gct
   if(!is.null(Dtmp)){
     dimnames(Dtmp) <- list(cell=1:control$n_x, stratum=strata.labels.combined, year=years)
-    Dtmp.wide <- melt(Dtmp)
+    Dtmp.wide <- plyr::melt(Dtmp)
     Dtmp.long <- dcast(Dtmp.wide, year+cell~stratum, value.var='value')
     names(Dtmp.long)[3:5] <- strata.labels.combined
     g <- ggplot(Dtmp.long, aes(x=stratum1, y=stratum2, color=year)) +
       geom_point()+ facet_wrap('cell') +
       theme(strip.background = element_blank(), strip.text.x = element_blank())
     ggsave(file.path(savedir, 'eps2_correlations_pairwise.png'), g, width=12, height=9)
-    cors <- ddply(Dtmp.wide, .(cell), function(x){
+    cors <- plyr::ddply(Dtmp.wide, .(cell), function(x){
       s1=subset(x, stratum==strata.labels.combined[1])$value
       s2=subset(x, stratum==strata.labels.combined[2])$value
       s3=subset(x, stratum==strata.labels.combined[3])$value
       data.frame(cor12=cor(s1,s2), cor13=cor(s1,s3), cor23=cor(s2,s3))
     })
-    cors.wide2 <- melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
+    cors.wide2 <- plyr::melt(cors[,-1], measure.vars=c('cor12', 'cor13', 'cor23'))
     cors.wide3 <- rbind(cbind(variable='epsilon1',cors.wide), cbind(variable='epsilon2',cors.wide2))
     names(cors.wide3)[2] <- 'correlation'
     g <- ggplot(cors.wide3, aes(x=value)) + geom_histogram(position='identity', bins=20) +
@@ -203,7 +204,7 @@ get.index.tmp <- function(case){
     tmp[,'BTS'] <- log(exp(tmp$stratum1)+exp(tmp$stratum2))
     tmp[,'ATS1'] <- tmp$stratum2
     tmp[,'ATS2'] <- tmp$stratum3
-    index.model <- melt(tmp[, c('year', 'BT', 'AT2', 'AT3')],
+    index.model <- plyr::melt(tmp[, c('year', 'BT', 'AT2', 'AT3')],
                         id.vars='year', value.name='logdensity', variable.name='gear')
   } else {
     ## strata here are actually gears b/c not summing
@@ -411,7 +412,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   if(!all(is.finite(index.gear$density))){
     return(NULL)
   } else {
-    index.gear2 <- ddply(index.gear, .(year, gear), summarize,
+    index.gear2 <- plyr::ddply(index.gear, .(year, gear), summarize,
                          lwr=quantile(density, probs=.025),
                          upr=quantile(density, probs=.975),
                          est=median(density))
@@ -419,7 +420,7 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   if(!all(is.finite(index.strata$density))){
     return(NULL)
   } else {
-    index.strata2 <- ddply(index.strata, .(year, stratum), summarize,
+    index.strata2 <- plyr::ddply(index.strata, .(year, stratum), summarize,
                            lwr=quantile(density, probs=.025),
                            upr=quantile(density, probs=.975),
                            est=median(density))
@@ -431,10 +432,10 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
     tmp <- dcast(index.gear, year+iter~gear, value.var='density')
     availability <- within(tmp, {BT=exp(BT)/exp(Total);
       AT=exp(AT)/exp(Total)})
-    availability <- melt(availability, id.vars=c('year', 'iter'),
+    availability <- plyr::melt(availability, id.vars=c('year', 'iter'),
                          measure.vars=c('AT', 'BT'),
                          variable.name='gear', value.name='availability')
-    availability2 <- ddply(availability, .(year, gear), summarize,
+    availability2 <- plyr::ddply(availability, .(year, gear), summarize,
                            lwr=quantile(availability, probs=.025),
                            upr=quantile(availability, probs=.975),
                            est=median(availability))
@@ -751,17 +752,17 @@ plot.pearson.mcmc <- function(results){
 plot.betas.mcmc <- function(results, savedir){
   if(model !='combined'){
     dimnames(results$beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(results$beta1)[3])
-    df1 <- cbind(beta='beta1', melt(results$beta1))
+    df1 <- cbind(beta='beta1', plyr::melt(results$beta1))
     dimnames(results$beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts), iter=1:dim(results$beta2)[3])
-    df2 <- cbind(beta='beta2', melt(results$beta2))
+    df2 <- cbind(beta='beta2', plyr::melt(results$beta2))
   } else {
     dimnames(results$beta1) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(results$beta1)[3])
-    df1 <- cbind(beta='beta1', melt(results$beta1))
+    df1 <- cbind(beta='beta1', plyr::melt(results$beta1))
     dimnames(results$beta2) <- list(year=years, stratum=strata.labels.combined, iter=1:dim(results$beta2)[3])
-    df2 <- cbind(beta='beta2', melt(results$beta2))
+    df2 <- cbind(beta='beta2', plyr::melt(results$beta2))
   }
   df <- rbind(df1, df2) %>%
-    ddply(.(stratum, beta, year), summarize,
+    plyr::ddply(.(stratum, beta, year), summarize,
           lwr=quantile(value, .025),
           upr=quantile(value, .975),
           med=median(value))
@@ -775,7 +776,7 @@ plot.betas.mcmc <- function(results, savedir){
   ##   df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
   ##   temp <- data.frame(stratum=strata.labels.combined, year=rep(1:12, each=3), index=1:36)
   ##   df <- merge(df, temp, by='index')
-  ##   df2 <- ddply(df, .(stratum, par.type, year), summarize,
+  ##   df2 <- plyr::ddply(df, .(stratum, par.type, year), summarize,
   ##                lwr=quantile(value, .025),
   ##                upr=quantile(value, .975),
   ##                med=median(value))
@@ -804,13 +805,13 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   pars.all <- names(fit)
   p <- pars.all[grep('lambda', x=pars.all)]
   if(length(p)>2){
-    df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+    df <- plyr::melt(as.data.frame(fit)[,p], id.vars=NULL)
     df$par.type <- sapply(strsplit(as.character(df$variable), split='\\['),
                           function(x) x[[1]])
     df$index <- as.numeric(sapply(strsplit(gsub('\\]', '', x=df$variable), split='\\['), function(x) x[[2]]))
     temp <- data.frame(year=years, index=1:12)
     df <- merge(df, temp, by='index')
-    df2 <- ddply(df, .(par.type, year), summarize,
+    df2 <- plyr::ddply(df, .(par.type, year), summarize,
                  lwr=quantile(value, .01),
                  upr=quantile(value, .99),
                  med=median(value))
@@ -835,11 +836,11 @@ plot.mcmc <- function(Obj, savedir, fit, n=8){
   ## This is currently broken and probably not helpful anyway
   ## p <- pars.all[grep('Omegainput', x=pars.all)]
   ## if(length(p)>0){
-  ##   df <- melt(as.data.frame(fit)[,p], id.vars=NULL)
+  ##   df <- plyr::melt(as.data.frame(fit)[,p], id.vars=NULL)
   ##   df <- merge(df, temp, by='index')
   ##   n <- max(df$index)/2 # nmber of knots per factor (numer of rows)
   ##   temp <- data.frame(factor=rep(c('factor1', 'factor2'), each=n), knot=rep(1:n,times=2), index=1:(2*n))
-  ##   df2 <- ddply(df, .(factor, par.type, knot), summarize,
+  ##   df2 <- plyr::ddply(df, .(factor, par.type, knot), summarize,
   ##                lwr=quantile(value, .01),
   ##                upr=quantile(value, .99),
   ##                med=median(value))
@@ -875,7 +876,7 @@ plot.index.mcmc <- function(results, savedir){
     ## Do relative densities by strata and year for median
     tmp <- dcast(results$index.strata, year~stratum, value.var='est')
     tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
-    index.strata.pct <- melt(tmp, 'year', variable.name='stratum',
+    index.strata.pct <- plyr::melt(tmp, 'year', variable.name='stratum',
                              value.name='pct.density')
     index.strata.pct$stratum <- factor(index.strata.pct$stratum,
                                        levels=rev(levels(results$index.strata$stratum)) )
@@ -1093,14 +1094,14 @@ plot.vastfit <- function(results, savedir,  plotQQ=FALSE, plotmaps=FALSE){
   beta2 <- results$Report$beta2_tc
   if(model !='combined'){
     dimnames(beta1) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts))
-    df1 <- cbind(beta='beta1', melt(beta1))
+    df1 <- cbind(beta='beta1', plyr::melt(beta1))
     dimnames(beta2) <- list(year=years, stratum=ifelse(model=='ats', strata.labels.ats, strata.labels.bts))
-    df2 <- cbind(beta='beta2', melt(beta2))
+    df2 <- cbind(beta='beta2', plyr::melt(beta2))
   } else {
     dimnames(beta1) <- list(year=years, stratum=strata.labels.combined)
-    df1 <- cbind(beta='beta1', melt(beta1))
+    df1 <- cbind(beta='beta1', plyr::melt(beta1))
     dimnames(beta2) <- list(year=years, stratum=strata.labels.combined)
-    df2 <- cbind(beta='beta2', melt(beta2))
+    df2 <- cbind(beta='beta2', plyr::melt(beta2))
   }
   betas <- rbind(df1,df2)
   if(nrow(betas)>0){
@@ -1138,7 +1139,7 @@ plot.vastfit <- function(results, savedir,  plotQQ=FALSE, plotmaps=FALSE){
   ##                        omega2=results$Report$Omega2_sc,
   ##                        E_km=results$Inputs$loc$E_km,
   ##                        N_km=results$Inputs$loc$N_km)
-  ##   fields.long <- melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
+  ##   fields.long <- plyr::melt(fields, id.vars=c('model', 'space', 'E_km', 'N_km'),
   ##                       factorsAsStrings=FALSE)
   ##   if(results$Index$model[1]=='combined'){
   ##     fields.long$strata <- paste0('strata_',unlist(lapply(strsplit(as.character(fields.long$variable), split='\\.'),
@@ -1152,7 +1153,7 @@ plot.vastfit <- function(results, savedir,  plotQQ=FALSE, plotmaps=FALSE){
   ##   fields.long$component[grep(fields.long$type, pattern='2')] <- 'Component=2'
   ##   fields.long$type <- gsub("1|2", "", x=fields.long$type)
   ##   fields.long$type <- factor(fields.long$type, levels=c('omegainput', 'omega'))
-  ##   fields.long <- ddply(fields.long, .(type, space, component), mutate,
+  ##   fields.long <- plyr::ddply(fields.long, .(type, space, component), mutate,
   ##                        normalized=value/sd(value))
   ##   Col  <-  colorRampPalette(colors=c("darkblue","blue","lightblue","lightgreen","yellow","orange","red"))
   ##   g <- ggplot(fields.long, aes(E_km, N_km, col=value)) +
@@ -1178,7 +1179,7 @@ plot.vastfit <- function(results, savedir,  plotQQ=FALSE, plotmaps=FALSE){
   ## Do relative densities by strata and year for median
   tmp <- dcast(results$Index.strata, year~strata, value.var='est')
   tmp[,2:4] <- exp(tmp[,2:4])/rowSums(exp(tmp[2:4]))
-  index.strata.pct <- melt(tmp, 'year', variable.name='strata',
+  index.strata.pct <- plyr::melt(tmp, 'year', variable.name='strata',
                            value.name='pct.density')
   index.strata.pct$strata <- factor(index.strata.pct$strata,
                                      levels=rev(levels(results$Index.strata$strata)) )
