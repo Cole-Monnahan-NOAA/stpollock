@@ -1,10 +1,12 @@
 
 library(TMB)
+message("Compiling VAST if needed...")
+Version <- "VAST_v8_0_0"
+TMB::compile('models/VAST_v8_0_0.cpp')
 ## library(devtools)
 ## remove.packages('VAST')
 ## install_github('James-Thorson/FishStatsUtils', ref='2.3.2')
 ## install_github('James-Thorson/VAST', ref='3.2.1')
-
 library(reshape2)
 ## library(plyr)
 library(TMBhelper)
@@ -20,8 +22,6 @@ library(FishStatsUtils)
 library(maps)
 library(mapdata)
 library(cowplot)
-Version <- "VAST_v8_0_0"
-compile('models/VAST_v8_0_0.cpp')
 
 strata.labels.combined <- c('<0.5m', '0.5-16m', '>16m')
 strata.labels.ats <- '>0.5m'
