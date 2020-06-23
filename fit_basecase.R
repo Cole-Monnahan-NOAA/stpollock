@@ -3,8 +3,8 @@ chains <- 6
 options(mc.cores = chains)
 td <- 17
 ad <- .85
-iter <- 700
-warmup <- 200
+iter <- 800
+warmup <- 300
 
 
 ## Base case for paper: combined
@@ -35,7 +35,7 @@ saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
 plot.mcmc(Obj, savedir, fit)
 
 ## Base case for paper: BTS
-control <- list(model='bts', n_x=40,
+control <- list(model='bts', n_x=400,
                 n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
                 make_plots=FALSE)
 savedir <- paste0(getwd(), '/mcmcfit_400_bts')

@@ -5,6 +5,9 @@
 
 ### Step 1: Prepare workspace for analysis
 source("startup.R")
+packageVersion('TMB')                   # 1.7.16
+packageVersion('tmbstan')               # 1.0.2
+packageVersion('rstan')                 # 2.19.3
 
 ### Step 2: Fit models to the pollock data
 source("fit_basecase.R")
