@@ -37,7 +37,7 @@ plot.mcmc(Obj, savedir, fit)
 ## Base case for paper: BTS
 control <- list(model='bts', n_x=400,
                 n_eps1=1, n_eps2=1, n_omega2=1, n_omega1=1,
-                make_plots=FALSE)
+                make_plots=TRUE)
 savedir <- paste0(getwd(), '/mcmcfit_400_bts')
 source("prepare_inputs.R")
 fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,

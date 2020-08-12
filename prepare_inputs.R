@@ -200,7 +200,8 @@ years <- min(Data_Geostat$Year):max(Data_Geostat$Year)
 nyr <- length(years)
 
 ### Derived objects for spatio-temporal estimation
-silent.fn(Spatial_List  <-
+silent.fn(
+  Spatial_List  <-
             make_spatial_info(grid_size_km=grid_size_km, n_x=n_x,
                               Method=Method, Lon=Data_Geostat[,'Lon'],
                               Lat=Data_Geostat[,'Lat'],
@@ -213,7 +214,8 @@ silent.fn(Spatial_List  <-
                               ## LAT_intensity=Extrapolation_List$Data_Extrap[which(Extrapolation_List$Data_Extrap$Include==1),'Lat'],
                               Extrapolation_List=Extrapolation_List,
                               knot_method='grid',
-                              DirPath=savedir, Save_Results=FALSE ))
+                              DirPath=savedir, Save_Results=FALSE
+                              ))
 ## silent.fn(Spatial_List <-
 ##             make_spatial_info(grid_size_km=grid_size_km, n_x=n_x, Method=Method,
 ##                               Lon=Data_Geostat[,'Lon'], Lat=Data_Geostat[,'Lat'],
@@ -542,8 +544,9 @@ if(make_plots){
   ## do it in R. First the totally naive way without space which includes
   ## the added zeroes
   a_g <- as.numeric(TmbData$a_gl)
-  IndexNaive <- ddply(subset(Data_Geostat, X != -999), .(Gear,Year), summarize,
-                      density=sum(a_g)/1000*mean(Catch_KG, na.rm=TRUE))
+  IndexNaive <- Data_Geostat %>% filter(X != -999) %>%
+    group_by(Gear,Year) %>%
+    summarize(density=sum(a_g)/1000*mean(Catch_KG, na.rm=TRUE)) %>% as.data.frame() %>% ungroup()
   gears <- levels(IndexNaive$Gear) ##c('BTS', 'ATS_3-16m', 'ATS>16m')
   yrs <- sort(unique(IndexNaive$Year))
   D_gcy <- tapply(Data_Geostat$Catch_KG, Data_Geostat[, c( 'knot_i', 'Gear','Year')],

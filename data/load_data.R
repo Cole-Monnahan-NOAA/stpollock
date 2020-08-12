@@ -11,21 +11,26 @@ if(efh==16) {
   stop("invalid efh")
 }
 
+#### Turns out I don't need this anymore since I filter out
+#### points during processing of the AT data
 ## ## Filter out AT data outside the extrapolation region? Use the
-## ## PlotDF from mdl (need to run this in prepare_inputs first) to
+## ## PlotDF from mdl after running this script skipping these lines
+## ## below. (need to run this in prepare_inputs first) to
 ## ## get a nonconvex hull and then fileter out points outside of
 ## ## that. To save time do it once and read in from file.
+## plotdf <- readRDS('data/PlotDF.RDS') ## mdl$PlotDF from EBS
 ## outer_hull <-
-##   as.matrix(subset(mdl$PlotDF, Include, select=c('Lon', "Lat"))) %>%
+##   as.matrix(subset(plotdf, Include, select=c('Lon', "Lat"))) %>%
 ##   INLA::inla.nonconvex.hull(convex = -0.05, concave = -0.05)
-## poly <- mapview::coords2Polygons(outer_hull$loc, ID='a')
+## ## plot(outer_hull$loc)
+## poly <- Orcs::coords2Polygons(outer_hull$loc, ID='a')
 ## points <- sp::SpatialPoints(ats[,c('lon', 'lat')])
 ## saveRDS(list(points=points, poly=poly), file='data/ebs_outer_hull.RDS')
-message("Filtering out AT points outside of EBS...")
-hull <- readRDS('data/ebs_outer_hull.RDS')
-ats$out <- with(hull, sp::over(points, poly))
-## ggplot(ats, aes(lon,lat, color=is.na(out))) + geom_point() + facet_wrap('year')
-ats <- ats[!is.na(ats$out),] %>% select(-out)
+## hull <- readRDS('data/ebs_outer_hull.RDS')
+## ats$out <- with(hull, sp::over(points, poly))
+## ## ggplot(ats, aes(lon,lat, color=is.na(out))) + geom_point() + facet_wrap('year')
+## ats <- ats[!is.na(ats$out),] %>% select(-out)
+## message("Filtering out AT points outside of EBS...")
 
 
 ## The "inflated" zeroes (see below too)
