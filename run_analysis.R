@@ -46,6 +46,6 @@ source("sensitivities/run_inflated0.R")
 ## Effect of effective fishing height (3m vs 16m)
 source("sensitivities/run_breakpoints.R")
 
-
-
+## Effect of AR1 vs random walk
+source("sensitivities/run_temporal.R")
 

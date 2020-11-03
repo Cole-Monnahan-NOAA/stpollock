@@ -1,47 +1,64 @@
-## Explore the temporal cnofiguration for the AT data set using MLE models
-## (For now at least).
+## Explore the difference between AR1 and random walk for the
+## combined model. Note that I have informative priors built
+## into the model for the rho parameter that turn on when the par
+## is active only
 
-setwd('..')
-source("startup.R")
-dir.create('sensitivities/temporal')
+td <- 15
+ad <- .8
+chains <- 6
+options(mc.cores = chains)
+iter <- 800
+warmup <- 300
+dir.create('sensitivities/temporal', showWarnings=FALSE)
 
-## Repeat with just the ATS
-indices <- list(); k <- 1
-for(model in c('ats', 'bts')){
-  for(type in c('AR1', 'RW')){
-    for(space in c('NS',"S", "ST")){
-      for(extrayears in c(TRUE,FALSE)){
-        control <- list(model=model, n_x=100)
-        control$n_eps1 <- control$n_eps2 <- ifelse(space=='ST', 1,0)
-        control$n_omega1 <- control$n_omega2 <- ifelse(space=='NS', 0,1)
-        control$temporal <- ifelse(type=='AR1',4 ,2)
-        control$replicateyears <- extrayears
-        savedir <- paste0(getwd(), '/sensitivities/temporal/senfit_',model, "_", type,"_",
-                          space)
-        if(extrayears) savedir <- paste0(savedir, "_extrayears")
-        source("prepare_inputs.R")
-        Opt <- Optimize(obj=Obj, lower=TmbList$Lower, loopnum=3, getsd=TRUE,
-                        upper=TmbList$Upper,   savedir=savedir,
-                        newtonsteps=1, control=list(trace=1))
-        results <- process.results(Opt, Obj, Inputs, model, space, savedir)
-        indices[[k]] <- cbind(extrayears=extrayears, type=type, results$Index)
-        k <- k+1
-        plot.vastfit(results, plotmaps=TRUE)
-      }
-    }
-  }
+## Setup with AR1 or RW
+for(tmp in c('AR1', 'RW')){
+  control <- list(model='combined', n_x=100,
+                  temporal=ifelse(tmp=='AR1', 4,2),
+                  ## n_eps1=0, n_eps2=0, n_omega2=0, n_omega1=0,
+                  n_eps1="IID", n_eps2="IID", n_omega2="IID", n_omega1="IID",
+                  make_plots=FALSE)
+  savedir <- paste0(getwd(), '/sensitivities/temporal/senfit_', tmp)
+  source("prepare_inputs.R")
+  fit <- tmbstan(Obj, lower=TmbList$Lower, upper=TmbList$Upper, chains=chains,
+                 iter=iter, open_progress=FALSE, warmup=warmup,
+                 init=prior.fn, thin=1, seed=1,
+                 control=list(max_treedepth=td, adapt_delta=ad))
+  saveRDS(object = fit, file=paste0(savedir,'/mcmcfit.RDS'))
+  plot.mcmc(Obj, savedir, fit)
 }
 
-out <- do.call(rbind, indices)
-out$space <- factor(out$space, levels=c('NS', 'S', 'ST'),
-       labels=c('No space', 'Spatial', 'Spatiotemporal'))
-out$extrayears <- factor(out$extrayears, levels=c(TRUE,FALSE),
-                         labels=c("Extra years", "Not extra years"))
-saveRDS(out, file='results/sensitivity_temporal.RDS')
 
-g <- ggplot(subset(out, model=='ats'), aes(year, y=est, ymin=lwr, ymax=upr, color=type, fill=type)) +
-  geom_ribbon(alpha=.5) + geom_line() + facet_grid(space~extrayears) + theme_bw()
-ggsave('plots/sensitivity_temporal_ats.png', g, width=7, height=5)
-g <- ggplot(subset(out, model=='bts'), aes(year, y=est, ymin=lwr, ymax=upr, color=type, fill=type)) +
-  geom_ribbon(alpha=.5) + geom_line() + facet_grid(space~extrayears) + theme_bw()
-ggsave('plots/sensitivity_temporal_bts.png', g, width=7, height=5)
+ar1 <- readRDS('sensitivities/temporal/senfit_AR1/results.mcmc.RDS')
+rw <- readRDS('sensitivities/temporal/senfit_RW/results.mcmc.RDS')
+res <- rbind(cbind(temporal='AR1', ar1$index.strata),
+             cbind(temporal='RW', rw$index.strata))
+
+
+## Index comparison
+g <- ggplot(res, aes(year, est, ymin=lwr, ymax=upr, fill=temporal)) +
+  geom_ribbon(alpha=.5) +
+  facet_wrap('stratum', ncol=1, scales='free') +
+  ylab('log index')+theme_bw()
+ggsave('plots/sensitivity_temporal.png', g, width=7, height=6)
+
+## plot marginal posteriors of rhos vs the prior
+rhos <- readRDS('sensitivities/temporal/senfit_AR1/mcmcfit.RDS') %>%
+  as.data.frame() %>% select(contains('rho')) %>%
+  pivot_longer(cols=1:6) %>%
+  separate(name, into=c('par', 'lp', 'layer'),  sep='_') %>%
+  mutate(layer=factor(layer, levels=c('f[1]', 'f[2]', 'f[3]'),
+                      labels=c('<0.5m', '0.5-16m', '>16m')))
+## Prior is rho~dbeta(2,2) so recreate that to add
+xseq<- seq(-.999,.999, len=1000)
+prior <- expand.grid(par=unique(x$par), lp=unique(x$lp),
+                     layer=unique(x$layer),
+                     value=xseq) %>%
+  mutate(density=dbeta((1+value)/2, 2,2))
+
+g <- ggplot(x, aes(value, after_stat(density), fill=factor(lp))) +
+  geom_histogram(alpha=.5, , position='identity') +
+  geom_line(data=prior, aes(x=value, y=density, group=factor(lp), fill=NULL)) +
+  facet_grid(layer~par) + theme_bw() + xlim(-1,1) + labs(x='Rho')
+ggsave('plots/sensitivity_temporal_rho_posterior.png', g, width=7, height=6)
+
