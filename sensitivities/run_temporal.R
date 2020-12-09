@@ -33,8 +33,6 @@ ar1 <- readRDS('sensitivities/temporal/senfit_AR1/results.mcmc.RDS')
 rw <- readRDS('sensitivities/temporal/senfit_RW/results.mcmc.RDS')
 res <- rbind(cbind(temporal='AR1', ar1$index.strata),
              cbind(temporal='RW', rw$index.strata))
-
-
 ## Index comparison
 g <- ggplot(res, aes(year, est, ymin=lwr, ymax=upr, fill=temporal)) +
   geom_ribbon(alpha=.5) +
@@ -45,20 +43,22 @@ ggsave('plots/sensitivity_temporal.png', g, width=7, height=6)
 ## plot marginal posteriors of rhos vs the prior
 rhos <- readRDS('sensitivities/temporal/senfit_AR1/mcmcfit.RDS') %>%
   as.data.frame() %>% select(contains('rho')) %>%
-  pivot_longer(cols=1:6) %>%
+  pivot_longer(cols=1:4) %>%
   separate(name, into=c('par', 'lp', 'layer'),  sep='_') %>%
   mutate(layer=factor(layer, levels=c('f[1]', 'f[2]', 'f[3]'),
-                      labels=c('<0.5m', '0.5-16m', '>16m')))
+                      labels=c('<0.5m', '0.5-16m', '>16m')),
+         Rho=case_when(lp=='rho1'~'rho n',
+                       lp=='rho2'~'rho w'))
 ## Prior is rho~dbeta(2,2) so recreate that to add
 xseq<- seq(-.999,.999, len=1000)
-prior <- expand.grid(par=unique(x$par), lp=unique(x$lp),
-                     layer=unique(x$layer),
+prior <- expand.grid(par=unique(rhos$par), lp=unique(rhos$lp),
+                     layer=unique(rhos$layer),
                      value=xseq) %>%
-  mutate(density=dbeta((1+value)/2, 2,2))
-
-g <- ggplot(x, aes(value, after_stat(density), fill=factor(lp))) +
+  ## Divide by two b/c of Jacobian
+  mutate(density=dbeta((1+value)/2, 2,2)/2)
+g <- ggplot(rhos, aes(value, after_stat(density), fill=Rho)) +
   geom_histogram(alpha=.5, , position='identity') +
   geom_line(data=prior, aes(x=value, y=density, group=factor(lp), fill=NULL)) +
-  facet_grid(layer~par) + theme_bw() + xlim(-1,1) + labs(x='Rho')
+  facet_grid(par~.) + theme_bw() + xlim(-1,1) + labs(x='Rho')
 ggsave('plots/sensitivity_temporal_rho_posterior.png', g, width=7, height=6)
 
