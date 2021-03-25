@@ -49,3 +49,18 @@ source("sensitivities/run_breakpoints.R")
 ## Effect of AR1 vs random walk
 source("sensitivities/run_temporal.R")
 
+
+## Do the model selection requested by a reviewer. You need to
+## run both teh main fits and the sensitivty
+## run_spatialconfig. The actual PSIS-LOO calcs are done via the
+## loo package in the fucntion get.results.mcmc which is called
+## by plot.mcmc.
+
+library(loo)
+loo_NS <- readRDS('sensitivities/spatialconfig/senfit_NS/loo.RDS')
+loo_S <- readRDS('sensitivities/spatialconfig/senfit_S/loo.RDS')
+loo_ST <- readRDS('sensitivities/spatialconfig/senfit_ST/loo.RDS')
+(loo.table <- loo_compare(loo_NS, loo_S, loo_ST))
+saveRDS(loo.table, file='results/loo.table.RDS')
+
+

@@ -307,7 +307,8 @@ plot.sampler.params <- function(fit){
   ggsave(paste0(savedir, '/sampler_params.png'), g, width=7, height=7)
 }
 
-get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
+get.results.mcmc <- function(Obj, fit, loo=FALSE){
+  ## Get parameters and drop log-posterior
   df <- as.matrix(fit)
   df <- df[,-ncol(df)] # drop lp__ column
   plot.sampler.params(fit)
@@ -448,6 +449,18 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
     availability2$combinedoff <- combinedoff
   index.gear2$fixlambda <- index.strata$fixlambda <-
     availability2$fixlambda <- fixlambda
+
+  if(loo){
+    library(loo)
+    loo_mat <- get.loo.mat(fit, Obj)
+    if(any(is.na(loo_mat))) stop("Some NAs in LOO matrix")
+    chainvec <- rep(1:dim(fit)[2] , each=dim(fit)[1])
+    message("Calculating LOO results and saving...")
+    reff <- relative_eff(exp(loo_mat), chain_id=chainvec)
+    myloo <- loo(loo_mat, r_eff=reff)
+    saveRDS(myloo, file.path(savedir, 'loo.RDS'))
+  }
+
   ## grab scenario from savedir
   scenario <- strsplit(savedir, split='/mcmc_')[[1]][2]
   out <- list(index.gear=index.gear2, index.strata=index.strata2,
@@ -462,6 +475,26 @@ get.results.mcmc <- function(Obj, fit){## Get parameters and drop log-posterior
   return(out)
 }
 
+get.loo.mat <- function(fit, Obj){
+  message("Looping through and calculating LOO matrix...")
+  df <- as.matrix(fit)
+  df <- df[,-ncol(df)] # drop lp__ column
+  tmp <- Obj$report(df[1,])
+  ## Merge these into 4d arrays, last dimension is posterior draw
+  ## number
+  loo_mat <- matrix(NA, ncol=length(tmp$LogProb2_i), nrow=nrow(df))
+  for(i in 1:nrow(df)){
+    if(i %% 50 ==0) print(i)
+    tmp <- Obj$report(df[i,])
+    x <- Obj$report(df[i,])$LogProb1_i
+    y <- Obj$report(df[i,])$LogProb2_i
+    ## VAST will report a 0 in LogProb2_i when the catch is 0. So I
+    ## can just sum the two vectors to interleave the two, accounting
+    ## for the two-part LL when catch>0
+    loo_mat[i,] <- x+y
+  }
+  return(loo_mat)
+}
 
 plot.posterior.predictive <- function(fit, results, plot=TRUE){
   ## Get some from each gear type and 0's and >0's
@@ -788,8 +821,8 @@ plot.betas.mcmc <- function(results, savedir){
 }
 
 
-plot.mcmc <- function(Obj, savedir, fit, n=8){
-  results <- get.results.mcmc(Obj, fit)
+plot.mcmc <- function(Obj, savedir, fit, n=8, loo=FALSE){
+  results <- get.results.mcmc(Obj, fit, loo)
   plot.index.mcmc(results, savedir)
   plot.betas.mcmc(results, savedir)
   plot.slow.mcmc(fit, savedir, n)
