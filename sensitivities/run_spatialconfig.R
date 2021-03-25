@@ -58,7 +58,7 @@ plot.mcmc(Obj, savedir, fit, loo=TRUE)
 results.list <- list(
   readRDS('sensitivities/spatialconfig/senfit_NS/results.mcmc.RDS'),
   readRDS('sensitivities/spatialconfig/senfit_S/results.mcmc.RDS'),
-  readRDS('sensitivities/mcmcfit_400/results.mcmc.RDS'))
+  readRDS('mcmcfit_400_combined/results.mcmc.RDS'))
 
 ## results.list <- lapply(list.files('sensitivities/spatialconfig', full.names=TRUE),
 ##                                  function(x) readRDS(file.path(x, 'results.mcmc.RDS')))
